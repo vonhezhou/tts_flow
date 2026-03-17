@@ -10,6 +10,7 @@ final class FakeTtsEngine implements TtsEngine {
     required this.engineId,
     required this.supportsStreaming,
     this.chunkCount = 1,
+    this.chunkDelay = Duration.zero,
   }) : assert(chunkCount > 0);
 
   @override
@@ -29,6 +30,7 @@ final class FakeTtsEngine implements TtsEngine {
       };
 
   final int chunkCount;
+  final Duration chunkDelay;
 
   @override
   Stream<TtsChunk> synthesize(
@@ -54,6 +56,10 @@ final class FakeTtsEngine implements TtsEngine {
       }
       final end = (start + size > total) ? total : start + size;
       final chunkBytes = Uint8List.fromList(payload.sublist(start, end));
+
+      if (chunkDelay > Duration.zero) {
+        await Future<void>.delayed(chunkDelay);
+      }
 
       yield TtsChunk(
         requestId: request.requestId,
