@@ -63,21 +63,3 @@ final class TtsChunk {
   final bool isLastChunk;
   final DateTime timestamp;
 }
-
-final class TtsResultSummary {
-  const TtsResultSummary({
-    required this.requestId,
-    required this.finalState,
-    required this.resolvedFormat,
-    required this.totalBytes,
-    required this.totalChunks,
-    required this.elapsed,
-  });
-
-  final String requestId;
-  final TtsRequestState finalState;
-  final TtsAudioFormat resolvedFormat;
-  final int totalBytes;
-  final int totalChunks;
-  final Duration elapsed;
-}

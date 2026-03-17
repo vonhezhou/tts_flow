@@ -8,9 +8,11 @@ final class FileOutput implements TtsOutput {
   FileOutput({
     required Directory outputDirectory,
     this.outputId = 'file-output',
-  }) : _outputDirectory = outputDirectory;
+  })  : _outputDirectory = outputDirectory,
+        _state = _FileOutputSessionState();
 
   final Directory _outputDirectory;
+  final _FileOutputSessionState _state;
 
   @override
   final String outputId;
@@ -18,25 +20,22 @@ final class FileOutput implements TtsOutput {
   @override
   Set<TtsAudioFormat> get acceptedFormats => TtsAudioFormat.values.toSet();
 
-  TtsOutputSession? _session;
-  File? _tempFile;
-  IOSink? _sink;
-
   @override
   Future<void> initSession(TtsOutputSession session) async {
     await _outputDirectory.create(recursive: true);
-    _session = session;
-    final extension = _extensionForFormat(session.resolvedFormat);
-    final tempPath =
-        '${_outputDirectory.path}${Platform.pathSeparator}${session.requestId}.$extension.tmp';
-    _tempFile = File(tempPath);
-    _sink = _tempFile!.openWrite();
+    _state.init(
+      session: session,
+      tempFile: _buildTempFile(
+        requestId: session.requestId,
+        format: session.resolvedFormat,
+      ),
+    );
   }
 
   @override
   Future<void> consumeChunk(TtsChunk chunk) async {
-    final session = _session;
-    final sink = _sink;
+    final session = _state.session;
+    final sink = _state.sink;
     if (session == null || sink == null) {
       throw StateError('FileOutput session is not initialized.');
     }
@@ -59,16 +58,15 @@ final class FileOutput implements TtsOutput {
 
   @override
   Future<TtsOutputArtifact> finalizeSession() async {
-    final session = _session;
-    final tempFile = _tempFile;
-    final sink = _sink;
+    final session = _state.session;
+    final tempFile = _state.tempFile;
+    final sink = _state.sink;
     if (session == null || tempFile == null || sink == null) {
       throw StateError('FileOutput session is not initialized.');
     }
 
     try {
-      await sink.flush();
-      await sink.close();
+      await _state.flushAndCloseSink();
       final extension = _extensionForFormat(session.resolvedFormat);
       final finalPath =
           '${_outputDirectory.path}${Platform.pathSeparator}${session.requestId}.$extension';
@@ -79,9 +77,7 @@ final class FileOutput implements TtsOutput {
       final moved = await tempFile.rename(finalPath);
       final size = await moved.length();
 
-      _session = null;
-      _tempFile = null;
-      _sink = null;
+      _state.clear();
 
       return FileOutputArtifact(
         requestId: session.requestId,
@@ -90,7 +86,7 @@ final class FileOutput implements TtsOutput {
         fileSizeBytes: size,
       );
     } catch (error) {
-      await _safeCleanupTemp();
+      await _state.safeCleanupTemp();
       throw TtsError(
         code: TtsErrorCode.outputWriteFailed,
         message: 'Failed finalizing output file.',
@@ -102,43 +98,24 @@ final class FileOutput implements TtsOutput {
 
   @override
   Future<void> onStop(String reason) async {
-    await _safeCleanupTemp();
-    _session = null;
-    _tempFile = null;
-    _sink = null;
+    await _state.safeCleanupTemp();
+    _state.clear();
   }
 
   @override
   Future<void> dispose() async {
-    await _safeCleanupTemp();
-    _session = null;
-    _tempFile = null;
-    _sink = null;
+    await _state.safeCleanupTemp();
+    _state.clear();
   }
 
-  Future<void> _safeCleanupTemp() async {
-    final sink = _sink;
-    if (sink != null) {
-      try {
-        await sink.flush();
-      } catch (_) {
-        // No-op: cleanup continues.
-      }
-      try {
-        await sink.close();
-      } catch (_) {
-        // No-op: cleanup continues.
-      }
-    }
-
-    final tempFile = _tempFile;
-    if (tempFile != null && await tempFile.exists()) {
-      try {
-        await tempFile.delete();
-      } catch (_) {
-        // No-op: best-effort cleanup.
-      }
-    }
+  File _buildTempFile({
+    required String requestId,
+    required TtsAudioFormat format,
+  }) {
+    final extension = _extensionForFormat(format);
+    final tempPath =
+        '${_outputDirectory.path}${Platform.pathSeparator}$requestId.$extension.tmp';
+    return File(tempPath);
   }
 
   String _extensionForFormat(TtsAudioFormat format) {
@@ -154,5 +131,57 @@ final class FileOutput implements TtsOutput {
       case TtsAudioFormat.aac:
         return 'aac';
     }
+  }
+}
+
+final class _FileOutputSessionState {
+  TtsOutputSession? session;
+  File? tempFile;
+  IOSink? sink;
+
+  void init({required TtsOutputSession session, required File tempFile}) {
+    this.session = session;
+    this.tempFile = tempFile;
+    sink = tempFile.openWrite();
+  }
+
+  Future<void> flushAndCloseSink() async {
+    final activeSink = sink;
+    if (activeSink == null) {
+      return;
+    }
+    await activeSink.flush();
+    await activeSink.close();
+  }
+
+  Future<void> safeCleanupTemp() async {
+    final activeSink = sink;
+    if (activeSink != null) {
+      try {
+        await activeSink.flush();
+      } catch (_) {
+        // No-op: cleanup continues.
+      }
+      try {
+        await activeSink.close();
+      } catch (_) {
+        // No-op: cleanup continues.
+      }
+    }
+
+    final activeTempFile = tempFile;
+    if (activeTempFile != null && await activeTempFile.exists()) {
+      try {
+        await activeTempFile.delete();
+      } catch (_) {
+        // No-op: best-effort cleanup.
+      }
+    }
+  }
+
+  void clear() {
+    session = null;
+    tempFile = null;
+    sink = null;
   }
 }
