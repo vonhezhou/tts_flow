@@ -14,19 +14,19 @@ Core design choices in this repository:
 - Pluggable engine contract via TtsEngine.
 - Pluggable output contract via TtsOutput.
 - Built-in outputs:
- 	- MemoryOutput
- 	- FileOutput
- 	- SpeakerOutput (backend abstraction baseline)
+  - MemoryOutput
+  - FileOutput
+  - SpeakerOutput (backend abstraction baseline)
 - Built-in adapters/utilities:
- 	- TtsFormatNegotiator
- 	- NonStreamingBridge
- 	- OpenAiTtsEngine transport adapter API
+  - TtsFormatNegotiator
+  - NonStreamingBridge
+  - OpenAiTtsEngine transport adapter API
 - Queue orchestration and controls:
- 	- speak
- 	- pauseCurrent
- 	- resumeCurrent
- 	- stopCurrent
- 	- clearQueue
+  - speak
+  - pauseCurrent
+  - resumeCurrent
+  - stopCurrent
+  - clearQueue
 
 ## Quick Start
 
@@ -62,9 +62,20 @@ Future<void> main() async {
 
 See example flow in example/main.dart.
 
+By default the example uses FakeTtsEngine.
+If OPENAI_API_KEY is set, it automatically switches to OpenAiTtsEngine.
+
 Run it with:
 
 ```bash
+dart run example/main.dart
+```
+
+Run with OpenAI mode:
+
+```bash
+# PowerShell
+$env:OPENAI_API_KEY="your_key_here"
 dart run example/main.dart
 ```
 
