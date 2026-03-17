@@ -50,11 +50,16 @@ void main() {
   });
 
   group('M3 OpenAI engine adapter', () {
-    test('adapts non-streaming response into ordered chunks', () async {
+    test('adapts streaming response into ordered chunks', () async {
       final engine = OpenAiTtsEngine(
         transport: _SuccessTransport(
-            Uint8List.fromList(List<int>.generate(10, (i) => i))),
-        nonStreamingChunkSizeBytes: 4,
+          Uint8List.fromList(List<int>.generate(10, (i) => i)),
+          streamChunks: const [
+            [0, 1, 2, 3],
+            [4, 5, 6],
+            [7, 8, 9],
+          ],
+        ),
       );
 
       final chunks = await engine
@@ -69,6 +74,9 @@ void main() {
       expect(chunks[0].sequenceNumber, 0);
       expect(chunks[1].sequenceNumber, 1);
       expect(chunks[2].sequenceNumber, 2);
+      expect(chunks[0].bytes, Uint8List.fromList([0, 1, 2, 3]));
+      expect(chunks[1].bytes, Uint8List.fromList([4, 5, 6]));
+      expect(chunks[2].bytes, Uint8List.fromList([7, 8, 9]));
       expect(chunks[2].isLastChunk, isTrue);
       expect(
           chunks.every((chunk) => chunk.format == TtsAudioFormat.mp3), isTrue);
@@ -109,22 +117,26 @@ void main() {
             throw const OpenAiTransportException(
                 statusCode: 500, message: 'server');
           }
-          return OpenAiTtsResponse(audioBytes: Uint8List.fromList([1, 2]));
+          return [1, 2];
         }),
         maxRetries: 2,
         initialBackoff: const Duration(milliseconds: 1),
       );
 
-      final response = await transport.synthesize(
-        const OpenAiTtsRequest(
-          text: 'hi',
-          voiceId: 'alloy',
-          format: TtsAudioFormat.mp3,
-        ),
-      );
+      final chunks = await transport
+          .synthesize(
+            const OpenAiTtsRequest(
+              text: 'hi',
+              voiceId: 'alloy',
+              format: TtsAudioFormat.mp3,
+            ),
+          )
+          .toList();
 
       expect(attempts, 2);
-      expect(response.audioBytes, Uint8List.fromList([1, 2]));
+      expect(chunks, const [
+        [1, 2]
+      ]);
     });
 
     test('retrying transport does not retry auth failure', () async {
@@ -139,13 +151,17 @@ void main() {
       );
 
       await expectLater(
-        transport.synthesize(
-          const OpenAiTtsRequest(
-            text: 'hi',
-            voiceId: 'alloy',
-            format: TtsAudioFormat.mp3,
-          ),
-        ),
+        () async {
+          await transport
+              .synthesize(
+                const OpenAiTtsRequest(
+                  text: 'hi',
+                  voiceId: 'alloy',
+                  format: TtsAudioFormat.mp3,
+                ),
+              )
+              .drain<void>();
+        },
         throwsA(isA<OpenAiTransportException>()),
       );
       expect(attempts, 1);
@@ -176,7 +192,8 @@ void main() {
       );
     });
 
-    test('fromClientConfig wires default transport and maps missing key to authFailed',
+    test(
+        'fromClientConfig wires default transport and maps missing key to authFailed',
         () async {
       final engine = OpenAiTtsEngine.fromClientConfig(
         config: const OpenAiClientConfig(apiKey: ''),
@@ -203,13 +220,17 @@ void main() {
 }
 
 final class _SuccessTransport implements OpenAiTtsTransport {
-  const _SuccessTransport(this.bytes);
+  const _SuccessTransport(this.bytes, {this.streamChunks});
 
   final Uint8List bytes;
+  final List<List<int>>? streamChunks;
 
   @override
-  Future<OpenAiTtsResponse> synthesize(OpenAiTtsRequest request) async {
-    return OpenAiTtsResponse(audioBytes: bytes);
+  Stream<List<int>> synthesize(OpenAiTtsRequest request) async* {
+    final chunks = streamChunks ?? [bytes];
+    for (final chunk in chunks) {
+      yield chunk;
+    }
   }
 }
 
@@ -219,18 +240,18 @@ final class _FailTransport implements OpenAiTtsTransport {
   final Exception error;
 
   @override
-  Future<OpenAiTtsResponse> synthesize(OpenAiTtsRequest request) {
-    return Future<OpenAiTtsResponse>.error(error);
+  Stream<List<int>> synthesize(OpenAiTtsRequest request) {
+    return Stream<List<int>>.error(error);
   }
 }
 
 final class _CallbackTransport implements OpenAiTtsTransport {
   const _CallbackTransport(this.callback);
 
-  final Future<OpenAiTtsResponse> Function() callback;
+  final Future<List<int>> Function() callback;
 
   @override
-  Future<OpenAiTtsResponse> synthesize(OpenAiTtsRequest request) {
-    return callback();
+  Stream<List<int>> synthesize(OpenAiTtsRequest request) async* {
+    yield await callback();
   }
 }

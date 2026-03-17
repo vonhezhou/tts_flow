@@ -1,9 +1,9 @@
 import 'dart:io';
+import 'dart:typed_data';
 
 import '../../core/tts_contracts.dart';
 import '../../core/tts_errors.dart';
 import '../../core/tts_models.dart';
-import '../non_streaming_bridge.dart';
 import 'http_transport.dart';
 import 'models.dart';
 import 'retrying_transport.dart';
@@ -57,7 +57,7 @@ final class OpenAiTtsEngine implements TtsEngine {
   final String model;
 
   @override
-  bool get supportsStreaming => false;
+  bool get supportsStreaming => true;
 
   @override
   bool get supportsPause => false;
@@ -76,7 +76,7 @@ final class OpenAiTtsEngine implements TtsEngine {
     TtsAudioFormat resolvedFormat,
   ) async* {
     try {
-      final response = await transport.synthesize(
+      final audioStream = transport.synthesize(
         OpenAiTtsRequest(
           text: request.text,
           voiceId: request.voice?.voiceId ?? defaultVoiceId,
@@ -85,15 +85,41 @@ final class OpenAiTtsEngine implements TtsEngine {
         ),
       );
 
+      var sequence = 0;
+      List<int>? pending;
+
+      await for (final chunk in audioStream) {
+        if (controlToken.isStopped) {
+          return;
+        }
+
+        if (pending != null) {
+          yield TtsChunk(
+            requestId: request.requestId,
+            sequenceNumber: sequence,
+            bytes: Uint8List.fromList(pending),
+            format: resolvedFormat,
+            isLastChunk: false,
+            timestamp: DateTime.now().toUtc(),
+          );
+          sequence++;
+        }
+
+        pending = chunk;
+      }
+
       if (controlToken.isStopped) {
         return;
       }
 
-      yield* NonStreamingBridge.toChunkStream(
+      final lastBytes = pending ?? Uint8List(0);
+      yield TtsChunk(
         requestId: request.requestId,
+        sequenceNumber: sequence,
+        bytes: Uint8List.fromList(lastBytes),
         format: resolvedFormat,
-        audioBytes: response.audioBytes,
-        chunkSizeBytes: nonStreamingChunkSizeBytes,
+        isLastChunk: true,
+        timestamp: DateTime.now().toUtc(),
       );
     } on OpenAiTransportException catch (error) {
       throw TtsError(

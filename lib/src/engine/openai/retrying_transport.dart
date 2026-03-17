@@ -16,11 +16,14 @@ final class OpenAiRetryingTransport implements OpenAiTtsTransport {
   final Future<void> Function(Duration) _delay;
 
   @override
-  Future<OpenAiTtsResponse> synthesize(OpenAiTtsRequest request) async {
+  Stream<List<int>> synthesize(OpenAiTtsRequest request) async* {
     var attempt = 0;
     while (true) {
       try {
-        return await _inner.synthesize(request);
+        await for (final chunk in _inner.synthesize(request)) {
+          yield chunk;
+        }
+        return;
       } on OpenAiTransportException catch (error) {
         final canRetry = error.isRetryable && attempt < maxRetries;
         if (!canRetry) {

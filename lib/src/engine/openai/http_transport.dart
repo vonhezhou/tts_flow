@@ -17,7 +17,43 @@ final class OpenAiHttpTtsTransport implements OpenAiTtsTransport {
   final HttpClient _httpClient;
 
   @override
-  Future<OpenAiTtsResponse> synthesize(OpenAiTtsRequest request) async {
+  Stream<List<int>> synthesize(OpenAiTtsRequest request) async* {
+    final response = await _sendRequest(request);
+
+    if (response.statusCode != HttpStatus.ok) {
+      final payload = await response.fold<BytesBuilder>(
+        BytesBuilder(copy: false),
+        (builder, data) {
+          builder.add(data);
+          return builder;
+        },
+      );
+      final errorBytes = payload.takeBytes();
+      final message = errorBytes.isEmpty
+          ? 'OpenAI request failed with status ${response.statusCode}.'
+          : utf8.decode(errorBytes, allowMalformed: true);
+      throw OpenAiTransportException(
+        statusCode: response.statusCode,
+        message: message,
+      );
+    }
+
+    try {
+      await for (final data in response) {
+        yield data;
+      }
+    } on OpenAiTransportException {
+      rethrow;
+    } catch (error) {
+      throw OpenAiTransportException(
+        statusCode: 0,
+        message: 'OpenAI response stream failed.',
+        cause: error,
+      );
+    }
+  }
+
+  Future<HttpClientResponse> _sendRequest(OpenAiTtsRequest request) async {
     if (_config.apiKey.isEmpty) {
       throw const OpenAiTransportException(
         statusCode: 401,
@@ -31,18 +67,12 @@ final class OpenAiHttpTtsTransport implements OpenAiTtsTransport {
         .set(HttpHeaders.authorizationHeader, 'Bearer ${_config.apiKey}');
     httpRequest.headers.set(HttpHeaders.contentTypeHeader, 'application/json');
 
-    final body = jsonEncode({
-      'model': request.model,
-      'input': request.text,
-      'voice': request.voiceId,
-      'response_format': _mapFormat(request.format),
-    });
+    final body = _buildBody(request);
 
     httpRequest.write(body);
 
-    HttpClientResponse response;
     try {
-      response = await httpRequest.close().timeout(
+      return await httpRequest.close().timeout(
             _config.requestTimeout,
             onTimeout: () => throw const OpenAiTransportException(
               statusCode: 408,
@@ -58,27 +88,15 @@ final class OpenAiHttpTtsTransport implements OpenAiTtsTransport {
         cause: error,
       );
     }
+  }
 
-    final bytes = await response.fold<BytesBuilder>(
-      BytesBuilder(copy: false),
-      (builder, data) {
-        builder.add(data);
-        return builder;
-      },
-    );
-    final payload = bytes.takeBytes();
-
-    if (response.statusCode != HttpStatus.ok) {
-      final message = payload.isEmpty
-          ? 'OpenAI request failed with status ${response.statusCode}.'
-          : utf8.decode(payload, allowMalformed: true);
-      throw OpenAiTransportException(
-        statusCode: response.statusCode,
-        message: message,
-      );
-    }
-
-    return OpenAiTtsResponse(audioBytes: payload);
+  String _buildBody(OpenAiTtsRequest request) {
+    return jsonEncode({
+      'model': request.model,
+      'input': request.text,
+      'voice': request.voiceId,
+      'response_format': _mapFormat(request.format),
+    });
   }
 
   String _mapFormat(TtsAudioFormat format) {

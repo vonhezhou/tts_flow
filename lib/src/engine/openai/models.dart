@@ -1,5 +1,3 @@
-import 'dart:typed_data';
-
 import '../../core/tts_models.dart';
 
 final class OpenAiTtsRequest {
@@ -14,12 +12,6 @@ final class OpenAiTtsRequest {
   final String voiceId;
   final TtsAudioFormat format;
   final String model;
-}
-
-final class OpenAiTtsResponse {
-  const OpenAiTtsResponse({required this.audioBytes});
-
-  final Uint8List audioBytes;
 }
 
 final class OpenAiTransportException implements Exception {
