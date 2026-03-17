@@ -1,5 +1,5 @@
 import 'dart:async';
-
+import 'dart:typed_data';
 import 'package:flutter_uni_tts/flutter_uni_tts.dart';
 import 'package:test/test.dart';
 
@@ -155,6 +155,50 @@ void main() {
       await sub.cancel();
       await service.dispose();
     });
+
+    test('continueOnError keeps pending queue after active failure', () async {
+      final service = TtsService(
+        engine: FakeTtsEngine(
+          engineId: 'fake-engine',
+          supportsStreaming: true,
+          chunkCount: 2,
+          chunkDelay: const Duration(milliseconds: 2),
+        ),
+        output: _FailByRequestIdOutput(
+          outputId: 'selective-fail',
+          failingRequestIds: {'first'},
+        ),
+        config: const TtsServiceConfig(
+          queueFailurePolicy: TtsQueueFailurePolicy.continueOnError,
+        ),
+      );
+
+      final events = <TtsRequestEvent>[];
+      final sub = service.requestEvents.listen(events.add);
+
+      final first = service.speak(
+        const TtsRequest(requestId: 'first', text: 'this will fail'),
+      );
+      final second = service.speak(
+        const TtsRequest(requestId: 'second', text: 'this should still run'),
+      );
+
+      await expectLater(first.toList(), throwsA(isA<TtsError>()));
+      final secondChunks = await second.toList();
+
+      expect(secondChunks, isNotEmpty);
+      expect(
+        events.any(
+          (event) =>
+              event.requestId == 'second' &&
+              event.type == TtsRequestEventType.requestCompleted,
+        ),
+        isTrue,
+      );
+
+      await sub.cancel();
+      await service.dispose();
+    });
   });
 }
 
@@ -191,4 +235,61 @@ final class _AlwaysFailOutput implements TtsOutput {
 
   @override
   Future<void> dispose() async {}
+}
+
+final class _FailByRequestIdOutput implements TtsOutput {
+  _FailByRequestIdOutput({
+    required this.outputId,
+    required Set<String> failingRequestIds,
+  }) : _failingRequestIds = Set<String>.from(failingRequestIds);
+
+  @override
+  final String outputId;
+
+  final Set<String> _failingRequestIds;
+  TtsOutputSession? _session;
+
+  @override
+  Set<TtsAudioFormat> get acceptedFormats => {TtsAudioFormat.wav};
+
+  @override
+  Future<void> initSession(TtsOutputSession session) async {
+    _session = session;
+  }
+
+  @override
+  Future<void> consumeChunk(TtsChunk chunk) async {
+    final session = _session;
+    if (session == null) {
+      return;
+    }
+    if (_failingRequestIds.contains(session.requestId)) {
+      throw const TtsError(
+        code: TtsErrorCode.outputWriteFailed,
+        message: 'Injected request-specific failure.',
+      );
+    }
+  }
+
+  @override
+  Future<TtsOutputArtifact> finalizeSession() async {
+    final session = _session;
+    if (session == null) {
+      throw StateError('No active output session.');
+    }
+    return MemoryOutputArtifact(
+      requestId: session.requestId,
+      resolvedFormat: session.resolvedFormat,
+      audioBytes: Uint8List(0),
+      totalBytes: 0,
+    );
+  }
+
+  @override
+  Future<void> onStop(String reason) async {}
+
+  @override
+  Future<void> dispose() async {
+    _session = null;
+  }
 }

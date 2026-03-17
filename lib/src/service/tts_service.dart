@@ -169,46 +169,61 @@ final class TtsService {
 
           unawaited(item.controller.close());
         } catch (error) {
-          final outputFailure = error is TtsOutputFailure ? error : null;
-          final outputError = outputFailure?.error;
-          final baseError = outputError ?? (error is TtsError ? error : null);
-          final ttsError = baseError != null
-              ? TtsError(
-                  code: baseError.code,
-                  message: baseError.message,
-                  requestId: baseError.requestId ?? request.requestId,
-                  cause: baseError.cause,
-                )
-              : TtsError(
-                  code: TtsErrorCode.internalError,
-                  message: 'Request processing failed.',
-                  requestId: request.requestId,
-                  cause: error,
-                );
-
+          final failure = _mapRequestFailure(error, request);
           _emitRequestEvent(
             TtsRequestEventType.requestFailed,
             requestId: request.requestId,
             state: TtsRequestState.failed,
-            error: ttsError,
-            outputId: outputFailure?.outputId,
-            outputError: outputError,
+            error: failure.ttsError,
+            outputId: failure.outputId,
+            outputError: failure.outputError,
           );
-          item.controller.addError(ttsError);
+          item.controller.addError(failure.ttsError);
           unawaited(item.controller.close());
 
-          _isHalted = true;
-          _emitQueueEvent(TtsQueueEventType.queueHalted,
-              requestId: request.requestId);
-          await _cancelPendingAfterFailure();
-          break;
+          if (_config.queueFailurePolicy == TtsQueueFailurePolicy.failFast) {
+            _isHalted = true;
+            _emitQueueEvent(TtsQueueEventType.queueHalted,
+                requestId: request.requestId);
+            await _cancelPendingAfterFailure();
+            break;
+          }
         } finally {
           _activeControlToken = null;
+        }
+
+        if (_isHalted) {
+          break;
         }
       }
     } finally {
       _isProcessing = false;
     }
+  }
+
+  _RequestFailure _mapRequestFailure(Object error, TtsRequest request) {
+    final outputFailure = error is TtsOutputFailure ? error : null;
+    final outputError = outputFailure?.error;
+    final baseError = outputError ?? (error is TtsError ? error : null);
+    final ttsError = baseError != null
+        ? TtsError(
+            code: baseError.code,
+            message: baseError.message,
+            requestId: baseError.requestId ?? request.requestId,
+            cause: baseError.cause,
+          )
+        : TtsError(
+            code: TtsErrorCode.internalError,
+            message: 'Request processing failed.',
+            requestId: request.requestId,
+            cause: error,
+          );
+
+    return _RequestFailure(
+      ttsError: ttsError,
+      outputId: outputFailure?.outputId,
+      outputError: outputError,
+    );
   }
 
   Future<void> _cancelPendingAfterFailure() async {
@@ -279,4 +294,16 @@ final class _QueuedRequest {
 
   final TtsRequest request;
   final StreamController<TtsChunk> controller;
+}
+
+final class _RequestFailure {
+  const _RequestFailure({
+    required this.ttsError,
+    required this.outputId,
+    required this.outputError,
+  });
+
+  final TtsError ttsError;
+  final String? outputId;
+  final TtsError? outputError;
 }

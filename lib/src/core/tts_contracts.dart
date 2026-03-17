@@ -4,6 +4,15 @@ import 'dart:typed_data';
 import 'tts_errors.dart';
 import 'tts_models.dart';
 
+enum TtsQueueFailurePolicy {
+  /// fail active request and
+  /// cancel all pending requests on first failure
+  failFast,
+
+  /// skip failed request and continue with next pending request
+  continueOnError,
+}
+
 final class TtsServiceConfig {
   const TtsServiceConfig({
     this.preferredFormatOrder = const [
@@ -13,9 +22,11 @@ final class TtsServiceConfig {
       TtsAudioFormat.wav,
       TtsAudioFormat.pcm16,
     ],
+    this.queueFailurePolicy = TtsQueueFailurePolicy.failFast,
   });
 
   final List<TtsAudioFormat> preferredFormatOrder;
+  final TtsQueueFailurePolicy queueFailurePolicy;
 }
 
 final class TtsControlToken {
