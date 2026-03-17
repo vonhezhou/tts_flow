@@ -16,6 +16,7 @@ Core design choices in this repository:
 - Built-in outputs:
   - MemoryOutput
   - FileOutput
+  - CompositeOutput (fanout to multiple outputs)
   - SpeakerOutput (backend abstraction baseline)
 - Built-in adapters/utilities:
   - TtsFormatNegotiator
@@ -78,6 +79,60 @@ Run with OpenAI mode:
 $env:OPENAI_API_KEY="your_key_here"
 dart run example/main.dart
 ```
+
+## CompositeOutput (Multi-output Fanout)
+
+Use `CompositeOutput` when you want one synthesis request to write to multiple
+outputs such as memory and file at the same time.
+
+```dart
+import 'dart:io';
+
+import 'package:flutter_uni_tts/flutter_uni_tts.dart';
+
+Future<void> main() async {
+  final tempDir = await Directory.systemTemp.createTemp('uni_tts_fanout_');
+
+  final output = CompositeOutput(
+    outputs: [
+      MemoryOutput(outputId: 'memory'),
+      FileOutput(outputId: 'file', outputDirectory: tempDir),
+    ],
+    errorPolicy: CompositeOutputErrorPolicy.bestEffort,
+  );
+
+  final service = TtsService(
+    engine: FakeTtsEngine(
+      engineId: 'fake-engine',
+      supportsStreaming: true,
+      chunkCount: 3,
+    ),
+    output: output,
+  );
+
+  await service
+      .speak(
+        const TtsRequest(
+          requestId: 'fanout-1',
+          text: 'hello fanout',
+          preferredFormat: TtsAudioFormat.wav,
+        ),
+      )
+      .drain();
+
+  await service.dispose();
+}
+```
+
+Policy options:
+
+- `CompositeOutputErrorPolicy.bestEffort` (default): failing outputs are
+  dropped and remaining outputs continue.
+- `CompositeOutputErrorPolicy.failFast`: first output failure aborts the
+  request and surfaces a `TtsOutputFailure`.
+
+Tip: use `failFast` when all outputs are required for correctness. Use
+`bestEffort` for resilient production fanout where partial output is acceptable.
 
 ## Development Commands
 

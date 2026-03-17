@@ -112,6 +112,103 @@ void main() {
       }
     });
   });
+
+  group('M4 composite output', () {
+    test('bestEffort finalizes successful outputs and records failures',
+        () async {
+      final output = CompositeOutput(
+        outputs: [
+          MemoryOutput(outputId: 'memory'),
+          _FailingTestOutput(outputId: 'failing', failOnConsume: true),
+        ],
+        errorPolicy: CompositeOutputErrorPolicy.bestEffort,
+      );
+
+      const session = TtsOutputSession(
+        requestId: 'composite-1',
+        resolvedFormat: TtsAudioFormat.wav,
+      );
+
+      await output.initSession(session);
+      await output.consumeChunk(
+        _chunk('composite-1', 0, [1, 2, 3], TtsAudioFormat.wav, isLast: true),
+      );
+      final artifact = await output.finalizeSession();
+
+      expect(artifact, isA<CompositeOutputArtifact>());
+      final composite = artifact as CompositeOutputArtifact;
+      expect(composite.artifacts.keys, contains('memory'));
+      expect(composite.artifacts.keys, isNot(contains('failing')));
+      expect(composite.outputErrors.keys, contains('failing'));
+    });
+
+    test('failFast throws TtsOutputFailure with output id', () async {
+      final output = CompositeOutput(
+        outputs: [
+          MemoryOutput(outputId: 'memory'),
+          _FailingTestOutput(outputId: 'failing', failOnConsume: true),
+        ],
+        errorPolicy: CompositeOutputErrorPolicy.failFast,
+      );
+
+      const session = TtsOutputSession(
+        requestId: 'composite-2',
+        resolvedFormat: TtsAudioFormat.wav,
+      );
+
+      await output.initSession(session);
+      await expectLater(
+        output.consumeChunk(
+          _chunk('composite-2', 0, [5], TtsAudioFormat.wav, isLast: true),
+        ),
+        throwsA(
+          isA<TtsOutputFailure>().having(
+            (failure) => failure.outputId,
+            'outputId',
+            'failing',
+          ),
+        ),
+      );
+    });
+  });
+}
+
+final class _FailingTestOutput implements TtsOutput {
+  _FailingTestOutput({
+    required this.outputId,
+    this.failOnConsume = false,
+  });
+
+  @override
+  final String outputId;
+  final bool failOnConsume;
+
+  @override
+  Set<TtsAudioFormat> get acceptedFormats => {TtsAudioFormat.wav};
+
+  @override
+  Future<void> consumeChunk(TtsChunk chunk) async {
+    if (failOnConsume) {
+      throw const TtsError(
+        code: TtsErrorCode.outputWriteFailed,
+        message: 'Injected consume failure.',
+      );
+    }
+  }
+
+  @override
+  Future<void> dispose() async {}
+
+  @override
+  Future<TtsOutputArtifact> finalizeSession() async {
+    throw UnimplementedError();
+  }
+
+  @override
+  Future<void> initSession(TtsOutputSession session) async {}
+
+  @override
+  Future<void> onStop(String reason) async {}
 }
 
 TtsChunk _chunk(

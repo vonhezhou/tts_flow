@@ -40,6 +40,8 @@ final class TtsRequestEvent {
     this.state,
     this.chunk,
     this.error,
+    this.outputId,
+    this.outputError,
   });
 
   final TtsRequestEventType type;
@@ -48,4 +50,6 @@ final class TtsRequestEvent {
   final TtsRequestState? state;
   final TtsChunk? chunk;
   final TtsError? error;
+  final String? outputId;
+  final TtsError? outputError;
 }

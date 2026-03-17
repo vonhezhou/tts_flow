@@ -169,8 +169,16 @@ final class TtsService {
 
           unawaited(item.controller.close());
         } catch (error) {
-          final ttsError = error is TtsError
-              ? error
+          final outputFailure = error is TtsOutputFailure ? error : null;
+          final outputError = outputFailure?.error;
+          final baseError = outputError ?? (error is TtsError ? error : null);
+          final ttsError = baseError != null
+              ? TtsError(
+                  code: baseError.code,
+                  message: baseError.message,
+                  requestId: baseError.requestId ?? request.requestId,
+                  cause: baseError.cause,
+                )
               : TtsError(
                   code: TtsErrorCode.internalError,
                   message: 'Request processing failed.',
@@ -183,6 +191,8 @@ final class TtsService {
             requestId: request.requestId,
             state: TtsRequestState.failed,
             error: ttsError,
+            outputId: outputFailure?.outputId,
+            outputError: outputError,
           );
           item.controller.addError(ttsError);
           unawaited(item.controller.close());
@@ -240,6 +250,8 @@ final class TtsService {
     TtsRequestState? state,
     TtsChunk? chunk,
     TtsError? error,
+    String? outputId,
+    TtsError? outputError,
   }) {
     _requestEventsController.add(
       TtsRequestEvent(
@@ -249,6 +261,8 @@ final class TtsService {
         state: state,
         chunk: chunk,
         error: error,
+        outputId: outputId,
+        outputError: outputError,
       ),
     );
   }

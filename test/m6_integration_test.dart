@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'dart:io';
 import 'dart:typed_data';
 
 import 'package:flutter_uni_tts/flutter_uni_tts.dart';
@@ -63,6 +64,48 @@ void main() {
 
       await sub.cancel();
       await service.dispose();
+    });
+
+    test('composite fanout writes file while streaming with failFast',
+        () async {
+      final tempDir = await Directory.systemTemp.createTemp('uni_tts_m6_');
+      try {
+        final service = TtsService(
+          engine: FakeTtsEngine(
+            engineId: 'fake-engine',
+            supportsStreaming: true,
+            chunkCount: 3,
+          ),
+          output: CompositeOutput(
+            outputs: [
+              MemoryOutput(outputId: 'memory'),
+              FileOutput(outputId: 'file', outputDirectory: tempDir),
+            ],
+            errorPolicy: CompositeOutputErrorPolicy.failFast,
+          ),
+        );
+
+        final chunks = await service
+            .speak(
+              const TtsRequest(
+                requestId: 'fanout-m6-1',
+                text: 'fanout integration request',
+                preferredFormat: TtsAudioFormat.wav,
+              ),
+            )
+            .toList();
+
+        expect(chunks, isNotEmpty);
+
+        final file =
+            File('${tempDir.path}${Platform.pathSeparator}fanout-m6-1.wav');
+        expect(await file.exists(), isTrue);
+        expect(await file.length(), greaterThan(0));
+
+        await service.dispose();
+      } finally {
+        await tempDir.delete(recursive: true);
+      }
     });
   });
 }

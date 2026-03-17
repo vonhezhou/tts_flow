@@ -7,11 +7,11 @@ import 'tts_models.dart';
 final class TtsServiceConfig {
   const TtsServiceConfig({
     this.preferredFormatOrder = const [
-      TtsAudioFormat.pcm16,
-      TtsAudioFormat.wav,
       TtsAudioFormat.mp3,
-      TtsAudioFormat.aac,
       TtsAudioFormat.oggOpus,
+      TtsAudioFormat.aac,
+      TtsAudioFormat.wav,
+      TtsAudioFormat.pcm16,
     ],
   });
 
@@ -92,6 +92,19 @@ final class SpeakerOutputArtifact extends TtsOutputArtifact {
 
   final String playbackId;
   final Duration playbackDuration;
+}
+
+final class CompositeOutputArtifact extends TtsOutputArtifact {
+  CompositeOutputArtifact({
+    required super.requestId,
+    required super.resolvedFormat,
+    required Map<String, TtsOutputArtifact> artifacts,
+    required Map<String, TtsError> outputErrors,
+  })  : artifacts = Map.unmodifiable(artifacts),
+        outputErrors = Map.unmodifiable(outputErrors);
+
+  final Map<String, TtsOutputArtifact> artifacts;
+  final Map<String, TtsError> outputErrors;
 }
 
 abstract interface class TtsEngine {

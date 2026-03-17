@@ -29,3 +29,17 @@ final class TtsError implements Exception {
   String toString() =>
       'TtsError(code: $code, message: $message, requestId: $requestId)';
 }
+
+final class TtsOutputFailure implements Exception {
+  const TtsOutputFailure({
+    required this.outputId,
+    required this.error,
+  });
+
+  final String outputId;
+  final TtsError error;
+
+  @override
+  String toString() =>
+      'TtsOutputFailure(outputId: $outputId, error: ${error.toString()})';
+}

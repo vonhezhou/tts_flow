@@ -115,5 +115,80 @@ void main() {
       await sub.cancel();
       await service.dispose();
     });
+
+    test('requestFailed event includes output failure details', () async {
+      final service = TtsService(
+        engine: FakeTtsEngine(
+          engineId: 'fake-engine',
+          supportsStreaming: true,
+          chunkCount: 2,
+          chunkDelay: const Duration(milliseconds: 2),
+        ),
+        output: CompositeOutput(
+          outputs: [
+            MemoryOutput(outputId: 'memory'),
+            _AlwaysFailOutput(outputId: 'fail-output'),
+          ],
+          errorPolicy: CompositeOutputErrorPolicy.failFast,
+        ),
+      );
+
+      TtsRequestEvent? failedEvent;
+      final sub = service.requestEvents.listen((event) {
+        if (event.type == TtsRequestEventType.requestFailed) {
+          failedEvent = event;
+        }
+      });
+
+      final stream = service.speak(
+        const TtsRequest(requestId: 'output-fail', text: 'fail through output'),
+      );
+
+      await expectLater(stream.toList(), throwsA(isA<TtsError>()));
+      await Future<void>.delayed(const Duration(milliseconds: 20));
+
+      expect(failedEvent, isNotNull);
+      expect(failedEvent!.outputId, 'fail-output');
+      expect(failedEvent!.outputError, isNotNull);
+      expect(failedEvent!.outputError!.code, TtsErrorCode.outputWriteFailed);
+
+      await sub.cancel();
+      await service.dispose();
+    });
   });
+}
+
+final class _AlwaysFailOutput implements TtsOutput {
+  _AlwaysFailOutput({required this.outputId});
+
+  @override
+  final String outputId;
+
+  @override
+  Set<TtsAudioFormat> get acceptedFormats => {TtsAudioFormat.wav};
+
+  @override
+  Future<void> initSession(TtsOutputSession session) async {}
+
+  @override
+  Future<void> consumeChunk(TtsChunk chunk) async {
+    throw const TtsError(
+      code: TtsErrorCode.outputWriteFailed,
+      message: 'Injected output failure.',
+    );
+  }
+
+  @override
+  Future<TtsOutputArtifact> finalizeSession() async {
+    throw const TtsError(
+      code: TtsErrorCode.outputWriteFailed,
+      message: 'Injected output failure.',
+    );
+  }
+
+  @override
+  Future<void> onStop(String reason) async {}
+
+  @override
+  Future<void> dispose() async {}
 }
