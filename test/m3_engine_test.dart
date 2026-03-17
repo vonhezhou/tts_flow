@@ -98,6 +98,83 @@ void main() {
         ),
       );
     });
+
+    test('retrying transport retries retryable failure then succeeds',
+        () async {
+      var attempts = 0;
+      final transport = OpenAiRetryingTransport(
+        inner: _CallbackTransport(() async {
+          attempts++;
+          if (attempts < 2) {
+            throw const OpenAiTransportException(
+                statusCode: 500, message: 'server');
+          }
+          return OpenAiTtsResponse(audioBytes: Uint8List.fromList([1, 2]));
+        }),
+        maxRetries: 2,
+        initialBackoff: const Duration(milliseconds: 1),
+      );
+
+      final response = await transport.synthesize(
+        const OpenAiTtsRequest(
+          text: 'hi',
+          voiceId: 'alloy',
+          format: TtsAudioFormat.mp3,
+        ),
+      );
+
+      expect(attempts, 2);
+      expect(response.audioBytes, Uint8List.fromList([1, 2]));
+    });
+
+    test('retrying transport does not retry auth failure', () async {
+      var attempts = 0;
+      final transport = OpenAiRetryingTransport(
+        inner: _CallbackTransport(() async {
+          attempts++;
+          throw const OpenAiTransportException(
+              statusCode: 401, message: 'unauthorized');
+        }),
+        maxRetries: 3,
+      );
+
+      await expectLater(
+        transport.synthesize(
+          const OpenAiTtsRequest(
+            text: 'hi',
+            voiceId: 'alloy',
+            format: TtsAudioFormat.mp3,
+          ),
+        ),
+        throwsA(isA<OpenAiTransportException>()),
+      );
+      expect(attempts, 1);
+    });
+
+    test('maps transport timeout to timeout error code', () async {
+      final engine = OpenAiTtsEngine(
+        transport: const _FailTransport(
+          OpenAiTransportException(statusCode: 408, message: 'timeout'),
+        ),
+      );
+
+      await expectLater(
+        engine
+            .synthesize(
+              const TtsRequest(requestId: 'o3', text: 'hello'),
+              TtsControlToken(),
+              TtsAudioFormat.mp3,
+            )
+            .toList(),
+        throwsA(
+          isA<TtsError>().having(
+            (error) => error.code,
+            'code',
+            TtsErrorCode.timeout,
+          ),
+        ),
+      );
+    });
   });
 }
 
@@ -120,5 +197,16 @@ final class _FailTransport implements OpenAiTtsTransport {
   @override
   Future<OpenAiTtsResponse> synthesize(OpenAiTtsRequest request) {
     return Future<OpenAiTtsResponse>.error(error);
+  }
+}
+
+final class _CallbackTransport implements OpenAiTtsTransport {
+  const _CallbackTransport(this.callback);
+
+  final Future<OpenAiTtsResponse> Function() callback;
+
+  @override
+  Future<OpenAiTtsResponse> synthesize(OpenAiTtsRequest request) {
+    return callback();
   }
 }
