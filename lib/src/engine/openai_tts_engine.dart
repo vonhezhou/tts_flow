@@ -205,6 +205,37 @@ final class OpenAiTtsEngine implements TtsEngine {
     this.model = 'gpt-4o-mini-tts',
   });
 
+  factory OpenAiTtsEngine.fromClientConfig({
+    required OpenAiClientConfig config,
+    String engineId = 'openai',
+    String defaultVoiceId = 'alloy',
+    int nonStreamingChunkSizeBytes = 4096,
+    HttpClient? httpClient,
+    Future<void> Function(Duration)? delay,
+  }) {
+    final baseTransport = OpenAiHttpTtsTransport(
+      config: config,
+      httpClient: httpClient,
+    );
+
+    final transport = config.maxRetries > 0
+        ? OpenAiRetryingTransport(
+            inner: baseTransport,
+            maxRetries: config.maxRetries,
+            initialBackoff: config.initialBackoff,
+            delay: delay,
+          )
+        : baseTransport;
+
+    return OpenAiTtsEngine(
+      transport: transport,
+      engineId: engineId,
+      defaultVoiceId: defaultVoiceId,
+      nonStreamingChunkSizeBytes: nonStreamingChunkSizeBytes,
+      model: config.model,
+    );
+  }
+
   final OpenAiTtsTransport transport;
   @override
   final String engineId;

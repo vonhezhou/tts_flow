@@ -175,6 +175,30 @@ void main() {
         ),
       );
     });
+
+    test('fromClientConfig wires default transport and maps missing key to authFailed',
+        () async {
+      final engine = OpenAiTtsEngine.fromClientConfig(
+        config: const OpenAiClientConfig(apiKey: ''),
+      );
+
+      await expectLater(
+        engine
+            .synthesize(
+              const TtsRequest(requestId: 'o4', text: 'hello'),
+              TtsControlToken(),
+              TtsAudioFormat.mp3,
+            )
+            .toList(),
+        throwsA(
+          isA<TtsError>().having(
+            (error) => error.code,
+            'code',
+            TtsErrorCode.authFailed,
+          ),
+        ),
+      );
+    });
   });
 }
 
