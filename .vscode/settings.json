@@ -1,0 +1,10 @@
+{
+  "[dart]": {
+    "editor.codeActionsOnSave": {
+      "source.organizeImports": "explicit"
+    }
+  },
+  "chat.tools.terminal.autoApprove": {
+    "dart": true
+  }
+}

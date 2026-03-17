@@ -1,2 +1,3 @@
-# tts_flow
-tts_flow is a clean, extensible TTS framework for Dart and Flutter.
+# flutter_uni_tts
+
+Universal TTS framework with pluggable engines, pluggable outputs, and queue-based orchestration.
