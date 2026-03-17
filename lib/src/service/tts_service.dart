@@ -3,6 +3,7 @@ import 'dart:async';
 import '../core/tts_contracts.dart';
 import '../core/tts_errors.dart';
 import '../core/tts_models.dart';
+import 'format_negotiator.dart';
 import 'queue_scheduler.dart';
 import 'tts_events.dart';
 
@@ -18,6 +19,7 @@ final class TtsService {
   final TtsEngine _engine;
   final TtsOutput _output;
   final TtsServiceConfig _config;
+  final TtsFormatNegotiator _formatNegotiator = const TtsFormatNegotiator();
   final QueueScheduler<_QueuedRequest> _scheduler =
       QueueScheduler<_QueuedRequest>();
 
@@ -212,31 +214,12 @@ final class TtsService {
   }
 
   TtsAudioFormat _resolveFormat(TtsRequest request) {
-    final intersection =
-        _engine.supportedFormats.intersection(_output.acceptedFormats);
-    if (intersection.isEmpty) {
-      throw TtsError(
-        code: TtsErrorCode.formatNegotiationFailed,
-        message: 'Engine and output do not share a common audio format.',
-        requestId: request.requestId,
-      );
-    }
-
-    if (request.preferredFormat != null &&
-        intersection.contains(request.preferredFormat)) {
-      return request.preferredFormat!;
-    }
-
-    for (final format in _config.preferredFormatOrder) {
-      if (intersection.contains(format)) {
-        return format;
-      }
-    }
-
-    throw TtsError(
-      code: TtsErrorCode.formatNegotiationFailed,
-      message: 'No compatible format found using preferred format order.',
+    return _formatNegotiator.negotiate(
+      engineFormats: _engine.supportedFormats,
+      outputFormats: _output.acceptedFormats,
+      preferredOrder: _config.preferredFormatOrder,
       requestId: request.requestId,
+      preferredFormat: request.preferredFormat,
     );
   }
 
