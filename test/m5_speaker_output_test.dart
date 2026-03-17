@@ -121,7 +121,8 @@ final class _FakeSpeakerBackend implements SpeakerBackend {
   }
 
   @override
-  Future<void> stopPlayback({required String playbackId, String? reason}) async {
+  Future<void> stopPlayback(
+      {required String playbackId, String? reason}) async {
     stoppedPlaybackIds.add(playbackId);
     stopReasons[playbackId] = reason;
   }
