@@ -128,5 +128,11 @@ final class _FakeSpeakerBackend implements SpeakerBackend {
   }
 
   @override
+  Future<void> pausePlayback({required String playbackId}) async {}
+
+  @override
+  Future<void> resumePlayback({required String playbackId}) async {}
+
+  @override
   Future<void> dispose() async {}
 }

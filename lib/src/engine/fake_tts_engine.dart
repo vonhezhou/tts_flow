@@ -20,9 +20,6 @@ final class FakeTtsEngine implements TtsEngine {
   final bool supportsStreaming;
 
   @override
-  bool get supportsPause => true;
-
-  @override
   Set<TtsAudioFormat> get supportedFormats => {
         TtsAudioFormat.pcm16,
         TtsAudioFormat.wav,
@@ -46,9 +43,6 @@ final class FakeTtsEngine implements TtsEngine {
       if (controlToken.isStopped) {
         break;
       }
-      while (controlToken.isPaused) {
-        await Future<void>.delayed(const Duration(milliseconds: 1));
-      }
 
       final start = i * size;
       if (start >= total) {
@@ -71,6 +65,12 @@ final class FakeTtsEngine implements TtsEngine {
       );
     }
   }
+
+  @override
+  Future<void> onPause() async {}
+
+  @override
+  Future<void> onResume() async {}
 
   @override
   Future<void> dispose() async {}

@@ -97,6 +97,12 @@ final class FileOutput implements TtsOutput {
   }
 
   @override
+  Future<void> onPause() async {}
+
+  @override
+  Future<void> onResume() async {}
+
+  @override
   Future<void> onStop(String reason) async {
     await _state.safeCleanupTemp();
     _state.clear();

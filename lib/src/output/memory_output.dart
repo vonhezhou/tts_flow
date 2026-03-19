@@ -53,6 +53,12 @@ final class MemoryOutput implements TtsOutput {
   }
 
   @override
+  Future<void> onPause() async {}
+
+  @override
+  Future<void> onResume() async {}
+
+  @override
   Future<void> onStop(String reason) async {
     _session = null;
     _buffer = null;

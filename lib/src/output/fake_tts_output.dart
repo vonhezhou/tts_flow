@@ -45,9 +45,13 @@ final class FakeTtsOutput implements TtsOutput {
   }
 
   @override
-  Future<void> onStop(String reason) async {
-    _buffer.clear();
-  }
+  Future<void> onPause() async {}
+
+  @override
+  Future<void> onResume() async {}
+
+  @override
+  Future<void> onStop(String reason) async {}
 
   @override
   Future<void> dispose() async {

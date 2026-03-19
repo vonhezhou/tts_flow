@@ -199,6 +199,49 @@ void main() {
       await sub.cancel();
       await service.dispose();
     });
+
+    test('pause while idle defers start until resume', () async {
+      final service = TtsService(
+        engine: FakeTtsEngine(
+          engineId: 'fake-engine',
+          supportsStreaming: true,
+          chunkCount: 2,
+          chunkDelay: const Duration(milliseconds: 5),
+        ),
+        output: FakeTtsOutput(),
+      );
+
+      final started = <String>[];
+      final sub = service.requestEvents.listen((event) {
+        if (event.type == TtsRequestEventType.requestStarted) {
+          started.add(event.requestId);
+        }
+      });
+
+      await service.pauseCurrent();
+      expect(service.isPaused, isTrue);
+
+      final first = service.speak(
+        const TtsRequest(requestId: 'paused-1', text: 'first queued'),
+      );
+      final second = service.speak(
+        const TtsRequest(requestId: 'paused-2', text: 'second queued'),
+      );
+
+      await Future<void>.delayed(const Duration(milliseconds: 30));
+      expect(started, isEmpty);
+
+      await service.resumeCurrent();
+      expect(service.isPaused, isFalse);
+
+      await first.toList();
+      await second.toList();
+
+      expect(started, ['paused-1', 'paused-2']);
+
+      await sub.cancel();
+      await service.dispose();
+    });
   });
 }
 
@@ -229,6 +272,12 @@ final class _AlwaysFailOutput implements TtsOutput {
       message: 'Injected output failure.',
     );
   }
+
+  @override
+  Future<void> onPause() async {}
+
+  @override
+  Future<void> onResume() async {}
 
   @override
   Future<void> onStop(String reason) async {}
@@ -284,6 +333,12 @@ final class _FailByRequestIdOutput implements TtsOutput {
       totalBytes: 0,
     );
   }
+
+  @override
+  Future<void> onPause() async {}
+
+  @override
+  Future<void> onResume() async {}
 
   @override
   Future<void> onStop(String reason) async {}

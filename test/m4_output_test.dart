@@ -208,6 +208,12 @@ final class _FailingTestOutput implements TtsOutput {
   Future<void> initSession(TtsOutputSession session) async {}
 
   @override
+  Future<void> onPause() async {}
+
+  @override
+  Future<void> onResume() async {}
+
+  @override
   Future<void> onStop(String reason) async {}
 }
 

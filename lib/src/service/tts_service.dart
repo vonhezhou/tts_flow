@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'dart:developer' as dev;
 
 import '../core/tts_contracts.dart';
 import '../core/tts_errors.dart';
@@ -31,10 +32,14 @@ final class TtsService {
   bool _isProcessing = false;
   bool _isDisposed = false;
   bool _isHalted = false;
+  bool _isPaused = false;
   TtsControlToken? _activeControlToken;
+  final List<TtsChunk> _pauseBuffer = [];
+  int _pauseBufferBytes = 0;
 
   Stream<TtsQueueEvent> get queueEvents => _queueEventsController.stream;
   Stream<TtsRequestEvent> get requestEvents => _requestEventsController.stream;
+  bool get isPaused => _isPaused;
 
   Stream<TtsChunk> speak(TtsRequest request) {
     _ensureNotDisposed();
@@ -61,12 +66,17 @@ final class TtsService {
 
   Future<void> pauseCurrent() async {
     _ensureNotDisposed();
-    _activeControlToken?.pause();
+    _isPaused = true;
+    await _engine.onPause();
+    await _output.onPause();
   }
 
   Future<void> resumeCurrent() async {
     _ensureNotDisposed();
-    _activeControlToken?.resume();
+    _isPaused = false;
+    await _output.onResume();
+    await _engine.onResume();
+    unawaited(_processQueue());
   }
 
   Future<void> stopCurrent() async {
@@ -114,6 +124,12 @@ final class TtsService {
 
     try {
       while (!_scheduler.isEmpty && !_isDisposed) {
+        // Pause gates starting the next request. Active request handling
+        // continues in-loop using buffering/passthrough policy.
+        if (_isPaused) {
+          break;
+        }
+
         final item = _scheduler.dequeue();
         final request = item.request;
         final controlToken = TtsControlToken();
@@ -141,6 +157,27 @@ final class TtsService {
             if (controlToken.isStopped) {
               break;
             }
+            // Flush any buffered chunks before processing new ones post-resume.
+            if (_pauseBuffer.isNotEmpty && !_isPaused) {
+              await _flushPauseBuffer(item, request, controlToken);
+              if (controlToken.isStopped) break;
+            }
+            if (_isPaused &&
+                _config.pauseBufferPolicy == TtsPauseBufferPolicy.buffered) {
+              _pauseBuffer.add(chunk);
+              final newBytes = _pauseBufferBytes + chunk.bytes.length;
+              if (_pauseBufferBytes <= _config.pauseBufferMaxBytes &&
+                  newBytes > _config.pauseBufferMaxBytes) {
+                dev.log(
+                  'TTS pause buffer exceeded ${_config.pauseBufferMaxBytes} '
+                  'bytes (current: $newBytes); chunks continue to accumulate.',
+                  name: 'flutter_uni_tts',
+                  level: 900,
+                );
+              }
+              _pauseBufferBytes = newBytes;
+              continue;
+            }
             await _output.consumeChunk(chunk);
             item.controller.add(chunk);
             _emitRequestEvent(
@@ -149,6 +186,16 @@ final class TtsService {
               state: TtsRequestState.running,
               chunk: chunk,
             );
+          }
+          // Engine stream exhausted. If it finished while still paused,
+          // wait for resume and then flush the remaining buffer.
+          if (!controlToken.isStopped && _pauseBuffer.isNotEmpty) {
+            while (_isPaused && !_isDisposed && !controlToken.isStopped) {
+              await Future<void>.delayed(const Duration(milliseconds: 20));
+            }
+            if (!controlToken.isStopped) {
+              await _flushPauseBuffer(item, request, controlToken);
+            }
           }
 
           if (controlToken.isStopped) {
@@ -190,6 +237,8 @@ final class TtsService {
           }
         } finally {
           _activeControlToken = null;
+          _pauseBuffer.clear();
+          _pauseBufferBytes = 0;
         }
 
         if (_isHalted) {
@@ -246,6 +295,27 @@ final class TtsService {
       requestId: request.requestId,
       preferredFormat: request.preferredFormat,
     );
+  }
+
+  Future<void> _flushPauseBuffer(
+    _QueuedRequest item,
+    TtsRequest request,
+    TtsControlToken controlToken,
+  ) async {
+    final toFlush = List<TtsChunk>.of(_pauseBuffer);
+    _pauseBuffer.clear();
+    _pauseBufferBytes = 0;
+    for (final chunk in toFlush) {
+      if (controlToken.isStopped) break;
+      await _output.consumeChunk(chunk);
+      item.controller.add(chunk);
+      _emitRequestEvent(
+        TtsRequestEventType.requestChunkReceived,
+        requestId: request.requestId,
+        state: TtsRequestState.running,
+        chunk: chunk,
+      );
+    }
   }
 
   void _emitQueueEvent(TtsQueueEventType type, {String? requestId}) {

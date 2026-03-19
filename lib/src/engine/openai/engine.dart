@@ -60,9 +60,6 @@ final class OpenAiTtsEngine implements TtsEngine {
   bool get supportsStreaming => true;
 
   @override
-  bool get supportsPause => false;
-
-  @override
   Set<TtsAudioFormat> get supportedFormats => {
         TtsAudioFormat.mp3,
         TtsAudioFormat.wav,
@@ -150,6 +147,12 @@ final class OpenAiTtsEngine implements TtsEngine {
     }
     return TtsErrorCode.internalError;
   }
+
+  @override
+  Future<void> onPause() async {}
+
+  @override
+  Future<void> onResume() async {}
 
   @override
   Future<void> dispose() async {}

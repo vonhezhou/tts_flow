@@ -23,6 +23,10 @@ abstract interface class SpeakerBackend {
     String? reason,
   });
 
+  Future<void> pausePlayback({required String playbackId});
+
+  Future<void> resumePlayback({required String playbackId});
+
   Future<void> dispose();
 }
 
@@ -84,6 +88,22 @@ final class SpeakerOutput implements TtsOutput {
       playbackId: playbackId,
       playbackDuration: duration,
     );
+  }
+
+  @override
+  Future<void> onPause() async {
+    final playbackId = _playbackId;
+    if (playbackId != null) {
+      await _backend.pausePlayback(playbackId: playbackId);
+    }
+  }
+
+  @override
+  Future<void> onResume() async {
+    final playbackId = _playbackId;
+    if (playbackId != null) {
+      await _backend.resumePlayback(playbackId: playbackId);
+    }
   }
 
   @override

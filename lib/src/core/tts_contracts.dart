@@ -13,6 +13,15 @@ enum TtsQueueFailurePolicy {
   continueOnError,
 }
 
+enum TtsPauseBufferPolicy {
+  /// Buffer chunks received from the engine during a pause and flush them
+  /// to the output when the request is resumed.
+  buffered,
+
+  /// Pass chunks directly to the output even while paused.
+  passthrough,
+}
+
 final class TtsServiceConfig {
   const TtsServiceConfig({
     this.preferredFormatOrder = const [
@@ -23,29 +32,29 @@ final class TtsServiceConfig {
       TtsAudioFormat.pcm16,
     ],
     this.queueFailurePolicy = TtsQueueFailurePolicy.failFast,
+    this.pauseBufferPolicy = TtsPauseBufferPolicy.buffered,
+    this.pauseBufferMaxBytes = 10 * 1024 * 1024,
   });
 
   final List<TtsAudioFormat> preferredFormatOrder;
   final TtsQueueFailurePolicy queueFailurePolicy;
+
+  /// Determines how chunks produced by the engine are handled during pause.
+  final TtsPauseBufferPolicy pauseBufferPolicy;
+
+  /// Maximum number of bytes to accumulate in the pause buffer before logging
+  /// a warning. Chunks continue to buffer beyond this limit and are not
+  /// dropped.
+  final int pauseBufferMaxBytes;
 }
 
 final class TtsControlToken {
   bool _stopped = false;
-  bool _paused = false;
 
   bool get isStopped => _stopped;
-  bool get isPaused => _paused;
 
   void stop() {
     _stopped = true;
-  }
-
-  void pause() {
-    _paused = true;
-  }
-
-  void resume() {
-    _paused = false;
   }
 }
 
@@ -121,7 +130,6 @@ final class CompositeOutputArtifact extends TtsOutputArtifact {
 abstract interface class TtsEngine {
   String get engineId;
   bool get supportsStreaming;
-  bool get supportsPause;
   Set<TtsAudioFormat> get supportedFormats;
 
   Stream<TtsChunk> synthesize(
@@ -129,6 +137,12 @@ abstract interface class TtsEngine {
     TtsControlToken controlToken,
     TtsAudioFormat resolvedFormat,
   );
+
+  /// Called when the service is paused.
+  Future<void> onPause();
+
+  /// Called when the service is resumed.
+  Future<void> onResume();
 
   Future<void> dispose();
 }
@@ -140,6 +154,13 @@ abstract interface class TtsOutput {
   Future<void> initSession(TtsOutputSession session);
   Future<void> consumeChunk(TtsChunk chunk);
   Future<TtsOutputArtifact> finalizeSession();
+
+  /// Called when the service is paused.
+  Future<void> onPause();
+
+  /// Called when the service is resumed.
+  Future<void> onResume();
+
   Future<void> onStop(String reason);
   Future<void> dispose();
 }

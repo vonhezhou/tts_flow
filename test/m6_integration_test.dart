@@ -115,13 +115,16 @@ final class _FailingEngine implements TtsEngine {
   String get engineId => 'failing-engine';
 
   @override
-  bool get supportsPause => false;
-
-  @override
   bool get supportsStreaming => true;
 
   @override
   Set<TtsAudioFormat> get supportedFormats => {TtsAudioFormat.mp3};
+
+  @override
+  Future<void> onPause() async {}
+
+  @override
+  Future<void> onResume() async {}
 
   @override
   Future<void> dispose() async {}

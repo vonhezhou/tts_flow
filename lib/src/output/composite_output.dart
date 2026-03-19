@@ -162,6 +162,48 @@ final class CompositeOutput implements TtsOutput {
   }
 
   @override
+  Future<void> onPause() async {
+    for (final entry in _activeOutputs.entries.toList()) {
+      try {
+        await entry.value.onPause();
+      } catch (error) {
+        final converted = _toOutputError(
+          error,
+          requestId: _session?.requestId,
+          stage: 'onPause',
+          outputId: entry.key,
+        );
+        _outputErrors[entry.key] = converted;
+        _activeOutputs.remove(entry.key);
+        if (errorPolicy == CompositeOutputErrorPolicy.failFast) {
+          throw TtsOutputFailure(outputId: entry.key, error: converted);
+        }
+      }
+    }
+  }
+
+  @override
+  Future<void> onResume() async {
+    for (final entry in _activeOutputs.entries.toList()) {
+      try {
+        await entry.value.onResume();
+      } catch (error) {
+        final converted = _toOutputError(
+          error,
+          requestId: _session?.requestId,
+          stage: 'onResume',
+          outputId: entry.key,
+        );
+        _outputErrors[entry.key] = converted;
+        _activeOutputs.remove(entry.key);
+        if (errorPolicy == CompositeOutputErrorPolicy.failFast) {
+          throw TtsOutputFailure(outputId: entry.key, error: converted);
+        }
+      }
+    }
+  }
+
+  @override
   Future<void> onStop(String reason) async {
     final activeEntries = _activeOutputs.entries.toList();
     for (final entry in activeEntries) {
