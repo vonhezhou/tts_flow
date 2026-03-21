@@ -1,5 +1,5 @@
-import 'dart:io';
 import 'dart:typed_data';
+import 'package:http/http.dart' as http;
 
 import '../../core/tts_contracts.dart';
 import '../../core/tts_errors.dart';
@@ -23,7 +23,7 @@ final class OpenAiTtsEngine implements TtsEngine {
     String engineId = 'openai',
     String defaultVoiceId = 'alloy',
     int nonStreamingChunkSizeBytes = 4096,
-    HttpClient? httpClient,
+    http.Client? httpClient,
     Future<void> Function(Duration)? delay,
   }) {
     final baseTransport = OpenAiHttpTtsTransport(

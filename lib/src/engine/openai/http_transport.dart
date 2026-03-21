@@ -1,6 +1,6 @@
 import 'dart:convert';
-import 'dart:io';
 import 'dart:typed_data';
+import 'package:http/http.dart' as http;
 
 import '../../core/tts_models.dart';
 import 'models.dart';
@@ -9,19 +9,19 @@ import 'transport.dart';
 final class OpenAiHttpTtsTransport implements OpenAiTtsTransport {
   OpenAiHttpTtsTransport({
     required OpenAiClientConfig config,
-    HttpClient? httpClient,
+    http.Client? httpClient,
   })  : _config = config,
-        _httpClient = httpClient ?? HttpClient();
+        _httpClient = httpClient ?? http.Client();
 
   final OpenAiClientConfig _config;
-  final HttpClient _httpClient;
+  final http.Client _httpClient;
 
   @override
   Stream<List<int>> synthesize(OpenAiTtsRequest request) async* {
     final response = await _sendRequest(request);
 
-    if (response.statusCode != HttpStatus.ok) {
-      final payload = await response.fold<BytesBuilder>(
+    if (response.statusCode != 200) {
+      final payload = await response.stream.fold<BytesBuilder>(
         BytesBuilder(copy: false),
         (builder, data) {
           builder.add(data);
@@ -39,7 +39,7 @@ final class OpenAiHttpTtsTransport implements OpenAiTtsTransport {
     }
 
     try {
-      await for (final data in response) {
+      await for (final data in response.stream) {
         yield data;
       }
     } on OpenAiTransportException {
@@ -53,7 +53,7 @@ final class OpenAiHttpTtsTransport implements OpenAiTtsTransport {
     }
   }
 
-  Future<HttpClientResponse> _sendRequest(OpenAiTtsRequest request) async {
+  Future<http.StreamedResponse> _sendRequest(OpenAiTtsRequest request) async {
     if (_config.apiKey.isEmpty) {
       throw const OpenAiTransportException(
         statusCode: 401,
@@ -62,17 +62,13 @@ final class OpenAiHttpTtsTransport implements OpenAiTtsTransport {
     }
 
     final uri = Uri.parse(_config.endpoint);
-    final httpRequest = await _httpClient.postUrl(uri);
-    httpRequest.headers
-        .set(HttpHeaders.authorizationHeader, 'Bearer ${_config.apiKey}');
-    httpRequest.headers.set(HttpHeaders.contentTypeHeader, 'application/json');
-
-    final body = _buildBody(request);
-
-    httpRequest.write(body);
+    final httpRequest = http.Request('POST', uri)
+      ..headers['Authorization'] = 'Bearer ${_config.apiKey}'
+      ..headers['Content-Type'] = 'application/json'
+      ..body = _buildBody(request);
 
     try {
-      return await httpRequest.close().timeout(
+      return await _httpClient.send(httpRequest).timeout(
             _config.requestTimeout,
             onTimeout: () => throw const OpenAiTransportException(
               statusCode: 408,
