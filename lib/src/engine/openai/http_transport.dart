@@ -1,13 +1,10 @@
-import 'dart:convert';
-import 'dart:typed_data';
 import 'package:http/http.dart' as http;
 
-import '../../core/tts_models.dart';
 import 'models.dart';
 import 'transport.dart';
 
-final class OpenAiHttpTtsTransport implements OpenAiTtsTransport {
-  OpenAiHttpTtsTransport({
+class OpenAiHttpApiClient implements OpenAiApiClient {
+  OpenAiHttpApiClient({
     required OpenAiClientConfig config,
     http.Client? httpClient,
   })  : _config = config,
@@ -17,55 +14,12 @@ final class OpenAiHttpTtsTransport implements OpenAiTtsTransport {
   final http.Client _httpClient;
 
   @override
-  Stream<List<int>> synthesize(OpenAiTtsRequest request) async* {
-    final response = await _sendRequest(request);
-
-    if (response.statusCode != 200) {
-      final payload = await response.stream.fold<BytesBuilder>(
-        BytesBuilder(copy: false),
-        (builder, data) {
-          builder.add(data);
-          return builder;
-        },
-      );
-      final errorBytes = payload.takeBytes();
-      final message = errorBytes.isEmpty
-          ? 'OpenAI request failed with status ${response.statusCode}.'
-          : utf8.decode(errorBytes, allowMalformed: true);
-      throw OpenAiTransportException(
-        statusCode: response.statusCode,
-        message: message,
-      );
-    }
-
-    try {
-      await for (final data in response.stream) {
-        yield data;
-      }
-    } on OpenAiTransportException {
-      rethrow;
-    } catch (error) {
-      throw OpenAiTransportException(
-        statusCode: 0,
-        message: 'OpenAI response stream failed.',
-        cause: error,
-      );
-    }
-  }
-
-  Future<http.StreamedResponse> _sendRequest(OpenAiTtsRequest request) async {
-    if (_config.apiKey.isEmpty) {
-      throw const OpenAiTransportException(
-        statusCode: 401,
-        message: 'OpenAI API key is missing.',
-      );
-    }
-
-    final uri = Uri.parse(_config.endpoint);
-    final httpRequest = http.Request('POST', uri)
-      ..headers['Authorization'] = 'Bearer ${_config.apiKey}'
-      ..headers['Content-Type'] = 'application/json'
-      ..body = _buildBody(request);
+  Future<http.StreamedResponse> send(OpenAiApiRequest request) async {
+    final endpoint = request.endpoint ?? _config.endpoint;
+    final uri = Uri.parse(endpoint);
+    final httpRequest = http.Request(request.method, uri)
+      ..headers.addAll(request.headers)
+      ..bodyBytes = request.bodyBytes;
 
     try {
       return await _httpClient.send(httpRequest).timeout(
@@ -83,30 +37,6 @@ final class OpenAiHttpTtsTransport implements OpenAiTtsTransport {
         message: 'OpenAI network request failed.',
         cause: error,
       );
-    }
-  }
-
-  String _buildBody(OpenAiTtsRequest request) {
-    return jsonEncode({
-      'model': request.model,
-      'input': request.text,
-      'voice': request.voiceId,
-      'response_format': _mapFormat(request.format),
-    });
-  }
-
-  String _mapFormat(TtsAudioFormat format) {
-    switch (format) {
-      case TtsAudioFormat.pcm16:
-        return 'pcm';
-      case TtsAudioFormat.mp3:
-        return 'mp3';
-      case TtsAudioFormat.wav:
-        return 'wav';
-      case TtsAudioFormat.oggOpus:
-        return 'opus';
-      case TtsAudioFormat.aac:
-        return 'aac';
     }
   }
 }

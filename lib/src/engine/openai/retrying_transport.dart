@@ -1,29 +1,28 @@
+import 'package:http/http.dart' as http;
+
 import 'models.dart';
 import 'transport.dart';
 
-final class OpenAiRetryingTransport implements OpenAiTtsTransport {
-  OpenAiRetryingTransport({
-    required OpenAiTtsTransport inner,
+final class OpenAiRetryingApiClient implements OpenAiApiClient {
+  OpenAiRetryingApiClient({
+    required OpenAiApiClient inner,
     this.maxRetries = 2,
     this.initialBackoff = const Duration(milliseconds: 250),
     Future<void> Function(Duration)? delay,
   })  : _inner = inner,
         _delay = delay ?? Future<void>.delayed;
 
-  final OpenAiTtsTransport _inner;
+  final OpenAiApiClient _inner;
   final int maxRetries;
   final Duration initialBackoff;
   final Future<void> Function(Duration) _delay;
 
   @override
-  Stream<List<int>> synthesize(OpenAiTtsRequest request) async* {
+  Future<http.StreamedResponse> send(OpenAiApiRequest request) async {
     var attempt = 0;
     while (true) {
       try {
-        await for (final chunk in _inner.synthesize(request)) {
-          yield chunk;
-        }
-        return;
+        return await _inner.send(request);
       } on OpenAiTransportException catch (error) {
         final canRetry = error.isRetryable && attempt < maxRetries;
         if (!canRetry) {

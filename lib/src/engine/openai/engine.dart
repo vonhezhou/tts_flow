@@ -1,4 +1,6 @@
+import 'dart:convert';
 import 'dart:typed_data';
+
 import 'package:http/http.dart' as http;
 
 import '../../core/tts_contracts.dart';
@@ -9,13 +11,14 @@ import 'models.dart';
 import 'retrying_transport.dart';
 import 'transport.dart';
 
-final class OpenAiTtsEngine implements TtsEngine {
+class OpenAiTtsEngine implements TtsEngine {
   OpenAiTtsEngine({
-    required this.transport,
+    required this.apiClient,
     this.engineId = 'openai',
     this.defaultVoiceId = 'alloy',
     this.nonStreamingChunkSizeBytes = 4096,
     this.model = 'gpt-4o-mini-tts',
+    this.apiKey = '',
   });
 
   factory OpenAiTtsEngine.fromClientConfig({
@@ -26,35 +29,37 @@ final class OpenAiTtsEngine implements TtsEngine {
     http.Client? httpClient,
     Future<void> Function(Duration)? delay,
   }) {
-    final baseTransport = OpenAiHttpTtsTransport(
+    final baseClient = OpenAiHttpApiClient(
       config: config,
       httpClient: httpClient,
     );
 
-    final transport = config.maxRetries > 0
-        ? OpenAiRetryingTransport(
-            inner: baseTransport,
+    final apiClient = config.maxRetries > 0
+        ? OpenAiRetryingApiClient(
+            inner: baseClient,
             maxRetries: config.maxRetries,
             initialBackoff: config.initialBackoff,
             delay: delay,
           )
-        : baseTransport;
+        : baseClient;
 
     return OpenAiTtsEngine(
-      transport: transport,
+      apiClient: apiClient,
       engineId: engineId,
       defaultVoiceId: defaultVoiceId,
       nonStreamingChunkSizeBytes: nonStreamingChunkSizeBytes,
       model: config.model,
+      apiKey: config.apiKey,
     );
   }
 
-  final OpenAiTtsTransport transport;
+  final OpenAiApiClient apiClient;
   @override
   final String engineId;
   final String defaultVoiceId;
   final int nonStreamingChunkSizeBytes;
   final String model;
+  final String apiKey;
 
   @override
   bool get supportsStreaming => true;
@@ -73,13 +78,22 @@ final class OpenAiTtsEngine implements TtsEngine {
     TtsAudioFormat resolvedFormat,
   ) async* {
     try {
-      final audioStream = transport.synthesize(
-        OpenAiTtsRequest(
-          text: request.text,
-          voiceId: request.voice?.voiceId ?? defaultVoiceId,
-          format: resolvedFormat,
-          model: model,
-        ),
+      final response = await apiClient.send(
+        buildApiRequest(request, resolvedFormat),
+      );
+
+      if (response.statusCode != 200) {
+        final errorBytes = await _collectBytes(response.stream);
+        throw OpenAiTransportException(
+          statusCode: response.statusCode,
+          message: parseErrorResponse(response.statusCode, errorBytes),
+        );
+      }
+
+      final audioStream = parseSuccessResponse(
+        response,
+        request,
+        resolvedFormat,
       );
 
       var sequence = 0;
@@ -120,7 +134,7 @@ final class OpenAiTtsEngine implements TtsEngine {
       );
     } on OpenAiTransportException catch (error) {
       throw TtsError(
-        code: _mapStatusCode(error.statusCode),
+        code: mapStatusCode(error.statusCode),
         message: error.message,
         requestId: request.requestId,
         cause: error,
@@ -135,7 +149,84 @@ final class OpenAiTtsEngine implements TtsEngine {
     }
   }
 
-  TtsErrorCode _mapStatusCode(int statusCode) {
+  /// Builds the raw HTTP request sent by the API client.
+  OpenAiApiRequest buildApiRequest(
+    TtsRequest request,
+    TtsAudioFormat resolvedFormat,
+  ) {
+    return OpenAiApiRequest.json(
+      method: 'POST',
+      endpoint: resolveEndpoint(request, resolvedFormat),
+      headers: buildRequestHeaders(request, resolvedFormat),
+      body: buildRequestBody(request, resolvedFormat),
+    );
+  }
+
+  /// Override to route requests to a non-default endpoint.
+  String? resolveEndpoint(TtsRequest request, TtsAudioFormat resolvedFormat) {
+    return null;
+  }
+
+  /// Override to customise request headers for OpenAI-compatible providers.
+  Map<String, String> buildRequestHeaders(
+    TtsRequest request,
+    TtsAudioFormat resolvedFormat,
+  ) {
+    final headers = <String, String>{
+      'Content-Type': 'application/json',
+    };
+    if (apiKey.isNotEmpty) {
+      headers['Authorization'] = 'Bearer $apiKey';
+    }
+    return headers;
+  }
+
+  /// Override to customise payload shape for compatible providers.
+  String buildRequestBody(TtsRequest request, TtsAudioFormat resolvedFormat) {
+    return jsonEncode({
+      'model': model,
+      'input': request.text,
+      'voice': request.voice?.voiceId ?? defaultVoiceId,
+      'response_format': mapFormat(resolvedFormat),
+    });
+  }
+
+  /// Override if a provider expects different format tokens.
+  String mapFormat(TtsAudioFormat format) {
+    switch (format) {
+      case TtsAudioFormat.pcm16:
+        return 'pcm';
+      case TtsAudioFormat.mp3:
+        return 'mp3';
+      case TtsAudioFormat.wav:
+        return 'wav';
+      case TtsAudioFormat.oggOpus:
+        return 'opus';
+      case TtsAudioFormat.aac:
+        return 'aac';
+    }
+  }
+
+  /// Override when success responses are wrapped in JSON envelopes.
+  Stream<List<int>> parseSuccessResponse(
+    http.StreamedResponse response,
+    TtsRequest request,
+    TtsAudioFormat resolvedFormat,
+  ) {
+    return response.stream;
+  }
+
+  /// Override to parse custom error envelope shapes.
+  String parseErrorResponse(int statusCode, Uint8List bodyBytes) {
+    return bodyBytes.isEmpty
+        ? 'OpenAI request failed with status $statusCode.'
+        : utf8.decode(bodyBytes, allowMalformed: true);
+  }
+
+  /// Maps an HTTP status code from the transport layer to a [TtsErrorCode].
+  /// Override to adjust error classification for compatible engines that use
+  /// non-standard status codes.
+  TtsErrorCode mapStatusCode(int statusCode) {
     if (statusCode == 401 || statusCode == 403) {
       return TtsErrorCode.authFailed;
     }
@@ -146,6 +237,14 @@ final class OpenAiTtsEngine implements TtsEngine {
       return TtsErrorCode.networkError;
     }
     return TtsErrorCode.internalError;
+  }
+
+  Future<Uint8List> _collectBytes(Stream<List<int>> stream) async {
+    final builder = BytesBuilder(copy: false);
+    await for (final data in stream) {
+      builder.add(data);
+    }
+    return builder.takeBytes();
   }
 
   @override

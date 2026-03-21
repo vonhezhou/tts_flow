@@ -1,17 +1,32 @@
-import '../../core/tts_models.dart';
+import 'dart:convert';
+import 'dart:typed_data';
 
-final class OpenAiTtsRequest {
-  const OpenAiTtsRequest({
-    required this.text,
-    required this.voiceId,
-    required this.format,
-    this.model = 'gpt-4o-mini-tts',
+final class OpenAiApiRequest {
+  const OpenAiApiRequest({
+    this.method = 'POST',
+    this.endpoint,
+    this.headers = const {},
+    required this.bodyBytes,
   });
 
-  final String text;
-  final String voiceId;
-  final TtsAudioFormat format;
-  final String model;
+  factory OpenAiApiRequest.json({
+    String method = 'POST',
+    String? endpoint,
+    Map<String, String> headers = const {},
+    required String body,
+  }) {
+    return OpenAiApiRequest(
+      method: method,
+      endpoint: endpoint,
+      headers: headers,
+      bodyBytes: Uint8List.fromList(utf8.encode(body)),
+    );
+  }
+
+  final String method;
+  final String? endpoint;
+  final Map<String, String> headers;
+  final Uint8List bodyBytes;
 }
 
 final class OpenAiTransportException implements Exception {
@@ -34,7 +49,7 @@ final class OpenAiTransportException implements Exception {
 
 final class OpenAiClientConfig {
   const OpenAiClientConfig({
-    required this.apiKey,
+    this.apiKey = '',
     this.endpoint = 'https://api.openai.com/v1/audio/speech',
     this.model = 'gpt-4o-mini-tts',
     this.requestTimeout = const Duration(seconds: 30),
