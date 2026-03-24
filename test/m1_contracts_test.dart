@@ -90,6 +90,34 @@ void main() {
       expect(memoryArtifact.totalBytes, 3);
     });
 
+    test('fake engine reports available voices and global default', () async {
+      final engine = FakeTtsEngine(
+        engineId: 'fake-engine',
+        supportsStreaming: false,
+      );
+
+      final voices = await engine.getAvailableVoices();
+      final defaultVoice = await engine.getDefaultVoice();
+
+      expect(voices, isNotEmpty);
+      expect(defaultVoice.isDefault, isTrue);
+      expect(
+          voices.any((voice) => voice.voiceId == defaultVoice.voiceId), isTrue);
+    });
+
+    test('fake engine resolves locale default voice with fallback', () async {
+      final engine = FakeTtsEngine(
+        engineId: 'fake-engine',
+        supportsStreaming: false,
+      );
+
+      final enGbDefault = await engine.getDefaultVoiceForLocale('en-GB');
+      final fallbackDefault = await engine.getDefaultVoiceForLocale('fr-FR');
+
+      expect(enGbDefault.locale, anyOf('en-GB', 'en-US'));
+      expect(fallbackDefault.voiceId, (await engine.getDefaultVoice()).voiceId);
+    });
+
     test('wav header round-trips 16-bit signed PCM WAV header', () {
       const descriptor = PcmDescriptor(
         sampleRateHz: 24000,

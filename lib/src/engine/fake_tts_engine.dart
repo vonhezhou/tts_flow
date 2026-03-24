@@ -34,6 +34,53 @@ final class FakeTtsEngine implements TtsEngine {
   final int chunkCount;
   final Duration chunkDelay;
 
+  static const List<TtsVoice> _voices = [
+    TtsVoice(
+      voiceId: 'fake-en-us-1',
+      locale: 'en-US',
+      displayName: 'Fake US English',
+      isDefault: true,
+    ),
+    TtsVoice(
+      voiceId: 'fake-en-gb-1',
+      locale: 'en-GB',
+      displayName: 'Fake UK English',
+    ),
+    TtsVoice(
+      voiceId: 'fake-es-es-1',
+      locale: 'es-ES',
+      displayName: 'Fake Spanish',
+    ),
+  ];
+
+  @override
+  Future<List<TtsVoice>> getAvailableVoices({String? locale}) async {
+    if (locale == null || locale.trim().isEmpty) {
+      return _voices;
+    }
+    final normalized = _normalizeLocale(locale);
+    return _voices.where((voice) {
+      return _localeMatches(voice.locale, normalized);
+    }).toList(growable: false);
+  }
+
+  @override
+  Future<TtsVoice> getDefaultVoice() async {
+    return _voices.firstWhere((voice) => voice.isDefault,
+        orElse: () => _voices.first);
+  }
+
+  @override
+  Future<TtsVoice> getDefaultVoiceForLocale(String locale) async {
+    final normalized = _normalizeLocale(locale);
+    final scoped = (await getAvailableVoices(locale: normalized));
+    if (scoped.isNotEmpty) {
+      return scoped.firstWhere((voice) => voice.isDefault,
+          orElse: () => scoped.first);
+    }
+    return getDefaultVoice();
+  }
+
   @override
   Stream<TtsChunk> synthesize(
     TtsRequest request,
@@ -73,4 +120,21 @@ final class FakeTtsEngine implements TtsEngine {
 
   @override
   Future<void> dispose() async {}
+
+  String _normalizeLocale(String locale) {
+    return locale.trim().replaceAll('_', '-').toLowerCase();
+  }
+
+  bool _localeMatches(String? voiceLocale, String normalizedLocale) {
+    if (voiceLocale == null || voiceLocale.isEmpty) {
+      return false;
+    }
+    final normalizedVoiceLocale = _normalizeLocale(voiceLocale);
+    if (normalizedVoiceLocale == normalizedLocale) {
+      return true;
+    }
+    final language = normalizedLocale.split('-').first;
+    return normalizedVoiceLocale == language ||
+        normalizedVoiceLocale.startsWith('$language-');
+  }
 }

@@ -8,3 +8,13 @@
 - M4: Added production MemoryOutput and FileOutput with request-scoped session isolation.
 - M5: Added SpeakerOutput baseline with backend abstraction and playback session artifact.
 - M6: Added integration-style service tests, improved docs, and example application flow.
+
+## Unreleased
+
+- Added engine/service voice discovery APIs: `getAvailableVoices`,
+ `getDefaultVoice`, and `getDefaultVoiceForLocale`.
+- Expanded `TtsVoice` with optional metadata (`locale`, `displayName`,
+ `isDefault`).
+- `OpenAiTtsEngine` resolves available voices from a built-in model-scoped
+ catalog (`tts-1`, `tts-1-hd`, `gpt-4o-mini-tts`) with deterministic locale
+ fallback. Per-model overrides can be supplied via `voiceCatalogOverrides`.

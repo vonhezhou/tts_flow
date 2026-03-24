@@ -124,6 +124,23 @@ final class _FailingEngine implements TtsEngine {
       };
 
   @override
+  Future<List<TtsVoice>> getAvailableVoices({String? locale}) async {
+    return const [
+      TtsVoice(voiceId: 'failing-default', isDefault: true),
+    ];
+  }
+
+  @override
+  Future<TtsVoice> getDefaultVoice() async {
+    return const TtsVoice(voiceId: 'failing-default', isDefault: true);
+  }
+
+  @override
+  Future<TtsVoice> getDefaultVoiceForLocale(String locale) async {
+    return getDefaultVoice();
+  }
+
+  @override
   Future<void> dispose() async {}
 
   @override

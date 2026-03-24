@@ -267,6 +267,26 @@ void main() {
       expect(output.lastCancelReason, CancelReason.stopCurrent);
       await service.dispose();
     });
+
+    test('service exposes engine available voices and defaults', () async {
+      final service = TtsService(
+        engine: FakeTtsEngine(
+          engineId: 'fake-engine',
+          supportsStreaming: true,
+        ),
+        output: FakeTtsOutput(),
+      );
+
+      final voices = await service.getAvailableVoices();
+      final defaultVoice = await service.getDefaultVoice();
+      final localeDefault = await service.getDefaultVoiceForLocale('en-US');
+
+      expect(voices, isNotEmpty);
+      expect(defaultVoice.voiceId, isNotEmpty);
+      expect(localeDefault.voiceId, isNotEmpty);
+
+      await service.dispose();
+    });
   });
 }
 

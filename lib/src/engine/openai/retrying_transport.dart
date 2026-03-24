@@ -19,10 +19,14 @@ final class OpenAiRetryingApiClient implements OpenAiApiClient {
 
   @override
   Future<http.StreamedResponse> send(OpenAiApiRequest request) async {
+    return _runWithRetry(() => _inner.send(request));
+  }
+
+  Future<T> _runWithRetry<T>(Future<T> Function() op) async {
     var attempt = 0;
     while (true) {
       try {
-        return await _inner.send(request);
+        return await op();
       } on OpenAiTransportException catch (error) {
         final canRetry = error.isRetryable && attempt < maxRetries;
         if (!canRetry) {

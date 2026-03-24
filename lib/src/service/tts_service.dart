@@ -41,6 +41,21 @@ final class TtsService {
   Stream<TtsRequestEvent> get requestEvents => _requestEventsController.stream;
   bool get isPaused => _isPaused;
 
+  Future<List<TtsVoice>> getAvailableVoices({String? locale}) async {
+    _ensureNotDisposed();
+    return _engine.getAvailableVoices(locale: locale);
+  }
+
+  Future<TtsVoice> getDefaultVoice() async {
+    _ensureNotDisposed();
+    return _engine.getDefaultVoice();
+  }
+
+  Future<TtsVoice> getDefaultVoiceForLocale(String locale) async {
+    _ensureNotDisposed();
+    return _engine.getDefaultVoiceForLocale(locale);
+  }
+
   Stream<TtsChunk> speak(TtsRequest request) {
     _ensureNotDisposed();
 

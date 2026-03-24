@@ -164,6 +164,90 @@ void main() {
   });
 
   group('M3 OpenAI engine adapter', () {
+    test('reports catalog voices for the configured model', () async {
+      final engine = OpenAiTtsEngine(
+        apiClient: _SuccessApiClient(),
+        model: 'gpt-4o-mini-tts',
+      );
+
+      final voices = await engine.getAvailableVoices();
+      final defaultVoice = await engine.getDefaultVoice();
+
+      expect(voices, hasLength(11));
+      expect(
+        voices.map((v) => v.voiceId),
+        containsAll(['alloy', 'ash', 'ballad', 'coral', 'echo']),
+      );
+      expect(defaultVoice.voiceId, 'alloy');
+      expect(defaultVoice.isDefault, isTrue);
+    });
+
+    test('uses built-in catalog scoped to tts-1 model', () async {
+      final engine = OpenAiTtsEngine(
+        apiClient: _SuccessApiClient(),
+        model: 'tts-1',
+      );
+
+      final voices = await engine.getAvailableVoices();
+
+      expect(voices, hasLength(6));
+      expect(
+        voices.map((v) => v.voiceId),
+        containsAll(['alloy', 'nova', 'shimmer']),
+      );
+    });
+
+    test('per-model override replaces built-in catalog for that model',
+        () async {
+      const customVoices = [
+        TtsVoice(voiceId: 'custom-1'),
+        TtsVoice(voiceId: 'custom-2'),
+      ];
+      final engine = OpenAiTtsEngine(
+        apiClient: _SuccessApiClient(),
+        model: 'tts-1',
+        voiceCatalogOverrides: {'tts-1': customVoices},
+      );
+
+      final voices = await engine.getAvailableVoices();
+
+      expect(voices, hasLength(2));
+      expect(
+          voices.map((v) => v.voiceId), containsAll(['custom-1', 'custom-2']));
+    });
+
+    test('unknown model falls back to generic voice list', () async {
+      final engine = OpenAiTtsEngine(
+        apiClient: _SuccessApiClient(),
+        model: 'unknown-model-xyz',
+      );
+
+      final voices = await engine.getAvailableVoices();
+
+      expect(voices, isNotEmpty);
+      expect(voices.any((v) => v.isDefault), isTrue);
+    });
+
+    test('resolves default voice for locale using per-model override',
+        () async {
+      final engine = OpenAiTtsEngine(
+        apiClient: _SuccessApiClient(),
+        model: 'tts-1',
+        voiceCatalogOverrides: {
+          'tts-1': const [
+            TtsVoice(voiceId: 'en-voice', locale: 'en-US', isDefault: true),
+            TtsVoice(voiceId: 'es-voice', locale: 'es-ES'),
+          ],
+        },
+      );
+
+      final localeDefault = await engine.getDefaultVoiceForLocale('es-ES');
+      final fallbackDefault = await engine.getDefaultVoiceForLocale('fr-FR');
+
+      expect(localeDefault.voiceId, 'es-voice');
+      expect(fallbackDefault.voiceId, 'en-voice');
+    });
+
     test('adapts streaming response into ordered chunks', () async {
       final engine = OpenAiTtsEngine(
         apiClient: _SuccessApiClient(

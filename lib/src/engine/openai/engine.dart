@@ -19,6 +19,7 @@ class OpenAiTtsEngine implements TtsEngine {
     this.nonStreamingChunkSizeBytes = 4096,
     this.model = 'gpt-4o-mini-tts',
     this.apiKey = '',
+    this.voiceCatalogOverrides,
   });
 
   factory OpenAiTtsEngine.fromClientConfig({
@@ -28,6 +29,7 @@ class OpenAiTtsEngine implements TtsEngine {
     int nonStreamingChunkSizeBytes = 4096,
     http.Client? httpClient,
     Future<void> Function(Duration)? delay,
+    Map<String, List<TtsVoice>>? voiceCatalogOverrides,
   }) {
     final baseClient = OpenAiHttpApiClient(
       config: config,
@@ -50,6 +52,7 @@ class OpenAiTtsEngine implements TtsEngine {
       nonStreamingChunkSizeBytes: nonStreamingChunkSizeBytes,
       model: config.model,
       apiKey: config.apiKey,
+      voiceCatalogOverrides: voiceCatalogOverrides,
     );
   }
 
@@ -60,6 +63,48 @@ class OpenAiTtsEngine implements TtsEngine {
   final int nonStreamingChunkSizeBytes;
   final String model;
   final String apiKey;
+  final Map<String, List<TtsVoice>>? voiceCatalogOverrides;
+
+  static const Map<String, List<TtsVoice>> _builtInCatalog = {
+    'tts-1': [
+      TtsVoice(voiceId: 'alloy'),
+      TtsVoice(voiceId: 'echo'),
+      TtsVoice(voiceId: 'fable'),
+      TtsVoice(voiceId: 'nova'),
+      TtsVoice(voiceId: 'onyx'),
+      TtsVoice(voiceId: 'shimmer'),
+    ],
+    'tts-1-hd': [
+      TtsVoice(voiceId: 'alloy'),
+      TtsVoice(voiceId: 'echo'),
+      TtsVoice(voiceId: 'fable'),
+      TtsVoice(voiceId: 'nova'),
+      TtsVoice(voiceId: 'onyx'),
+      TtsVoice(voiceId: 'shimmer'),
+    ],
+    'gpt-4o-mini-tts': [
+      TtsVoice(voiceId: 'alloy'),
+      TtsVoice(voiceId: 'ash'),
+      TtsVoice(voiceId: 'ballad'),
+      TtsVoice(voiceId: 'coral'),
+      TtsVoice(voiceId: 'echo'),
+      TtsVoice(voiceId: 'fable'),
+      TtsVoice(voiceId: 'nova'),
+      TtsVoice(voiceId: 'onyx'),
+      TtsVoice(voiceId: 'sage'),
+      TtsVoice(voiceId: 'shimmer'),
+      TtsVoice(voiceId: 'verse'),
+    ],
+  };
+
+  static const List<String> _fallbackVoiceIds = [
+    'alloy',
+    'echo',
+    'fable',
+    'nova',
+    'onyx',
+    'shimmer',
+  ];
 
   @override
   bool get supportsStreaming => true;
@@ -70,6 +115,64 @@ class OpenAiTtsEngine implements TtsEngine {
         const SimpleFormatCapability(format: TtsAudioFormat.wav),
         const SimpleFormatCapability(format: TtsAudioFormat.aac),
       };
+
+  @override
+  Future<List<TtsVoice>> getAvailableVoices({String? locale}) async {
+    final voices = _resolveVoices();
+    if (locale == null || locale.trim().isEmpty) {
+      return voices;
+    }
+
+    final normalizedLocale = _normalizeLocale(locale);
+    final scoped = voices.where((voice) {
+      return _localeMatches(voice.locale, normalizedLocale);
+    }).toList(growable: false);
+
+    // If provider metadata does not include locales, do not hide voices.
+    if (scoped.isEmpty && voices.every((voice) => voice.locale == null)) {
+      return voices;
+    }
+
+    return scoped;
+  }
+
+  @override
+  Future<TtsVoice> getDefaultVoice() async {
+    final voices = _resolveVoices();
+
+    for (final voice in voices) {
+      if (voice.isDefault) {
+        return voice;
+      }
+    }
+    for (final voice in voices) {
+      if (voice.voiceId == defaultVoiceId) {
+        return voice;
+      }
+    }
+    return voices.first;
+  }
+
+  @override
+  Future<TtsVoice> getDefaultVoiceForLocale(String locale) async {
+    final normalizedLocale = _normalizeLocale(locale);
+    final scoped = await getAvailableVoices(locale: normalizedLocale);
+    if (scoped.isNotEmpty) {
+      for (final voice in scoped) {
+        if (voice.isDefault) {
+          return voice;
+        }
+      }
+      for (final voice in scoped) {
+        if (voice.voiceId == defaultVoiceId) {
+          return voice;
+        }
+      }
+      return scoped.first;
+    }
+
+    return getDefaultVoice();
+  }
 
   @override
   Stream<TtsChunk> synthesize(
@@ -245,6 +348,66 @@ class OpenAiTtsEngine implements TtsEngine {
       builder.add(data);
     }
     return builder.takeBytes();
+  }
+
+  List<TtsVoice> _resolveVoices() {
+    final override = voiceCatalogOverrides?[model];
+    if (override != null) {
+      return _withDefaultFallback(override);
+    }
+    final catalog = _builtInCatalog[model];
+    if (catalog != null) {
+      return _withDefaultFallback(catalog);
+    }
+    return _fallbackVoices();
+  }
+
+  List<TtsVoice> _withDefaultFallback(List<TtsVoice> discovered) {
+    if (discovered.isEmpty) {
+      return _fallbackVoices();
+    }
+    final hasDefault = discovered.any((voice) => voice.isDefault);
+    if (hasDefault) {
+      return discovered;
+    }
+
+    return discovered.map((voice) {
+      if (voice.voiceId != defaultVoiceId) {
+        return voice;
+      }
+      return TtsVoice(
+        voiceId: voice.voiceId,
+        locale: voice.locale,
+        displayName: voice.displayName,
+        isDefault: true,
+      );
+    }).toList(growable: false);
+  }
+
+  List<TtsVoice> _fallbackVoices() {
+    return _fallbackVoiceIds.map((voiceId) {
+      return TtsVoice(
+        voiceId: voiceId,
+        isDefault: voiceId == defaultVoiceId,
+      );
+    }).toList(growable: false);
+  }
+
+  String _normalizeLocale(String locale) {
+    return locale.trim().replaceAll('_', '-').toLowerCase();
+  }
+
+  bool _localeMatches(String? voiceLocale, String normalizedLocale) {
+    if (voiceLocale == null || voiceLocale.isEmpty) {
+      return false;
+    }
+    final normalizedVoiceLocale = _normalizeLocale(voiceLocale);
+    if (normalizedVoiceLocale == normalizedLocale) {
+      return true;
+    }
+    final language = normalizedLocale.split('-').first;
+    return normalizedVoiceLocale == language ||
+        normalizedVoiceLocale.startsWith('$language-');
   }
 
   @override

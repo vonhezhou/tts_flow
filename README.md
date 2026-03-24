@@ -49,6 +49,31 @@ inputs) to speed up integration debugging.
   - resumeCurrent
   - stopCurrent
   - clearQueue
+- Voice discovery helpers:
+  - getAvailableVoices
+  - getDefaultVoice
+  - getDefaultVoiceForLocale
+
+## Voice Discovery
+
+Use service-level helper methods to inspect engine voices and locale defaults.
+For `OpenAiTtsEngine`, the available voices are determined by a built-in
+model-scoped catalog (different models support different voice sets). You can
+supply per-model overrides via `voiceCatalogOverrides`.
+
+```dart
+import 'package:flutter_uni_tts/flutter_uni_tts.dart';
+
+Future<void> inspectVoices(TtsService service) async {
+  final voices = await service.getAvailableVoices();
+  final defaultVoice = await service.getDefaultVoice();
+  final usDefault = await service.getDefaultVoiceForLocale('en-US');
+
+  print('voices: ${voices.map((voice) => voice.voiceId).toList()}');
+  print('default: ${defaultVoice.voiceId}');
+  print('en-US default: ${usDefault.voiceId}');
+}
+```
 
 ## Quick Start
 
