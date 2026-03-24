@@ -242,6 +242,22 @@ class TtsOptions {
   final double? volume;
   final int? sampleRateHz;
   final Duration? timeout;
+
+  TtsOptions copyWith({
+    double? speed,
+    double? pitch,
+    double? volume,
+    int? sampleRateHz,
+    Duration? timeout,
+  }) {
+    return TtsOptions(
+      speed: speed ?? this.speed,
+      pitch: pitch ?? this.pitch,
+      volume: volume ?? this.volume,
+      sampleRateHz: sampleRateHz ?? this.sampleRateHz,
+      timeout: timeout ?? this.timeout,
+    );
+  }
 }
 
 class TtsRequest {

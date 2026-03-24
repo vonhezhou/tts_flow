@@ -5,8 +5,8 @@ flutter_uni_tts is a clean, extensible TTS framework for Dart and Flutter.
 Core design choices in this repository:
 
 - Fixed service wiring: each TtsService instance uses one engine and one output.
-- Request-scoped capability negotiation: audio spec is resolved per request.
-- Unified API: speak always returns a stream of `TtsChunk`.
+- Service-scoped defaults: voice/options/format are configured once per service.
+- Unified API: speak(requestId, text, [params]) always returns a stream of `TtsChunk`.
 - FIFO queue semantics with halt-on-failure behavior.
 
 ## Audio Negotiation
@@ -21,10 +21,10 @@ Audio negotiation is capability-based and request-scoped.
 
 Resolution priority:
 
-1. Request-level preferred format (`TtsRequest.preferredFormat`) if compatible.
+1. Service-level preferred format (`TtsService.preferredFormat`) if compatible.
 2. Service preferred order (`TtsServiceConfig.preferredFormatOrder`).
-3. For PCM descriptors, request preferred sample rate (`TtsOptions.sampleRateHz`)
-   when compatible, otherwise a deterministic fallback.
+3. For PCM descriptors, service options sample rate (`TtsOptions.sampleRateHz`)
+  when compatible, otherwise a deterministic fallback.
 
 When negotiation fails, `TtsErrorCode.formatNegotiationFailed` now includes
 diagnostic context in the message (shared formats/capabilities and preference
@@ -44,6 +44,7 @@ inputs) to speed up integration debugging.
   - NonStreamingBridge
   - OpenAiTtsEngine transport adapter API
 - Queue orchestration and controls:
+  - init
   - speak
   - pauseCurrent
   - resumeCurrent
@@ -89,15 +90,13 @@ Future<void> main() async {
   ),
   output: MemoryOutput(),
  );
+ 
+ await service.init();
+ service.preferredFormat = TtsAudioFormat.wav;
+ service.sampleRateHz = 24000;
 
  final chunks = await service
-   .speak(
-    const TtsRequest(
-     requestId: 'hello-1',
-     text: 'Hello from flutter uni tts',
-     preferredFormat: TtsAudioFormat.wav,
-    ),
-   )
+   .speak('hello-1', 'Hello from flutter uni tts')
    .toList();
 
  print('Received ${chunks.length} chunks.');
@@ -156,14 +155,11 @@ Future<void> main() async {
     output: output,
   );
 
+  await service.init();
+  service.preferredFormat = TtsAudioFormat.wav;
+
   await service
-      .speak(
-        const TtsRequest(
-          requestId: 'fanout-1',
-          text: 'hello fanout',
-          preferredFormat: TtsAudioFormat.wav,
-        ),
-      )
+      .speak('fanout-1', 'hello fanout')
       .drain();
 
   await service.dispose();

@@ -24,12 +24,10 @@ void main() {
         }
       });
 
-      final streamA = service.speak(
-        const TtsRequest(requestId: 'a', text: 'first request payload'),
-      );
-      final streamB = service.speak(
-        const TtsRequest(requestId: 'b', text: 'second request payload'),
-      );
+      await service.init();
+
+      final streamA = service.speak('a', 'first request payload');
+      final streamB = service.speak('b', 'second request payload');
 
       await streamA.toList();
       await streamB.toList();
@@ -51,12 +49,10 @@ void main() {
         output: FakeTtsOutput(),
       );
 
-      final active = service.speak(
-        const TtsRequest(requestId: 'active', text: 'active request'),
-      );
-      final pending = service.speak(
-        const TtsRequest(requestId: 'pending', text: 'pending request'),
-      );
+      await service.init();
+
+      final active = service.speak('active', 'active request');
+      final pending = service.speak('pending', 'pending request');
 
       await Future<void>.delayed(const Duration(milliseconds: 8));
       final clearedCount = await service.clearQueue();
@@ -83,13 +79,11 @@ void main() {
       final events = <TtsRequestEvent>[];
       final sub = service.requestEvents.listen(events.add);
 
-      final longStream = service.speak(
-        const TtsRequest(
-            requestId: 'long', text: 'this is a long request payload'),
-      );
-      final nextStream = service.speak(
-        const TtsRequest(requestId: 'next', text: 'next request'),
-      );
+      await service.init();
+
+      final longStream =
+          service.speak('long', 'this is a long request payload');
+      final nextStream = service.speak('next', 'next request');
 
       await Future<void>.delayed(const Duration(milliseconds: 12));
       await service.stopCurrent();
@@ -141,9 +135,9 @@ void main() {
         }
       });
 
-      final stream = service.speak(
-        const TtsRequest(requestId: 'output-fail', text: 'fail through output'),
-      );
+      await service.init();
+
+      final stream = service.speak('output-fail', 'fail through output');
 
       await expectLater(stream.toList(), throwsA(isA<TtsError>()));
       await Future<void>.delayed(const Duration(milliseconds: 20));
@@ -177,12 +171,10 @@ void main() {
       final events = <TtsRequestEvent>[];
       final sub = service.requestEvents.listen(events.add);
 
-      final first = service.speak(
-        const TtsRequest(requestId: 'first', text: 'this will fail'),
-      );
-      final second = service.speak(
-        const TtsRequest(requestId: 'second', text: 'this should still run'),
-      );
+      await service.init();
+
+      final first = service.speak('first', 'this will fail');
+      final second = service.speak('second', 'this should still run');
 
       await expectLater(first.toList(), throwsA(isA<TtsError>()));
       final secondChunks = await second.toList();
@@ -219,20 +211,18 @@ void main() {
         }
       });
 
-      await service.pauseCurrent();
+      await service.init();
+
+      await service.pause();
       expect(service.isPaused, isTrue);
 
-      final first = service.speak(
-        const TtsRequest(requestId: 'paused-1', text: 'first queued'),
-      );
-      final second = service.speak(
-        const TtsRequest(requestId: 'paused-2', text: 'second queued'),
-      );
+      final first = service.speak('paused-1', 'first queued');
+      final second = service.speak('paused-2', 'second queued');
 
       await Future<void>.delayed(const Duration(milliseconds: 30));
       expect(started, isEmpty);
 
-      await service.resumeCurrent();
+      await service.resume();
       expect(service.isPaused, isFalse);
 
       await first.toList();
@@ -256,9 +246,9 @@ void main() {
         output: output,
       );
 
-      final longStream = service.speak(
-        const TtsRequest(requestId: 'cancel-reason', text: 'long request'),
-      );
+      await service.init();
+
+      final longStream = service.speak('cancel-reason', 'long request');
 
       await Future<void>.delayed(const Duration(milliseconds: 12));
       await service.stopCurrent();
@@ -277,6 +267,8 @@ void main() {
         output: FakeTtsOutput(),
       );
 
+      await service.init();
+
       final voices = await service.getAvailableVoices();
       final defaultVoice = await service.getDefaultVoice();
       final localeDefault = await service.getDefaultVoiceForLocale('en-US');
@@ -284,6 +276,43 @@ void main() {
       expect(voices, isNotEmpty);
       expect(defaultVoice.voiceId, isNotEmpty);
       expect(localeDefault.voiceId, isNotEmpty);
+      expect(service.voice, isNotNull);
+
+      service.speed = 1.1;
+      service.pitch = 0.9;
+      service.volume = 0.8;
+      service.sampleRateHz = 24000;
+      service.timeout = const Duration(seconds: 10);
+      service.preferredFormat = TtsAudioFormat.wav;
+      expect(service.speed, 1.1);
+      expect(service.pitch, 0.9);
+      expect(service.volume, 0.8);
+      expect(service.sampleRateHz, 24000);
+      expect(service.timeout, const Duration(seconds: 10));
+
+      final streamedChunks = await service.speak(
+        'defaults-applied',
+        'request uses service defaults',
+        const {'style': 'news', 'emotion': 'calm'},
+      ).toList();
+      expect(streamedChunks, isNotEmpty);
+
+      await service.dispose();
+    });
+
+    test('speak requires init before usage', () async {
+      final service = TtsService(
+        engine: FakeTtsEngine(
+          engineId: 'fake-engine',
+          supportsStreaming: true,
+        ),
+        output: FakeTtsOutput(),
+      );
+
+      expect(
+        () => service.speak('not-ready', 'call before init'),
+        throwsStateError,
+      );
 
       await service.dispose();
     });

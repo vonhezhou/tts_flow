@@ -18,15 +18,11 @@ void main() {
         output: MemoryOutput(),
       );
 
-      final chunks = await service
-          .speak(
-            const TtsRequest(
-              requestId: 'i-1',
-              text: 'integration sample text',
-              preferredFormat: TtsAudioFormat.wav,
-            ),
-          )
-          .toList();
+      await service.init();
+      service.preferredFormat = TtsAudioFormat.wav;
+
+      final chunks =
+          await service.speak('i-1', 'integration sample text').toList();
 
       expect(chunks, isNotEmpty);
       expect(
@@ -43,6 +39,8 @@ void main() {
         output: MemoryOutput(),
       );
 
+      await service.init();
+
       final canceledIds = <String>[];
       final sub = service.requestEvents.listen((event) {
         if (event.type == TtsRequestEventType.requestCanceled) {
@@ -50,12 +48,8 @@ void main() {
         }
       });
 
-      final first = service.speak(
-        const TtsRequest(requestId: 'fail-1', text: 'this request fails'),
-      );
-      final second = service.speak(
-        const TtsRequest(requestId: 'fail-2', text: 'should be canceled'),
-      );
+      final first = service.speak('fail-1', 'this request fails');
+      final second = service.speak('fail-2', 'should be canceled');
 
       await expectLater(first.toList(), throwsA(isA<TtsError>()));
       expect(await second.toList(), isEmpty);
@@ -86,14 +80,11 @@ void main() {
           ),
         );
 
+        await service.init();
+        service.preferredFormat = TtsAudioFormat.wav;
+
         final chunks = await service
-            .speak(
-              const TtsRequest(
-                requestId: 'fanout-m6-1',
-                text: 'fanout integration request',
-                preferredFormat: TtsAudioFormat.wav,
-              ),
-            )
+            .speak('fanout-m6-1', 'fanout integration request')
             .toList();
 
         expect(chunks, isNotEmpty);

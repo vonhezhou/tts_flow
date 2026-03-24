@@ -486,7 +486,7 @@ http.StreamedResponse _streamedResponse(
   );
 }
 
-/// Engine subclass that parses {"audio": "<base64>"} JSON envelopes.
+/// Engine subclass that parses {"audio": "\<base64>"} JSON envelopes.
 final class _JsonEnvelopeEngine extends OpenAiTtsEngine {
   _JsonEnvelopeEngine({required super.apiClient});
 

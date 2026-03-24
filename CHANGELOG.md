@@ -11,6 +11,17 @@
 
 ## Unreleased
 
+- Breaking: `TtsService.speak(TtsRequest)` was replaced by
+ `speak(String requestId, String text, [Map<String, Object> params])`.
+- Breaking: `TtsService` now requires explicit `init()` before `speak` and
+ control APIs; `init()` seeds service voice from `engine.getDefaultVoice()`.
+- Added persistent service defaults for synthesis behavior:
+ `voice`, `options`, and `preferredFormat`.
+- Added direct option field accessors on `TtsService` for
+ `speed`, `pitch`, `volume`, `sampleRateHz`, and `timeout`.
+- `speak(...)` now constructs a fresh internal `TtsRequest` snapshot from
+ current service defaults on each invocation (call params are per-request only).
+
 - Added engine/service voice discovery APIs: `getAvailableVoices`,
  `getDefaultVoice`, and `getDefaultVoiceForLocale`.
 - Expanded `TtsVoice` with optional metadata (`locale`, `displayName`,

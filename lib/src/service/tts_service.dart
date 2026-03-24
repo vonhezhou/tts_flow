@@ -15,7 +15,10 @@ final class TtsService {
     TtsServiceConfig? config,
   })  : _engine = engine,
         _output = output,
-        _config = config ?? const TtsServiceConfig();
+        _config = config ?? const TtsServiceConfig(),
+        _options = const TtsOptions(),
+        _preferredFormat =
+            (config ?? const TtsServiceConfig()).preferredFormatOrder.first;
 
   final TtsEngine _engine;
   final TtsOutput _output;
@@ -30,16 +33,80 @@ final class TtsService {
       StreamController<TtsRequestEvent>.broadcast();
 
   bool _isProcessing = false;
+  bool _isInitialized = false;
   bool _isDisposed = false;
   bool _isHalted = false;
   bool _isPaused = false;
   SynthesisControl? _activeControl;
   final List<TtsChunk> _pauseBuffer = [];
   int _pauseBufferBytes = 0;
+  late TtsVoice _voice;
+  TtsOptions _options;
+  TtsAudioFormat _preferredFormat;
 
   Stream<TtsQueueEvent> get queueEvents => _queueEventsController.stream;
   Stream<TtsRequestEvent> get requestEvents => _requestEventsController.stream;
   bool get isPaused => _isPaused;
+  bool get isInitialized => _isInitialized;
+
+  TtsVoice get voice => _voice;
+
+  set voice(TtsVoice value) {
+    _ensureNotDisposed();
+    _voice = value;
+  }
+
+  double? get speed => _options.speed;
+
+  set speed(double? value) {
+    _ensureNotDisposed();
+    _options = _options.copyWith(speed: value);
+  }
+
+  double? get pitch => _options.pitch;
+
+  set pitch(double? value) {
+    _ensureNotDisposed();
+    _options = _options.copyWith(pitch: value);
+  }
+
+  double? get volume => _options.volume;
+
+  set volume(double? value) {
+    _ensureNotDisposed();
+    _options = _options.copyWith(volume: value);
+  }
+
+  int? get sampleRateHz => _options.sampleRateHz;
+
+  set sampleRateHz(int? value) {
+    _ensureNotDisposed();
+    _options = _options.copyWith(sampleRateHz: value);
+  }
+
+  Duration? get timeout => _options.timeout;
+
+  set timeout(Duration? value) {
+    _ensureNotDisposed();
+    _options = _options.copyWith(timeout: value);
+  }
+
+  TtsAudioFormat get preferredFormat => _preferredFormat;
+
+  set preferredFormat(TtsAudioFormat value) {
+    _ensureNotDisposed();
+    _preferredFormat = value;
+  }
+
+  Future<void> init() async {
+    _ensureNotDisposed();
+    if (_isInitialized) {
+      return;
+    }
+
+    _voice = await _engine.getDefaultVoice();
+    _isInitialized = true;
+  }
 
   Future<List<TtsVoice>> getAvailableVoices({String? locale}) async {
     _ensureNotDisposed();
@@ -56,8 +123,18 @@ final class TtsService {
     return _engine.getDefaultVoiceForLocale(locale);
   }
 
-  Stream<TtsChunk> speak(TtsRequest request) {
-    _ensureNotDisposed();
+  Stream<TtsChunk> speak(
+    String requestId,
+    String text, [
+    Map<String, Object> params = const <String, Object>{},
+  ]) {
+    _ensureReady();
+
+    final request = _buildRequest(
+      requestId: requestId,
+      text: text,
+      params: params,
+    );
 
     if (_isHalted) {
       _isHalted = false;
@@ -79,19 +156,19 @@ final class TtsService {
     return controller.stream;
   }
 
-  Future<void> pauseCurrent() async {
-    _ensureNotDisposed();
+  Future<void> pause() async {
+    _ensureReady();
     _isPaused = true;
   }
 
-  Future<void> resumeCurrent() async {
-    _ensureNotDisposed();
+  Future<void> resume() async {
+    _ensureReady();
     _isPaused = false;
     unawaited(_processQueue());
   }
 
   Future<void> stopCurrent() async {
-    _ensureNotDisposed();
+    _ensureReady();
     _activeControl?.cancel(CancelReason.stopCurrent);
   }
 
@@ -122,9 +199,27 @@ final class TtsService {
     await clearQueue();
     await _engine.dispose();
     await _output.dispose();
+    _isInitialized = false;
     _isDisposed = true;
     await _queueEventsController.close();
     await _requestEventsController.close();
+  }
+
+  TtsRequest _buildRequest({
+    required String requestId,
+    required String text,
+    required Map<String, Object> params,
+  }) {
+    return TtsRequest(
+      requestId: requestId,
+      text: text,
+      voice: _voice,
+      preferredFormat: _preferredFormat,
+      options: _options,
+      params: Map<String, Object>.unmodifiable(
+        Map<String, Object>.from(params),
+      ),
+    );
   }
 
   Future<void> _processQueue() async {
@@ -370,6 +465,13 @@ final class TtsService {
   void _ensureNotDisposed() {
     if (_isDisposed) {
       throw StateError('TtsService is disposed.');
+    }
+  }
+
+  void _ensureReady() {
+    _ensureNotDisposed();
+    if (!_isInitialized) {
+      throw StateError('TtsService is not initialized. Call init() first.');
     }
   }
 }

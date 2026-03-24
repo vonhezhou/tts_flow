@@ -25,6 +25,7 @@ Future<void> main() async {
     engine: engine,
     output: MemoryOutput(),
   );
+  await service.init();
 
   print(
     useOpenAi
@@ -40,20 +41,12 @@ Future<void> main() async {
     print('request: ${event.type} req=${event.requestId}');
   });
 
-  final first = service.speak(
-    const TtsRequest(
-      requestId: 'example-1',
-      text: 'First request uses preferred WAV.',
-      preferredFormat: TtsAudioFormat.wav,
-    ),
-  );
+  service.preferredFormat = TtsAudioFormat.wav;
+  final first = service.speak('example-1', 'First request uses preferred WAV.');
 
+  service.preferredFormat = TtsAudioFormat.mp3;
   final second = service.speak(
-    const TtsRequest(
-      requestId: 'example-2',
-      text: 'Second request falls back to compatible format.',
-    ),
-  );
+      'example-2', 'Second request falls back to compatible format.');
 
   final firstChunks = await first.toList();
   final secondChunks = await second.toList();
