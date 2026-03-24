@@ -46,7 +46,7 @@ final class MemoryOutput implements TtsOutput {
     _buffer = null;
     return MemoryOutputArtifact(
       requestId: session.requestId,
-      resolvedFormat: session.resolvedFormat,
+      audioSpec: session.audioSpec,
       audioBytes: audioBytes,
       totalBytes: audioBytes.length,
     );

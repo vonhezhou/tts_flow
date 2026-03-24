@@ -75,7 +75,7 @@ class OpenAiTtsEngine implements TtsEngine {
   Stream<TtsChunk> synthesize(
     TtsRequest request,
     TtsControlToken controlToken,
-    TtsAudioFormat resolvedFormat,
+    TtsAudioSpec resolvedFormat,
   ) async* {
     try {
       final response = await apiClient.send(
@@ -93,7 +93,7 @@ class OpenAiTtsEngine implements TtsEngine {
       final audioStream = parseSuccessResponse(
         response,
         request,
-        resolvedFormat,
+        resolvedFormat.format,
       );
 
       var sequence = 0;
@@ -109,7 +109,7 @@ class OpenAiTtsEngine implements TtsEngine {
             requestId: request.requestId,
             sequenceNumber: sequence,
             bytes: Uint8List.fromList(pending),
-            format: resolvedFormat,
+            audioSpec: resolvedFormat,
             isLastChunk: false,
             timestamp: DateTime.now().toUtc(),
           );
@@ -128,7 +128,7 @@ class OpenAiTtsEngine implements TtsEngine {
         requestId: request.requestId,
         sequenceNumber: sequence,
         bytes: Uint8List.fromList(lastBytes),
-        format: resolvedFormat,
+        audioSpec: resolvedFormat,
         isLastChunk: true,
         timestamp: DateTime.now().toUtc(),
       );
@@ -152,7 +152,7 @@ class OpenAiTtsEngine implements TtsEngine {
   /// Builds the raw HTTP request sent by the API client.
   OpenAiApiRequest buildApiRequest(
     TtsRequest request,
-    TtsAudioFormat resolvedFormat,
+    TtsAudioSpec resolvedFormat,
   ) {
     return OpenAiApiRequest.json(
       method: 'POST',
@@ -163,14 +163,14 @@ class OpenAiTtsEngine implements TtsEngine {
   }
 
   /// Override to route requests to a non-default endpoint.
-  String? resolveEndpoint(TtsRequest request, TtsAudioFormat resolvedFormat) {
+  String? resolveEndpoint(TtsRequest request, TtsAudioSpec resolvedFormat) {
     return null;
   }
 
   /// Override to customise request headers for OpenAI-compatible providers.
   Map<String, String> buildRequestHeaders(
     TtsRequest request,
-    TtsAudioFormat resolvedFormat,
+    TtsAudioSpec resolvedFormat,
   ) {
     final headers = <String, String>{
       'Content-Type': 'application/json',
@@ -182,12 +182,12 @@ class OpenAiTtsEngine implements TtsEngine {
   }
 
   /// Override to customise payload shape for compatible providers.
-  String buildRequestBody(TtsRequest request, TtsAudioFormat resolvedFormat) {
+  String buildRequestBody(TtsRequest request, TtsAudioSpec resolvedFormat) {
     return jsonEncode({
       'model': model,
       'input': request.text,
       'voice': request.voice?.voiceId ?? defaultVoiceId,
-      'response_format': mapFormat(resolvedFormat),
+      'response_format': mapFormat(resolvedFormat.format),
     });
   }
 

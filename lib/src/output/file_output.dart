@@ -27,7 +27,7 @@ final class FileOutput implements TtsOutput {
       session: session,
       tempFile: _buildTempFile(
         requestId: session.requestId,
-        format: session.resolvedFormat,
+        audioSpec: session.audioSpec,
       ),
     );
   }
@@ -67,7 +67,7 @@ final class FileOutput implements TtsOutput {
 
     try {
       await _state.flushAndCloseSink();
-      final extension = _extensionForFormat(session.resolvedFormat);
+      final extension = _extensionForFormat(session.audioSpec.format);
       final finalPath =
           '${_outputDirectory.path}${Platform.pathSeparator}${session.requestId}.$extension';
       final targetFile = File(finalPath);
@@ -81,7 +81,7 @@ final class FileOutput implements TtsOutput {
 
       return FileOutputArtifact(
         requestId: session.requestId,
-        resolvedFormat: session.resolvedFormat,
+        audioSpec: session.audioSpec,
         filePath: moved.path,
         fileSizeBytes: size,
       );
@@ -116,9 +116,9 @@ final class FileOutput implements TtsOutput {
 
   File _buildTempFile({
     required String requestId,
-    required TtsAudioFormat format,
+    required TtsAudioSpec audioSpec,
   }) {
-    final extension = _extensionForFormat(format);
+    final extension = _extensionForFormat(audioSpec.format);
     final tempPath =
         '${_outputDirectory.path}${Platform.pathSeparator}$requestId.$extension.tmp';
     return File(tempPath);

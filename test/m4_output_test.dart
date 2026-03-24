@@ -10,7 +10,7 @@ void main() {
       final output = MemoryOutput();
       const session = TtsOutputSession(
         requestId: 'mem-1',
-        resolvedFormat: TtsAudioFormat.wav,
+        audioSpec: TtsAudioSpec(format: TtsAudioFormat.wav),
       );
 
       await output.initSession(session);
@@ -22,7 +22,7 @@ void main() {
       expect(artifact, isA<MemoryOutputArtifact>());
       final mem = artifact as MemoryOutputArtifact;
       expect(mem.requestId, 'mem-1');
-      expect(mem.resolvedFormat, TtsAudioFormat.wav);
+      expect(mem.audioSpec.format, TtsAudioFormat.wav);
       expect(mem.totalBytes, 3);
       expect(mem.audioBytes, Uint8List.fromList([1, 2, 3]));
     });
@@ -32,7 +32,8 @@ void main() {
 
       await output.initSession(
         const TtsOutputSession(
-            requestId: 'a', resolvedFormat: TtsAudioFormat.mp3),
+            requestId: 'a',
+            audioSpec: TtsAudioSpec(format: TtsAudioFormat.mp3)),
       );
       await output.consumeChunk(
           _chunk('a', 0, [8, 8], TtsAudioFormat.mp3, isLast: true));
@@ -40,7 +41,8 @@ void main() {
 
       await output.initSession(
         const TtsOutputSession(
-            requestId: 'b', resolvedFormat: TtsAudioFormat.wav),
+            requestId: 'b',
+            audioSpec: TtsAudioSpec(format: TtsAudioFormat.wav)),
       );
       await output
           .consumeChunk(_chunk('b', 0, [7], TtsAudioFormat.wav, isLast: true));
@@ -59,7 +61,7 @@ void main() {
         final output = FileOutput(outputDirectory: tempDir);
         const session = TtsOutputSession(
           requestId: 'file-1',
-          resolvedFormat: TtsAudioFormat.mp3,
+          audioSpec: TtsAudioSpec(format: TtsAudioFormat.mp3),
         );
 
         await output.initSession(session);
@@ -74,7 +76,7 @@ void main() {
 
         final fileArtifact = artifact as FileOutputArtifact;
         expect(fileArtifact.requestId, 'file-1');
-        expect(fileArtifact.resolvedFormat, TtsAudioFormat.mp3);
+        expect(fileArtifact.audioSpec.format, TtsAudioFormat.mp3);
         expect(await File(fileArtifact.filePath).exists(), isTrue);
         expect(
             await File(fileArtifact.filePath).readAsBytes(), [1, 2, 3, 4, 5]);
@@ -90,7 +92,7 @@ void main() {
         final output = FileOutput(outputDirectory: tempDir);
         const session = TtsOutputSession(
           requestId: 'file-2',
-          resolvedFormat: TtsAudioFormat.wav,
+          audioSpec: TtsAudioSpec(format: TtsAudioFormat.wav),
         );
 
         await output.initSession(session);
@@ -126,7 +128,7 @@ void main() {
 
       const session = TtsOutputSession(
         requestId: 'composite-1',
-        resolvedFormat: TtsAudioFormat.wav,
+        audioSpec: TtsAudioSpec(format: TtsAudioFormat.wav),
       );
 
       await output.initSession(session);
@@ -153,7 +155,7 @@ void main() {
 
       const session = TtsOutputSession(
         requestId: 'composite-2',
-        resolvedFormat: TtsAudioFormat.wav,
+        audioSpec: TtsAudioSpec(format: TtsAudioFormat.wav),
       );
 
       await output.initSession(session);
@@ -228,7 +230,7 @@ TtsChunk _chunk(
     requestId: requestId,
     sequenceNumber: seq,
     bytes: Uint8List.fromList(bytes),
-    format: format,
+    audioSpec: TtsAudioSpec(format: format),
     isLastChunk: isLast,
     timestamp: DateTime.now().toUtc(),
   );

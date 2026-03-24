@@ -153,7 +153,7 @@ final class CompositeOutput implements TtsOutput {
 
     final artifact = CompositeOutputArtifact(
       requestId: session.requestId,
-      resolvedFormat: session.resolvedFormat,
+      audioSpec: session.audioSpec,
       artifacts: artifacts,
       outputErrors: _outputErrors,
     );

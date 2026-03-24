@@ -7,7 +7,7 @@ final class NonStreamingBridge {
 
   static Stream<TtsChunk> toChunkStream({
     required String requestId,
-    required TtsAudioFormat format,
+    required TtsAudioSpec audioSpec,
     required Uint8List audioBytes,
     int chunkSizeBytes = 4096,
     DateTime Function()? clock,
@@ -17,7 +17,7 @@ final class NonStreamingBridge {
         requestId: requestId,
         sequenceNumber: 0,
         bytes: Uint8List(0),
-        format: format,
+        audioSpec: audioSpec,
         isLastChunk: true,
         timestamp: (clock ?? DateTime.now).call().toUtc(),
       );
@@ -34,7 +34,7 @@ final class NonStreamingBridge {
         requestId: requestId,
         sequenceNumber: sequence,
         bytes: bytes,
-        format: format,
+        audioSpec: audioSpec,
         isLastChunk: end >= audioBytes.length,
         timestamp: (clock ?? DateTime.now).call().toUtc(),
       );

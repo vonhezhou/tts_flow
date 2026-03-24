@@ -30,7 +30,8 @@ void main() {
 
       expect(chunks, isNotEmpty);
       expect(
-          chunks.every((chunk) => chunk.format == TtsAudioFormat.wav), isTrue);
+          chunks.every((chunk) => chunk.audioSpec.format == TtsAudioFormat.wav),
+          isTrue);
       expect(chunks.last.isLastChunk, isTrue);
 
       await service.dispose();
@@ -133,7 +134,7 @@ final class _FailingEngine implements TtsEngine {
   Stream<TtsChunk> synthesize(
     TtsRequest request,
     TtsControlToken controlToken,
-    TtsAudioFormat resolvedFormat,
+    TtsAudioSpec resolvedFormat,
   ) async* {
     if (request.requestId == 'fail-1') {
       throw const TtsError(
@@ -147,7 +148,7 @@ final class _FailingEngine implements TtsEngine {
       requestId: request.requestId,
       sequenceNumber: 0,
       bytes: Uint8List.fromList([1]),
-      format: resolvedFormat,
+      audioSpec: resolvedFormat,
       isLastChunk: true,
       timestamp: DateTime.now().toUtc(),
     );

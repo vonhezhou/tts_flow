@@ -1,5 +1,6 @@
 import 'dart:async';
 import 'dart:typed_data';
+
 import 'package:flutter_uni_tts/flutter_uni_tts.dart';
 import 'package:test/test.dart';
 
@@ -328,7 +329,7 @@ final class _FailByRequestIdOutput implements TtsOutput {
     }
     return MemoryOutputArtifact(
       requestId: session.requestId,
-      resolvedFormat: session.resolvedFormat,
+      audioSpec: session.audioSpec,
       audioBytes: Uint8List(0),
       totalBytes: 0,
     );

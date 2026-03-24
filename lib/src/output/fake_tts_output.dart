@@ -38,7 +38,7 @@ final class FakeTtsOutput implements TtsOutput {
     final bytes = _buffer.takeBytes();
     return MemoryOutputArtifact(
       requestId: session.requestId,
-      resolvedFormat: session.resolvedFormat,
+      audioSpec: session.audioSpec,
       audioBytes: bytes,
       totalBytes: bytes.length,
     );

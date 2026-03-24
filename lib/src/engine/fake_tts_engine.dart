@@ -33,7 +33,7 @@ final class FakeTtsEngine implements TtsEngine {
   Stream<TtsChunk> synthesize(
     TtsRequest request,
     TtsControlToken controlToken,
-    TtsAudioFormat resolvedFormat,
+    TtsAudioSpec resolvedFormat,
   ) async* {
     final payload = utf8.encode(request.text);
     final total = payload.length;
@@ -59,7 +59,7 @@ final class FakeTtsEngine implements TtsEngine {
         requestId: request.requestId,
         sequenceNumber: i,
         bytes: chunkBytes,
-        format: resolvedFormat,
+        audioSpec: resolvedFormat,
         isLastChunk: end >= total,
         timestamp: DateTime.now().toUtc(),
       );

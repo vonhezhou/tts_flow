@@ -68,7 +68,7 @@ void main() {
           .synthesize(
             const TtsRequest(requestId: 'o1', text: 'hello'),
             TtsControlToken(),
-            TtsAudioFormat.mp3,
+            TtsAudioSpec(format: TtsAudioFormat.mp3),
           )
           .toList();
 
@@ -81,7 +81,7 @@ void main() {
       expect(chunks[2].bytes, Uint8List.fromList([7, 8, 9]));
       expect(chunks[2].isLastChunk, isTrue);
       expect(
-        chunks.every((chunk) => chunk.format == TtsAudioFormat.mp3),
+        chunks.every((chunk) => chunk.audioSpec.format == TtsAudioFormat.mp3),
         isTrue,
       );
     });
@@ -98,7 +98,7 @@ void main() {
             .synthesize(
               const TtsRequest(requestId: 'o2', text: 'hello'),
               TtsControlToken(),
-              TtsAudioFormat.mp3,
+              TtsAudioSpec(format: TtsAudioFormat.mp3),
             )
             .toList(),
         throwsA(
@@ -178,7 +178,7 @@ void main() {
             .synthesize(
               const TtsRequest(requestId: 'o3', text: 'hello'),
               TtsControlToken(),
-              TtsAudioFormat.mp3,
+              TtsAudioSpec(format: TtsAudioFormat.mp3),
             )
             .toList(),
         throwsA(
@@ -205,7 +205,7 @@ void main() {
             .synthesize(
               const TtsRequest(requestId: 'o4', text: 'hello'),
               TtsControlToken(),
-              TtsAudioFormat.mp3,
+              TtsAudioSpec(format: TtsAudioFormat.mp3),
             )
             .toList(),
         throwsA(
@@ -233,7 +233,7 @@ void main() {
           .synthesize(
             const TtsRequest(requestId: 'j1', text: 'hello'),
             TtsControlToken(),
-            TtsAudioFormat.mp3,
+            TtsAudioSpec(format: TtsAudioFormat.mp3),
           )
           .toList();
 

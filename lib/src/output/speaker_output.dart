@@ -52,7 +52,7 @@ final class SpeakerOutput implements TtsOutput {
     _session = session;
     _playbackId = await _backend.startPlayback(
       requestId: session.requestId,
-      format: session.resolvedFormat,
+      format: session.audioSpec.format,
     );
   }
 
@@ -84,7 +84,7 @@ final class SpeakerOutput implements TtsOutput {
 
     return SpeakerOutputArtifact(
       requestId: session.requestId,
-      resolvedFormat: session.resolvedFormat,
+      audioSpec: session.audioSpec,
       playbackId: playbackId,
       playbackDuration: duration,
     );

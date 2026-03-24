@@ -61,27 +61,27 @@ final class TtsControlToken {
 final class TtsOutputSession {
   const TtsOutputSession({
     required this.requestId,
-    required this.resolvedFormat,
+    required this.audioSpec,
   });
 
   final String requestId;
-  final TtsAudioFormat resolvedFormat;
+  final TtsAudioSpec audioSpec;
 }
 
 sealed class TtsOutputArtifact {
   const TtsOutputArtifact({
     required this.requestId,
-    required this.resolvedFormat,
+    required this.audioSpec,
   });
 
   final String requestId;
-  final TtsAudioFormat resolvedFormat;
+  final TtsAudioSpec audioSpec;
 }
 
 final class MemoryOutputArtifact extends TtsOutputArtifact {
   const MemoryOutputArtifact({
     required super.requestId,
-    required super.resolvedFormat,
+    required super.audioSpec,
     required this.audioBytes,
     required this.totalBytes,
   });
@@ -93,7 +93,7 @@ final class MemoryOutputArtifact extends TtsOutputArtifact {
 final class FileOutputArtifact extends TtsOutputArtifact {
   const FileOutputArtifact({
     required super.requestId,
-    required super.resolvedFormat,
+    required super.audioSpec,
     required this.filePath,
     required this.fileSizeBytes,
   });
@@ -105,7 +105,7 @@ final class FileOutputArtifact extends TtsOutputArtifact {
 final class SpeakerOutputArtifact extends TtsOutputArtifact {
   const SpeakerOutputArtifact({
     required super.requestId,
-    required super.resolvedFormat,
+    required super.audioSpec,
     required this.playbackId,
     required this.playbackDuration,
   });
@@ -117,7 +117,7 @@ final class SpeakerOutputArtifact extends TtsOutputArtifact {
 final class CompositeOutputArtifact extends TtsOutputArtifact {
   CompositeOutputArtifact({
     required super.requestId,
-    required super.resolvedFormat,
+    required super.audioSpec,
     required Map<String, TtsOutputArtifact> artifacts,
     required Map<String, TtsError> outputErrors,
   })  : artifacts = Map.unmodifiable(artifacts),
@@ -135,7 +135,7 @@ abstract interface class TtsEngine {
   Stream<TtsChunk> synthesize(
     TtsRequest request,
     TtsControlToken controlToken,
-    TtsAudioFormat resolvedFormat,
+    TtsAudioSpec resolvedFormat,
   );
 
   /// Called when the service is paused.

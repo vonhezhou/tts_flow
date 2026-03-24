@@ -12,7 +12,7 @@ void main() {
       await output.initSession(
         const TtsOutputSession(
           requestId: 'spk-1',
-          resolvedFormat: TtsAudioFormat.mp3,
+          audioSpec: TtsAudioSpec(format: TtsAudioFormat.mp3),
         ),
       );
       await output.consumeChunk(_chunk('spk-1', [1, 2], TtsAudioFormat.mp3));
@@ -23,7 +23,7 @@ void main() {
 
       final speaker = artifact as SpeakerOutputArtifact;
       expect(speaker.requestId, 'spk-1');
-      expect(speaker.resolvedFormat, TtsAudioFormat.mp3);
+      expect(speaker.audioSpec.format, TtsAudioFormat.mp3);
       expect(speaker.playbackId, 'playback-spk-1');
       expect(speaker.playbackDuration, const Duration(milliseconds: 3));
       expect(backend.writtenBytes['playback-spk-1'], [1, 2, 3]);
@@ -36,7 +36,7 @@ void main() {
       await output.initSession(
         const TtsOutputSession(
           requestId: 'spk-2',
-          resolvedFormat: TtsAudioFormat.wav,
+          audioSpec: TtsAudioSpec(format: TtsAudioFormat.wav),
         ),
       );
       await output.consumeChunk(_chunk('spk-2', [9], TtsAudioFormat.wav));
@@ -53,7 +53,7 @@ void main() {
       await output.initSession(
         const TtsOutputSession(
           requestId: 'spk-a',
-          resolvedFormat: TtsAudioFormat.mp3,
+          audioSpec: TtsAudioSpec(format: TtsAudioFormat.mp3),
         ),
       );
       await output.consumeChunk(_chunk('spk-a', [4], TtsAudioFormat.mp3));
@@ -62,7 +62,7 @@ void main() {
       await output.initSession(
         const TtsOutputSession(
           requestId: 'spk-b',
-          resolvedFormat: TtsAudioFormat.wav,
+          audioSpec: TtsAudioSpec(format: TtsAudioFormat.wav),
         ),
       );
       await output.consumeChunk(_chunk('spk-b', [7, 8], TtsAudioFormat.wav));
@@ -79,7 +79,7 @@ TtsChunk _chunk(String requestId, List<int> bytes, TtsAudioFormat format) {
     requestId: requestId,
     sequenceNumber: 0,
     bytes: Uint8List.fromList(bytes),
-    format: format,
+    audioSpec: TtsAudioSpec(format: format),
     isLastChunk: false,
     timestamp: DateTime.now().toUtc(),
   );
