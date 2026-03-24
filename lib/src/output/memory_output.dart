@@ -37,7 +37,7 @@ final class MemoryOutput implements TtsOutput {
   }
 
   @override
-  Future<TtsOutputArtifact> finalizeSession() async {
+  Future<AudioArtifact> finalizeSession() async {
     final session = _session;
     final buffer = _buffer;
     if (session == null || buffer == null) {
@@ -46,7 +46,7 @@ final class MemoryOutput implements TtsOutput {
     final audioBytes = buffer.takeBytes();
     _session = null;
     _buffer = null;
-    return MemoryOutputArtifact(
+    return InMemoryAudioArtifact(
       requestId: session.requestId,
       audioSpec: session.audioSpec,
       audioBytes: audioBytes,
@@ -55,13 +55,7 @@ final class MemoryOutput implements TtsOutput {
   }
 
   @override
-  Future<void> onPause() async {}
-
-  @override
-  Future<void> onResume() async {}
-
-  @override
-  Future<void> onStop(String reason) async {
+  Future<void> onCancel(SynthesisControl control) async {
     _session = null;
     _buffer = null;
   }

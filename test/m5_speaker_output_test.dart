@@ -13,15 +13,17 @@ void main() {
         const TtsOutputSession(
           requestId: 'spk-1',
           audioSpec: TtsAudioSpec(format: TtsAudioFormat.mp3),
+          voice: null,
+          options: null,
         ),
       );
       await output.consumeChunk(_chunk('spk-1', [1, 2], TtsAudioFormat.mp3));
       await output.consumeChunk(_chunk('spk-1', [3], TtsAudioFormat.mp3));
 
       final artifact = await output.finalizeSession();
-      expect(artifact, isA<SpeakerOutputArtifact>());
+      expect(artifact, isA<PlaybackAudioArtifact>());
 
-      final speaker = artifact as SpeakerOutputArtifact;
+      final speaker = artifact as PlaybackAudioArtifact;
       expect(speaker.requestId, 'spk-1');
       expect(speaker.audioSpec.format, TtsAudioFormat.mp3);
       expect(speaker.playbackId, 'playback-spk-1');
@@ -33,7 +35,7 @@ void main() {
       );
     });
 
-    test('onStop stops active playback', () async {
+    test('onCancel stops active playback', () async {
       final backend = _FakeSpeakerBackend();
       final output = SpeakerOutput(backend: backend);
 
@@ -41,10 +43,14 @@ void main() {
         const TtsOutputSession(
           requestId: 'spk-2',
           audioSpec: TtsAudioSpec(format: TtsAudioFormat.wav),
+          voice: null,
+          options: null,
         ),
       );
       await output.consumeChunk(_chunk('spk-2', [9], TtsAudioFormat.wav));
-      await output.onStop('manual-stop');
+      final control = SynthesisControl()
+        ..cancel(CancelReason.stopCurrent, message: 'manual-stop');
+      await output.onCancel(control);
 
       expect(backend.stoppedPlaybackIds, contains('playback-spk-2'));
       expect(backend.stopReasons['playback-spk-2'], 'manual-stop');
@@ -58,6 +64,8 @@ void main() {
         const TtsOutputSession(
           requestId: 'spk-a',
           audioSpec: TtsAudioSpec(format: TtsAudioFormat.mp3),
+          voice: null,
+          options: null,
         ),
       );
       await output.consumeChunk(_chunk('spk-a', [4], TtsAudioFormat.mp3));
@@ -67,6 +75,8 @@ void main() {
         const TtsOutputSession(
           requestId: 'spk-b',
           audioSpec: TtsAudioSpec(format: TtsAudioFormat.wav),
+          voice: null,
+          options: null,
         ),
       );
       await output.consumeChunk(_chunk('spk-b', [7, 8], TtsAudioFormat.wav));

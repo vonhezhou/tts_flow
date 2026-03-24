@@ -22,6 +22,15 @@ enum TtsPauseBufferPolicy {
   passthrough,
 }
 
+/// Reason associated with cancellation of an active synthesis request.
+enum CancelReason {
+  /// Cancellation requested explicitly via [TtsService.stopCurrent].
+  stopCurrent,
+
+  /// Cancellation initiated because the service is being disposed.
+  serviceDispose,
+}
+
 final class TtsServiceConfig {
   const TtsServiceConfig({
     this.preferredFormatOrder = const [
@@ -48,13 +57,21 @@ final class TtsServiceConfig {
   final int pauseBufferMaxBytes;
 }
 
-final class TtsControlToken {
-  bool _stopped = false;
+final class SynthesisControl {
+  CancelReason? _cancelReason;
+  String? _cancelMessage;
 
-  bool get isStopped => _stopped;
+  bool get isCanceled => _cancelReason != null;
+  CancelReason? get cancelReason => _cancelReason;
+  String? get cancelMessage => _cancelMessage;
 
-  void stop() {
-    _stopped = true;
+  /// Cancels synthesis.
+  ///
+  /// Cancellation metadata is first-write-wins to keep cancellation cause
+  /// stable when multiple callers race to cancel the same request.
+  void cancel(CancelReason reason, {String? message}) {
+    _cancelReason ??= reason;
+    _cancelMessage ??= message;
   }
 }
 
@@ -62,14 +79,20 @@ final class TtsOutputSession {
   const TtsOutputSession({
     required this.requestId,
     required this.audioSpec,
+    required this.voice,
+    required this.options,
+    this.params = const {},
   });
 
   final String requestId;
   final TtsAudioSpec audioSpec;
+  final TtsVoice? voice;
+  final TtsOptions? options;
+  final Map<String, Object> params;
 }
 
-sealed class TtsOutputArtifact {
-  const TtsOutputArtifact({
+sealed class AudioArtifact {
+  const AudioArtifact({
     required this.requestId,
     required this.audioSpec,
   });
@@ -78,8 +101,8 @@ sealed class TtsOutputArtifact {
   final TtsAudioSpec audioSpec;
 }
 
-final class MemoryOutputArtifact extends TtsOutputArtifact {
-  const MemoryOutputArtifact({
+final class InMemoryAudioArtifact extends AudioArtifact {
+  const InMemoryAudioArtifact({
     required super.requestId,
     required super.audioSpec,
     required this.audioBytes,
@@ -90,8 +113,8 @@ final class MemoryOutputArtifact extends TtsOutputArtifact {
   final int totalBytes;
 }
 
-final class FileOutputArtifact extends TtsOutputArtifact {
-  const FileOutputArtifact({
+final class FileAudioArtifact extends AudioArtifact {
+  const FileAudioArtifact({
     required super.requestId,
     required super.audioSpec,
     required this.filePath,
@@ -102,8 +125,8 @@ final class FileOutputArtifact extends TtsOutputArtifact {
   final int fileSizeBytes;
 }
 
-final class SpeakerOutputArtifact extends TtsOutputArtifact {
-  const SpeakerOutputArtifact({
+final class PlaybackAudioArtifact extends AudioArtifact {
+  const PlaybackAudioArtifact({
     required super.requestId,
     required super.audioSpec,
     required this.playbackId,
@@ -114,16 +137,16 @@ final class SpeakerOutputArtifact extends TtsOutputArtifact {
   final Duration playbackDuration;
 }
 
-final class CompositeOutputArtifact extends TtsOutputArtifact {
-  CompositeOutputArtifact({
+final class CompositeAudioArtifact extends AudioArtifact {
+  CompositeAudioArtifact({
     required super.requestId,
     required super.audioSpec,
-    required Map<String, TtsOutputArtifact> artifacts,
+    required Map<String, AudioArtifact> artifacts,
     required Map<String, TtsError> outputErrors,
   })  : artifacts = Map.unmodifiable(artifacts),
         outputErrors = Map.unmodifiable(outputErrors);
 
-  final Map<String, TtsOutputArtifact> artifacts;
+  final Map<String, AudioArtifact> artifacts;
   final Map<String, TtsError> outputErrors;
 }
 
@@ -134,15 +157,9 @@ abstract interface class TtsEngine {
 
   Stream<TtsChunk> synthesize(
     TtsRequest request,
-    TtsControlToken controlToken,
+    SynthesisControl control,
     TtsAudioSpec resolvedFormat,
   );
-
-  /// Called when the service is paused.
-  Future<void> onPause();
-
-  /// Called when the service is resumed.
-  Future<void> onResume();
 
   Future<void> dispose();
 }
@@ -153,15 +170,9 @@ abstract interface class TtsOutput {
 
   Future<void> initSession(TtsOutputSession session);
   Future<void> consumeChunk(TtsChunk chunk);
-  Future<TtsOutputArtifact> finalizeSession();
+  Future<AudioArtifact> finalizeSession();
 
-  /// Called when the service is paused.
-  Future<void> onPause();
-
-  /// Called when the service is resumed.
-  Future<void> onResume();
-
-  Future<void> onStop(String reason);
+  Future<void> onCancel(SynthesisControl control);
   Future<void> dispose();
 }
 

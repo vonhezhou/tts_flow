@@ -74,7 +74,7 @@ class OpenAiTtsEngine implements TtsEngine {
   @override
   Stream<TtsChunk> synthesize(
     TtsRequest request,
-    TtsControlToken controlToken,
+    SynthesisControl control,
     TtsAudioSpec resolvedFormat,
   ) async* {
     try {
@@ -100,7 +100,7 @@ class OpenAiTtsEngine implements TtsEngine {
       List<int>? pending;
 
       await for (final chunk in audioStream) {
-        if (controlToken.isStopped) {
+        if (control.isCanceled) {
           return;
         }
 
@@ -119,7 +119,7 @@ class OpenAiTtsEngine implements TtsEngine {
         pending = chunk;
       }
 
-      if (controlToken.isStopped) {
+      if (control.isCanceled) {
         return;
       }
 
@@ -246,12 +246,6 @@ class OpenAiTtsEngine implements TtsEngine {
     }
     return builder.takeBytes();
   }
-
-  @override
-  Future<void> onPause() async {}
-
-  @override
-  Future<void> onResume() async {}
 
   @override
   Future<void> dispose() async {}

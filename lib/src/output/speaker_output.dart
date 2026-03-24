@@ -72,7 +72,7 @@ final class SpeakerOutput implements TtsOutput {
   }
 
   @override
-  Future<TtsOutputArtifact> finalizeSession() async {
+  Future<AudioArtifact> finalizeSession() async {
     final session = _session;
     final playbackId = _playbackId;
     if (session == null || playbackId == null) {
@@ -83,7 +83,7 @@ final class SpeakerOutput implements TtsOutput {
     _session = null;
     _playbackId = null;
 
-    return SpeakerOutputArtifact(
+    return PlaybackAudioArtifact(
       requestId: session.requestId,
       audioSpec: session.audioSpec,
       playbackId: playbackId,
@@ -92,26 +92,14 @@ final class SpeakerOutput implements TtsOutput {
   }
 
   @override
-  Future<void> onPause() async {
+  Future<void> onCancel(SynthesisControl control) async {
     final playbackId = _playbackId;
     if (playbackId != null) {
-      await _backend.pausePlayback(playbackId: playbackId);
-    }
-  }
-
-  @override
-  Future<void> onResume() async {
-    final playbackId = _playbackId;
-    if (playbackId != null) {
-      await _backend.resumePlayback(playbackId: playbackId);
-    }
-  }
-
-  @override
-  Future<void> onStop(String reason) async {
-    final playbackId = _playbackId;
-    if (playbackId != null) {
-      await _backend.stopPlayback(playbackId: playbackId, reason: reason);
+      final reason = control.cancelMessage ?? control.cancelReason?.name;
+      await _backend.stopPlayback(
+        playbackId: playbackId,
+        reason: reason,
+      );
     }
     _session = null;
     _playbackId = null;
@@ -119,7 +107,8 @@ final class SpeakerOutput implements TtsOutput {
 
   @override
   Future<void> dispose() async {
-    await onStop('dispose');
+    final control = SynthesisControl()..cancel(CancelReason.serviceDispose);
+    await onCancel(control);
     await _backend.dispose();
   }
 }

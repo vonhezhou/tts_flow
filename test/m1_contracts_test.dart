@@ -5,6 +5,17 @@ import 'package:test/test.dart';
 
 void main() {
   group('M1 contracts', () {
+    test('synthesis control keeps first cancellation reason', () {
+      final control = SynthesisControl();
+
+      control.cancel(CancelReason.stopCurrent, message: 'manual');
+      control.cancel(CancelReason.serviceDispose, message: 'dispose');
+
+      expect(control.isCanceled, isTrue);
+      expect(control.cancelReason, CancelReason.stopCurrent);
+      expect(control.cancelMessage, 'manual');
+    });
+
     test('fake engine emits one chunk when chunkCount is 1', () async {
       final engine = FakeTtsEngine(
         engineId: 'fake-engine',
@@ -13,7 +24,7 @@ void main() {
       );
 
       final request = TtsRequest(requestId: 'r1', text: 'hello world');
-      final control = TtsControlToken();
+      final control = SynthesisControl();
 
       final chunks = await engine
           .synthesize(
@@ -34,7 +45,7 @@ void main() {
       );
 
       final request = TtsRequest(requestId: 'r2', text: 'chunk me please');
-      final control = TtsControlToken();
+      final control = SynthesisControl();
 
       final chunks = await engine
           .synthesize(
@@ -54,6 +65,8 @@ void main() {
       const session = TtsOutputSession(
         requestId: 'r3',
         audioSpec: TtsAudioSpec(format: TtsAudioFormat.pcm),
+        voice: null,
+        options: null,
       );
 
       await output.initSession(session);
@@ -69,9 +82,9 @@ void main() {
       );
 
       final artifact = await output.finalizeSession();
-      expect(artifact, isA<MemoryOutputArtifact>());
+      expect(artifact, isA<InMemoryAudioArtifact>());
 
-      final memoryArtifact = artifact as MemoryOutputArtifact;
+      final memoryArtifact = artifact as InMemoryAudioArtifact;
       expect(memoryArtifact.requestId, 'r3');
       expect(memoryArtifact.audioSpec.format, TtsAudioFormat.pcm);
       expect(memoryArtifact.totalBytes, 3);

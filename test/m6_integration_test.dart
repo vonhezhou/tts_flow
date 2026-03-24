@@ -124,18 +124,12 @@ final class _FailingEngine implements TtsEngine {
       };
 
   @override
-  Future<void> onPause() async {}
-
-  @override
-  Future<void> onResume() async {}
-
-  @override
   Future<void> dispose() async {}
 
   @override
   Stream<TtsChunk> synthesize(
     TtsRequest request,
-    TtsControlToken controlToken,
+    SynthesisControl control,
     TtsAudioSpec resolvedFormat,
   ) async* {
     if (request.requestId == 'fail-1') {

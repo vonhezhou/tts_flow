@@ -34,14 +34,14 @@ final class FakeTtsOutput implements TtsOutput {
   }
 
   @override
-  Future<TtsOutputArtifact> finalizeSession() async {
+  Future<AudioArtifact> finalizeSession() async {
     final session = _session;
     if (session == null) {
       throw StateError('No active output session.');
     }
 
     final bytes = _buffer.takeBytes();
-    return MemoryOutputArtifact(
+    return InMemoryAudioArtifact(
       requestId: session.requestId,
       audioSpec: session.audioSpec,
       audioBytes: bytes,
@@ -50,13 +50,7 @@ final class FakeTtsOutput implements TtsOutput {
   }
 
   @override
-  Future<void> onPause() async {}
-
-  @override
-  Future<void> onResume() async {}
-
-  @override
-  Future<void> onStop(String reason) async {}
+  Future<void> onCancel(SynthesisControl control) async {}
 
   @override
   Future<void> dispose() async {

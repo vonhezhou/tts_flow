@@ -33,7 +33,7 @@ final class TtsService {
   bool _isDisposed = false;
   bool _isHalted = false;
   bool _isPaused = false;
-  TtsControlToken? _activeControlToken;
+  SynthesisControl? _activeControl;
   final List<TtsChunk> _pauseBuffer = [];
   int _pauseBufferBytes = 0;
 
@@ -67,21 +67,17 @@ final class TtsService {
   Future<void> pauseCurrent() async {
     _ensureNotDisposed();
     _isPaused = true;
-    await _engine.onPause();
-    await _output.onPause();
   }
 
   Future<void> resumeCurrent() async {
     _ensureNotDisposed();
     _isPaused = false;
-    await _output.onResume();
-    await _engine.onResume();
     unawaited(_processQueue());
   }
 
   Future<void> stopCurrent() async {
     _ensureNotDisposed();
-    _activeControlToken?.stop();
+    _activeControl?.cancel(CancelReason.stopCurrent);
   }
 
   Future<int> clearQueue() async {
@@ -107,7 +103,7 @@ final class TtsService {
       return;
     }
 
-    await stopCurrent();
+    _activeControl?.cancel(CancelReason.serviceDispose);
     await clearQueue();
     await _engine.dispose();
     await _output.dispose();
@@ -132,8 +128,8 @@ final class TtsService {
 
         final item = _scheduler.dequeue();
         final request = item.request;
-        final controlToken = TtsControlToken();
-        _activeControlToken = controlToken;
+        final control = SynthesisControl();
+        _activeControl = control;
 
         _emitQueueEvent(TtsQueueEventType.requestDequeued,
             requestId: request.requestId);
@@ -149,18 +145,21 @@ final class TtsService {
             TtsOutputSession(
               requestId: request.requestId,
               audioSpec: audioSpec,
+              voice: request.voice,
+              options: request.options,
+              params: request.params,
             ),
           );
 
           await for (final chunk
-              in _engine.synthesize(request, controlToken, audioSpec)) {
-            if (controlToken.isStopped) {
+              in _engine.synthesize(request, control, audioSpec)) {
+            if (control.isCanceled) {
               break;
             }
             // Flush any buffered chunks before processing new ones post-resume.
             if (_pauseBuffer.isNotEmpty && !_isPaused) {
-              await _flushPauseBuffer(item, request, controlToken);
-              if (controlToken.isStopped) break;
+              await _flushPauseBuffer(item, request, control);
+              if (control.isCanceled) break;
             }
             if (_isPaused &&
                 _config.pauseBufferPolicy == TtsPauseBufferPolicy.buffered) {
@@ -189,17 +188,17 @@ final class TtsService {
           }
           // Engine stream exhausted. If it finished while still paused,
           // wait for resume and then flush the remaining buffer.
-          if (!controlToken.isStopped && _pauseBuffer.isNotEmpty) {
-            while (_isPaused && !_isDisposed && !controlToken.isStopped) {
+          if (!control.isCanceled && _pauseBuffer.isNotEmpty) {
+            while (_isPaused && !_isDisposed && !control.isCanceled) {
               await Future<void>.delayed(const Duration(milliseconds: 20));
             }
-            if (!controlToken.isStopped) {
-              await _flushPauseBuffer(item, request, controlToken);
+            if (!control.isCanceled) {
+              await _flushPauseBuffer(item, request, control);
             }
           }
 
-          if (controlToken.isStopped) {
-            await _output.onStop('stopCurrent');
+          if (control.isCanceled) {
+            await _output.onCancel(control);
             _emitRequestEvent(
               TtsRequestEventType.requestStopped,
               requestId: request.requestId,
@@ -236,7 +235,7 @@ final class TtsService {
             break;
           }
         } finally {
-          _activeControlToken = null;
+          _activeControl = null;
           _pauseBuffer.clear();
           _pauseBufferBytes = 0;
         }
@@ -301,13 +300,13 @@ final class TtsService {
   Future<void> _flushPauseBuffer(
     _QueuedRequest item,
     TtsRequest request,
-    TtsControlToken controlToken,
+    SynthesisControl control,
   ) async {
     final toFlush = List<TtsChunk>.of(_pauseBuffer);
     _pauseBuffer.clear();
     _pauseBufferBytes = 0;
     for (final chunk in toFlush) {
-      if (controlToken.isStopped) break;
+      if (control.isCanceled) break;
       await _output.consumeChunk(chunk);
       item.controller.add(chunk);
       _emitRequestEvent(

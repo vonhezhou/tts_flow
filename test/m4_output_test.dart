@@ -11,6 +11,8 @@ void main() {
       const session = TtsOutputSession(
         requestId: 'mem-1',
         audioSpec: TtsAudioSpec(format: TtsAudioFormat.wav),
+        voice: null,
+        options: null,
       );
 
       await output.initSession(session);
@@ -19,8 +21,8 @@ void main() {
           _chunk('mem-1', 1, [3], TtsAudioFormat.wav, isLast: true));
       final artifact = await output.finalizeSession();
 
-      expect(artifact, isA<MemoryOutputArtifact>());
-      final mem = artifact as MemoryOutputArtifact;
+      expect(artifact, isA<InMemoryAudioArtifact>());
+      final mem = artifact as InMemoryAudioArtifact;
       expect(mem.requestId, 'mem-1');
       expect(mem.audioSpec.format, TtsAudioFormat.wav);
       expect(mem.totalBytes, 3);
@@ -33,20 +35,24 @@ void main() {
       await output.initSession(
         const TtsOutputSession(
             requestId: 'a',
-            audioSpec: TtsAudioSpec(format: TtsAudioFormat.mp3)),
+            audioSpec: TtsAudioSpec(format: TtsAudioFormat.mp3),
+            voice: null,
+            options: null),
       );
       await output.consumeChunk(
           _chunk('a', 0, [8, 8], TtsAudioFormat.mp3, isLast: true));
-      final first = await output.finalizeSession() as MemoryOutputArtifact;
+      final first = await output.finalizeSession() as InMemoryAudioArtifact;
 
       await output.initSession(
         const TtsOutputSession(
             requestId: 'b',
-            audioSpec: TtsAudioSpec(format: TtsAudioFormat.wav)),
+            audioSpec: TtsAudioSpec(format: TtsAudioFormat.wav),
+            voice: null,
+            options: null),
       );
       await output
           .consumeChunk(_chunk('b', 0, [7], TtsAudioFormat.wav, isLast: true));
-      final second = await output.finalizeSession() as MemoryOutputArtifact;
+      final second = await output.finalizeSession() as InMemoryAudioArtifact;
 
       expect(first.audioBytes, Uint8List.fromList([8, 8]));
       expect(second.audioBytes, Uint8List.fromList([7]));
@@ -62,6 +68,8 @@ void main() {
         const session = TtsOutputSession(
           requestId: 'file-1',
           audioSpec: TtsAudioSpec(format: TtsAudioFormat.mp3),
+          voice: null,
+          options: null,
         );
 
         await output.initSession(session);
@@ -72,9 +80,9 @@ void main() {
         );
 
         final artifact = await output.finalizeSession();
-        expect(artifact, isA<FileOutputArtifact>());
+        expect(artifact, isA<FileAudioArtifact>());
 
-        final fileArtifact = artifact as FileOutputArtifact;
+        final fileArtifact = artifact as FileAudioArtifact;
         expect(fileArtifact.requestId, 'file-1');
         expect(fileArtifact.audioSpec.format, TtsAudioFormat.mp3);
         expect(await File(fileArtifact.filePath).exists(), isTrue);
@@ -85,7 +93,7 @@ void main() {
       }
     });
 
-    test('onStop cleans up temp file', () async {
+    test('onCancel cleans up temp file', () async {
       final tempDir =
           await Directory.systemTemp.createTemp('uni_tts_file_output_stop_');
       try {
@@ -93,12 +101,16 @@ void main() {
         const session = TtsOutputSession(
           requestId: 'file-2',
           audioSpec: TtsAudioSpec(format: TtsAudioFormat.wav),
+          voice: null,
+          options: null,
         );
 
         await output.initSession(session);
         await output
             .consumeChunk(_chunk('file-2', 0, [9, 9], TtsAudioFormat.wav));
-        await output.onStop('test-stop');
+        final control = SynthesisControl()
+          ..cancel(CancelReason.stopCurrent, message: 'test-stop');
+        await output.onCancel(control);
 
         final tempFiles = tempDir
             .listSync()
@@ -129,6 +141,8 @@ void main() {
       const session = TtsOutputSession(
         requestId: 'composite-1',
         audioSpec: TtsAudioSpec(format: TtsAudioFormat.wav),
+        voice: null,
+        options: null,
       );
 
       await output.initSession(session);
@@ -137,8 +151,8 @@ void main() {
       );
       final artifact = await output.finalizeSession();
 
-      expect(artifact, isA<CompositeOutputArtifact>());
-      final composite = artifact as CompositeOutputArtifact;
+      expect(artifact, isA<CompositeAudioArtifact>());
+      final composite = artifact as CompositeAudioArtifact;
       expect(composite.artifacts.keys, contains('memory'));
       expect(composite.artifacts.keys, isNot(contains('failing')));
       expect(composite.outputErrors.keys, contains('failing'));
@@ -156,6 +170,8 @@ void main() {
       const session = TtsOutputSession(
         requestId: 'composite-2',
         audioSpec: TtsAudioSpec(format: TtsAudioFormat.wav),
+        voice: null,
+        options: null,
       );
 
       await output.initSession(session);
@@ -204,7 +220,7 @@ final class _FailingTestOutput implements TtsOutput {
   Future<void> dispose() async {}
 
   @override
-  Future<TtsOutputArtifact> finalizeSession() async {
+  Future<AudioArtifact> finalizeSession() async {
     throw UnimplementedError();
   }
 
@@ -212,13 +228,7 @@ final class _FailingTestOutput implements TtsOutput {
   Future<void> initSession(TtsOutputSession session) async {}
 
   @override
-  Future<void> onPause() async {}
-
-  @override
-  Future<void> onResume() async {}
-
-  @override
-  Future<void> onStop(String reason) async {}
+  Future<void> onCancel(SynthesisControl control) async {}
 }
 
 TtsChunk _chunk(

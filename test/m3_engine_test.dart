@@ -178,7 +178,7 @@ void main() {
       final chunks = await engine
           .synthesize(
             const TtsRequest(requestId: 'o1', text: 'hello'),
-            TtsControlToken(),
+            SynthesisControl(),
             TtsAudioSpec(format: TtsAudioFormat.mp3),
           )
           .toList();
@@ -208,7 +208,7 @@ void main() {
         engine
             .synthesize(
               const TtsRequest(requestId: 'o2', text: 'hello'),
-              TtsControlToken(),
+              SynthesisControl(),
               TtsAudioSpec(format: TtsAudioFormat.mp3),
             )
             .toList(),
@@ -288,7 +288,7 @@ void main() {
         engine
             .synthesize(
               const TtsRequest(requestId: 'o3', text: 'hello'),
-              TtsControlToken(),
+              SynthesisControl(),
               TtsAudioSpec(format: TtsAudioFormat.mp3),
             )
             .toList(),
@@ -315,7 +315,7 @@ void main() {
         engine
             .synthesize(
               const TtsRequest(requestId: 'o4', text: 'hello'),
-              TtsControlToken(),
+              SynthesisControl(),
               TtsAudioSpec(format: TtsAudioFormat.mp3),
             )
             .toList(),
@@ -343,7 +343,7 @@ void main() {
       final chunks = await engine
           .synthesize(
             const TtsRequest(requestId: 'j1', text: 'hello'),
-            TtsControlToken(),
+            SynthesisControl(),
             TtsAudioSpec(format: TtsAudioFormat.mp3),
           )
           .toList();

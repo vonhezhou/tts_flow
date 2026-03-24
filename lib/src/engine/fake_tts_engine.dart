@@ -37,7 +37,7 @@ final class FakeTtsEngine implements TtsEngine {
   @override
   Stream<TtsChunk> synthesize(
     TtsRequest request,
-    TtsControlToken controlToken,
+    SynthesisControl control,
     TtsAudioSpec resolvedFormat,
   ) async* {
     final payload = utf8.encode(request.text);
@@ -45,7 +45,7 @@ final class FakeTtsEngine implements TtsEngine {
     final size = (total / chunkCount).ceil();
 
     for (var i = 0; i < chunkCount; i++) {
-      if (controlToken.isStopped) {
+      if (control.isCanceled) {
         break;
       }
 
@@ -70,12 +70,6 @@ final class FakeTtsEngine implements TtsEngine {
       );
     }
   }
-
-  @override
-  Future<void> onPause() async {}
-
-  @override
-  Future<void> onResume() async {}
 
   @override
   Future<void> dispose() async {}

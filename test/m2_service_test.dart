@@ -243,6 +243,30 @@ void main() {
       await sub.cancel();
       await service.dispose();
     });
+
+    test('stopCurrent forwards stopCurrent cancel reason to output', () async {
+      final output = _CaptureCancelOutput();
+      final service = TtsService(
+        engine: FakeTtsEngine(
+          engineId: 'fake-engine',
+          supportsStreaming: true,
+          chunkCount: 8,
+          chunkDelay: const Duration(milliseconds: 5),
+        ),
+        output: output,
+      );
+
+      final longStream = service.speak(
+        const TtsRequest(requestId: 'cancel-reason', text: 'long request'),
+      );
+
+      await Future<void>.delayed(const Duration(milliseconds: 12));
+      await service.stopCurrent();
+      await longStream.toList();
+
+      expect(output.lastCancelReason, CancelReason.stopCurrent);
+      await service.dispose();
+    });
   });
 }
 
@@ -269,7 +293,7 @@ final class _AlwaysFailOutput implements TtsOutput {
   }
 
   @override
-  Future<TtsOutputArtifact> finalizeSession() async {
+  Future<AudioArtifact> finalizeSession() async {
     throw const TtsError(
       code: TtsErrorCode.outputWriteFailed,
       message: 'Injected output failure.',
@@ -277,13 +301,7 @@ final class _AlwaysFailOutput implements TtsOutput {
   }
 
   @override
-  Future<void> onPause() async {}
-
-  @override
-  Future<void> onResume() async {}
-
-  @override
-  Future<void> onStop(String reason) async {}
+  Future<void> onCancel(SynthesisControl control) async {}
 
   @override
   Future<void> dispose() async {}
@@ -326,12 +344,12 @@ final class _FailByRequestIdOutput implements TtsOutput {
   }
 
   @override
-  Future<TtsOutputArtifact> finalizeSession() async {
+  Future<AudioArtifact> finalizeSession() async {
     final session = _session;
     if (session == null) {
       throw StateError('No active output session.');
     }
-    return MemoryOutputArtifact(
+    return InMemoryAudioArtifact(
       requestId: session.requestId,
       audioSpec: session.audioSpec,
       audioBytes: Uint8List(0),
@@ -340,16 +358,65 @@ final class _FailByRequestIdOutput implements TtsOutput {
   }
 
   @override
-  Future<void> onPause() async {}
-
-  @override
-  Future<void> onResume() async {}
-
-  @override
-  Future<void> onStop(String reason) async {}
+  Future<void> onCancel(SynthesisControl control) async {}
 
   @override
   Future<void> dispose() async {
     _session = null;
+  }
+}
+
+final class _CaptureCancelOutput implements TtsOutput {
+  final BytesBuilder _buffer = BytesBuilder(copy: false);
+  TtsOutputSession? _session;
+  CancelReason? lastCancelReason;
+
+  @override
+  String get outputId => 'capture-cancel-output';
+
+  @override
+  Set<AudioCapability> get acceptedCapabilities => {
+        const SimpleFormatCapability(format: TtsAudioFormat.wav),
+        const SimpleFormatCapability(format: TtsAudioFormat.mp3),
+      };
+
+  @override
+  Future<void> initSession(TtsOutputSession session) async {
+    _session = session;
+    _buffer.clear();
+  }
+
+  @override
+  Future<void> consumeChunk(TtsChunk chunk) async {
+    _buffer.add(chunk.bytes);
+  }
+
+  @override
+  Future<AudioArtifact> finalizeSession() async {
+    final session = _session;
+    if (session == null) {
+      throw StateError('No active output session.');
+    }
+    final bytes = _buffer.takeBytes();
+    _session = null;
+    return InMemoryAudioArtifact(
+      requestId: session.requestId,
+      audioSpec: session.audioSpec,
+      audioBytes: bytes,
+      totalBytes: bytes.length,
+    );
+  }
+
+  @override
+  Future<void> onCancel(SynthesisControl control) async {
+    lastCancelReason = control.cancelReason;
+    _session = null;
+    _buffer.clear();
+  }
+
+  @override
+  Future<void> dispose() async {
+    _session = null;
+    _buffer.clear();
   }
 }

@@ -121,13 +121,13 @@ final class CompositeOutput implements TtsOutput {
   }
 
   @override
-  Future<TtsOutputArtifact> finalizeSession() async {
+  Future<AudioArtifact> finalizeSession() async {
     final session = _session;
     if (session == null) {
       throw StateError('CompositeOutput session is not initialized.');
     }
 
-    final artifacts = <String, TtsOutputArtifact>{};
+    final artifacts = <String, AudioArtifact>{};
     for (final entry in _activeOutputs.entries.toList()) {
       try {
         final artifact = await entry.value.finalizeSession();
@@ -154,7 +154,7 @@ final class CompositeOutput implements TtsOutput {
       throw TtsOutputFailure(outputId: first.key, error: first.value);
     }
 
-    final artifact = CompositeOutputArtifact(
+    final artifact = CompositeAudioArtifact(
       requestId: session.requestId,
       audioSpec: session.audioSpec,
       artifacts: artifacts,
@@ -165,59 +165,17 @@ final class CompositeOutput implements TtsOutput {
   }
 
   @override
-  Future<void> onPause() async {
-    for (final entry in _activeOutputs.entries.toList()) {
-      try {
-        await entry.value.onPause();
-      } catch (error) {
-        final converted = _toOutputError(
-          error,
-          requestId: _session?.requestId,
-          stage: 'onPause',
-          outputId: entry.key,
-        );
-        _outputErrors[entry.key] = converted;
-        _activeOutputs.remove(entry.key);
-        if (errorPolicy == CompositeOutputErrorPolicy.failFast) {
-          throw TtsOutputFailure(outputId: entry.key, error: converted);
-        }
-      }
-    }
-  }
-
-  @override
-  Future<void> onResume() async {
-    for (final entry in _activeOutputs.entries.toList()) {
-      try {
-        await entry.value.onResume();
-      } catch (error) {
-        final converted = _toOutputError(
-          error,
-          requestId: _session?.requestId,
-          stage: 'onResume',
-          outputId: entry.key,
-        );
-        _outputErrors[entry.key] = converted;
-        _activeOutputs.remove(entry.key);
-        if (errorPolicy == CompositeOutputErrorPolicy.failFast) {
-          throw TtsOutputFailure(outputId: entry.key, error: converted);
-        }
-      }
-    }
-  }
-
-  @override
-  Future<void> onStop(String reason) async {
+  Future<void> onCancel(SynthesisControl control) async {
     final activeEntries = _activeOutputs.entries.toList();
     for (final entry in activeEntries) {
       try {
-        await entry.value.onStop(reason);
+        await entry.value.onCancel(control);
       } catch (error) {
         final requestId = _session?.requestId;
         final converted = _toOutputError(
           error,
           requestId: requestId,
-          stage: 'onStop',
+          stage: 'onCancel',
           outputId: entry.key,
         );
         _outputErrors[entry.key] = converted;

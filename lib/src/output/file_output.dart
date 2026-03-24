@@ -59,7 +59,7 @@ final class FileOutput implements TtsOutput {
   }
 
   @override
-  Future<TtsOutputArtifact> finalizeSession() async {
+  Future<AudioArtifact> finalizeSession() async {
     final session = _state.session;
     final tempFile = _state.tempFile;
     final sink = _state.sink;
@@ -81,7 +81,7 @@ final class FileOutput implements TtsOutput {
 
       _state.clear();
 
-      return FileOutputArtifact(
+      return FileAudioArtifact(
         requestId: session.requestId,
         audioSpec: session.audioSpec,
         filePath: moved.path,
@@ -99,13 +99,7 @@ final class FileOutput implements TtsOutput {
   }
 
   @override
-  Future<void> onPause() async {}
-
-  @override
-  Future<void> onResume() async {}
-
-  @override
-  Future<void> onStop(String reason) async {
+  Future<void> onCancel(SynthesisControl control) async {
     await _state.safeCleanupTemp();
     _state.clear();
   }
