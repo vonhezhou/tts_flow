@@ -32,11 +32,9 @@ final class TtsService {
   final StreamController<TtsRequestEvent> _requestEventsController =
       StreamController<TtsRequestEvent>.broadcast();
 
-  bool _isProcessing = false;
-  bool _isInitialized = false;
-  bool _isDisposed = false;
-  bool _isHalted = false;
-  bool _isPaused = false;
+  _ServiceLifecycle _lifecycle = _ServiceLifecycle.created;
+  _QueueActivity _queueActivity = _QueueActivity.idle;
+  _QueueMode _queueMode = _QueueMode.running;
   SynthesisControl? _activeControl;
   final List<TtsChunk> _pauseBuffer = [];
   int _pauseBufferBytes = 0;
@@ -46,8 +44,8 @@ final class TtsService {
 
   Stream<TtsQueueEvent> get queueEvents => _queueEventsController.stream;
   Stream<TtsRequestEvent> get requestEvents => _requestEventsController.stream;
-  bool get isPaused => _isPaused;
-  bool get isInitialized => _isInitialized;
+  bool get isPaused => _queueMode == _QueueMode.paused;
+  bool get isInitialized => _lifecycle == _ServiceLifecycle.initialized;
 
   TtsVoice get voice => _voice;
 
@@ -100,12 +98,12 @@ final class TtsService {
 
   Future<void> init() async {
     _ensureNotDisposed();
-    if (_isInitialized) {
+    if (_lifecycle == _ServiceLifecycle.initialized) {
       return;
     }
 
     _voice = await _engine.getDefaultVoice();
-    _isInitialized = true;
+    _lifecycle = _ServiceLifecycle.initialized;
   }
 
   Future<List<TtsVoice>> getAvailableVoices({String? locale}) async {
@@ -136,8 +134,8 @@ final class TtsService {
       params: params,
     );
 
-    if (_isHalted) {
-      _isHalted = false;
+    if (_queueMode == _QueueMode.halted) {
+      _queueMode = _QueueMode.running;
     }
 
     final controller = StreamController<TtsChunk>();
@@ -158,12 +156,16 @@ final class TtsService {
 
   Future<void> pause() async {
     _ensureReady();
-    _isPaused = true;
+    if (_queueMode != _QueueMode.halted) {
+      _queueMode = _QueueMode.paused;
+    }
   }
 
   Future<void> resume() async {
     _ensureReady();
-    _isPaused = false;
+    if (_queueMode == _QueueMode.paused) {
+      _queueMode = _QueueMode.running;
+    }
     unawaited(_processQueue());
   }
 
@@ -191,7 +193,7 @@ final class TtsService {
   }
 
   Future<void> dispose() async {
-    if (_isDisposed) {
+    if (_lifecycle == _ServiceLifecycle.disposed) {
       return;
     }
 
@@ -199,8 +201,11 @@ final class TtsService {
     await clearQueue();
     await _engine.dispose();
     await _output.dispose();
-    _isInitialized = false;
-    _isDisposed = true;
+    _pauseBuffer.clear();
+    _pauseBufferBytes = 0;
+    _queueActivity = _QueueActivity.idle;
+    _queueMode = _QueueMode.running;
+    _lifecycle = _ServiceLifecycle.disposed;
     await _queueEventsController.close();
     await _requestEventsController.close();
   }
@@ -223,16 +228,17 @@ final class TtsService {
   }
 
   Future<void> _processQueue() async {
-    if (_isProcessing || _isDisposed) {
+    if (_queueActivity == _QueueActivity.processing ||
+        _lifecycle == _ServiceLifecycle.disposed) {
       return;
     }
-    _isProcessing = true;
+    _queueActivity = _QueueActivity.processing;
 
     try {
-      while (!_scheduler.isEmpty && !_isDisposed) {
+      while (!_scheduler.isEmpty && _lifecycle != _ServiceLifecycle.disposed) {
         // Pause gates starting the next request. Active request handling
         // continues in-loop using buffering/passthrough policy.
-        if (_isPaused) {
+        if (_queueMode == _QueueMode.paused) {
           break;
         }
 
@@ -267,11 +273,11 @@ final class TtsService {
               break;
             }
             // Flush any buffered chunks before processing new ones post-resume.
-            if (_pauseBuffer.isNotEmpty && !_isPaused) {
+            if (_pauseBuffer.isNotEmpty && _queueMode != _QueueMode.paused) {
               await _flushPauseBuffer(item, request, control);
               if (control.isCanceled) break;
             }
-            if (_isPaused &&
+            if (_queueMode == _QueueMode.paused &&
                 _config.pauseBufferPolicy == TtsPauseBufferPolicy.buffered) {
               _pauseBuffer.add(chunk);
               final newBytes = _pauseBufferBytes + chunk.bytes.length;
@@ -299,7 +305,9 @@ final class TtsService {
           // Engine stream exhausted. If it finished while still paused,
           // wait for resume and then flush the remaining buffer.
           if (!control.isCanceled && _pauseBuffer.isNotEmpty) {
-            while (_isPaused && !_isDisposed && !control.isCanceled) {
+            while (_queueMode == _QueueMode.paused &&
+                _lifecycle != _ServiceLifecycle.disposed &&
+                !control.isCanceled) {
               await Future<void>.delayed(const Duration(milliseconds: 20));
             }
             if (!control.isCanceled) {
@@ -338,7 +346,7 @@ final class TtsService {
           unawaited(item.controller.close());
 
           if (_config.queueFailurePolicy == TtsQueueFailurePolicy.failFast) {
-            _isHalted = true;
+            _queueMode = _QueueMode.halted;
             _emitQueueEvent(TtsQueueEventType.queueHalted,
                 requestId: request.requestId);
             await _cancelPendingAfterFailure();
@@ -350,12 +358,12 @@ final class TtsService {
           _pauseBufferBytes = 0;
         }
 
-        if (_isHalted) {
+        if (_queueMode == _QueueMode.halted) {
           break;
         }
       }
     } finally {
-      _isProcessing = false;
+      _queueActivity = _QueueActivity.idle;
     }
   }
 
@@ -463,17 +471,34 @@ final class TtsService {
   }
 
   void _ensureNotDisposed() {
-    if (_isDisposed) {
+    if (_lifecycle == _ServiceLifecycle.disposed) {
       throw StateError('TtsService is disposed.');
     }
   }
 
   void _ensureReady() {
     _ensureNotDisposed();
-    if (!_isInitialized) {
+    if (_lifecycle != _ServiceLifecycle.initialized) {
       throw StateError('TtsService is not initialized. Call init() first.');
     }
   }
+}
+
+enum _ServiceLifecycle {
+  created,
+  initialized,
+  disposed,
+}
+
+enum _QueueActivity {
+  idle,
+  processing,
+}
+
+enum _QueueMode {
+  running,
+  paused,
+  halted,
 }
 
 final class _QueuedRequest {
