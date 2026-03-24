@@ -1,5 +1,5 @@
 import 'dart:async';
-import 'dart:developer' as dev;
+import 'dart:developer';
 
 import '../core/tts_contracts.dart';
 import '../core/tts_errors.dart';
@@ -7,6 +7,13 @@ import '../core/tts_models.dart';
 import 'format_negotiator.dart';
 import 'queue_scheduler.dart';
 import 'tts_events.dart';
+
+part 'internal/tts_service_events.dart';
+part 'internal/tts_service_request_helpers.dart';
+part 'internal/tts_service_request_runtime.dart';
+part 'internal/tts_service_runtime.dart';
+part 'internal/tts_service_state.dart';
+part 'internal/tts_service_transitions.dart';
 
 final class TtsService {
   TtsService({
@@ -32,20 +39,15 @@ final class TtsService {
   final StreamController<TtsRequestEvent> _requestEventsController =
       StreamController<TtsRequestEvent>.broadcast();
 
-  _ServiceLifecycle _lifecycle = _ServiceLifecycle.created;
-  _QueueActivity _queueActivity = _QueueActivity.idle;
-  _QueueMode _queueMode = _QueueMode.running;
-  SynthesisControl? _activeControl;
-  final List<TtsChunk> _pauseBuffer = [];
-  int _pauseBufferBytes = 0;
+  final _TtsServiceState _state = _TtsServiceState();
   late TtsVoice _voice;
   TtsOptions _options;
   TtsAudioFormat _preferredFormat;
 
   Stream<TtsQueueEvent> get queueEvents => _queueEventsController.stream;
   Stream<TtsRequestEvent> get requestEvents => _requestEventsController.stream;
-  bool get isPaused => _queueMode == _QueueMode.paused;
-  bool get isInitialized => _lifecycle == _ServiceLifecycle.initialized;
+  bool get isPaused => _state.isPaused;
+  bool get isInitialized => _state.isInitialized;
 
   TtsVoice get voice => _voice;
 
@@ -98,12 +100,12 @@ final class TtsService {
 
   Future<void> init() async {
     _ensureNotDisposed();
-    if (_lifecycle == _ServiceLifecycle.initialized) {
+    if (_state.isInitialized) {
       return;
     }
 
     _voice = await _engine.getDefaultVoice();
-    _lifecycle = _ServiceLifecycle.initialized;
+    _state.markInitialized();
   }
 
   Future<List<TtsVoice>> getAvailableVoices({String? locale}) async {
@@ -134,9 +136,7 @@ final class TtsService {
       params: params,
     );
 
-    if (_queueMode == _QueueMode.halted) {
-      _queueMode = _QueueMode.running;
-    }
+    _state.unhaltOnEnqueue();
 
     final controller = StreamController<TtsChunk>();
     final queued = _QueuedRequest(request: request, controller: controller);
@@ -156,22 +156,18 @@ final class TtsService {
 
   Future<void> pause() async {
     _ensureReady();
-    if (_queueMode != _QueueMode.halted) {
-      _queueMode = _QueueMode.paused;
-    }
+    _state.pauseQueue();
   }
 
   Future<void> resume() async {
     _ensureReady();
-    if (_queueMode == _QueueMode.paused) {
-      _queueMode = _QueueMode.running;
-    }
+    _state.resumeQueue();
     unawaited(_processQueue());
   }
 
   Future<void> stopCurrent() async {
     _ensureReady();
-    _activeControl?.cancel(CancelReason.stopCurrent);
+    _state.activeControl?.cancel(CancelReason.stopCurrent);
   }
 
   Future<int> clearQueue() async {
@@ -193,19 +189,15 @@ final class TtsService {
   }
 
   Future<void> dispose() async {
-    if (_lifecycle == _ServiceLifecycle.disposed) {
+    if (_state.isDisposed) {
       return;
     }
 
-    _activeControl?.cancel(CancelReason.serviceDispose);
+    _state.activeControl?.cancel(CancelReason.serviceDispose);
     await clearQueue();
     await _engine.dispose();
     await _output.dispose();
-    _pauseBuffer.clear();
-    _pauseBufferBytes = 0;
-    _queueActivity = _QueueActivity.idle;
-    _queueMode = _QueueMode.running;
-    _lifecycle = _ServiceLifecycle.disposed;
+    _state.markDisposed();
     await _queueEventsController.close();
     await _requestEventsController.close();
   }
@@ -228,191 +220,19 @@ final class TtsService {
   }
 
   Future<void> _processQueue() async {
-    if (_queueActivity == _QueueActivity.processing ||
-        _lifecycle == _ServiceLifecycle.disposed) {
-      return;
-    }
-    _queueActivity = _QueueActivity.processing;
-
-    try {
-      while (!_scheduler.isEmpty && _lifecycle != _ServiceLifecycle.disposed) {
-        // Pause gates starting the next request. Active request handling
-        // continues in-loop using buffering/passthrough policy.
-        if (_queueMode == _QueueMode.paused) {
-          break;
-        }
-
-        final item = _scheduler.dequeue();
-        final request = item.request;
-        final control = SynthesisControl();
-        _activeControl = control;
-
-        _emitQueueEvent(TtsQueueEventType.requestDequeued,
-            requestId: request.requestId);
-        _emitRequestEvent(
-          TtsRequestEventType.requestStarted,
-          requestId: request.requestId,
-          state: TtsRequestState.running,
-        );
-
-        try {
-          final audioSpec = _resolveAudioSpec(request);
-          await _output.initSession(
-            TtsOutputSession(
-              requestId: request.requestId,
-              audioSpec: audioSpec,
-              voice: request.voice,
-              options: request.options,
-              params: request.params,
-            ),
-          );
-
-          await for (final chunk
-              in _engine.synthesize(request, control, audioSpec)) {
-            if (control.isCanceled) {
-              break;
-            }
-            // Flush any buffered chunks before processing new ones post-resume.
-            if (_pauseBuffer.isNotEmpty && _queueMode != _QueueMode.paused) {
-              await _flushPauseBuffer(item, request, control);
-              if (control.isCanceled) break;
-            }
-            if (_queueMode == _QueueMode.paused &&
-                _config.pauseBufferPolicy == TtsPauseBufferPolicy.buffered) {
-              _pauseBuffer.add(chunk);
-              final newBytes = _pauseBufferBytes + chunk.bytes.length;
-              if (_pauseBufferBytes <= _config.pauseBufferMaxBytes &&
-                  newBytes > _config.pauseBufferMaxBytes) {
-                dev.log(
-                  'TTS pause buffer exceeded ${_config.pauseBufferMaxBytes} '
-                  'bytes (current: $newBytes); chunks continue to accumulate.',
-                  name: 'flutter_uni_tts',
-                  level: 900,
-                );
-              }
-              _pauseBufferBytes = newBytes;
-              continue;
-            }
-            await _output.consumeChunk(chunk);
-            item.controller.add(chunk);
-            _emitRequestEvent(
-              TtsRequestEventType.requestChunkReceived,
-              requestId: request.requestId,
-              state: TtsRequestState.running,
-              chunk: chunk,
-            );
-          }
-          // Engine stream exhausted. If it finished while still paused,
-          // wait for resume and then flush the remaining buffer.
-          if (!control.isCanceled && _pauseBuffer.isNotEmpty) {
-            while (_queueMode == _QueueMode.paused &&
-                _lifecycle != _ServiceLifecycle.disposed &&
-                !control.isCanceled) {
-              await Future<void>.delayed(const Duration(milliseconds: 20));
-            }
-            if (!control.isCanceled) {
-              await _flushPauseBuffer(item, request, control);
-            }
-          }
-
-          if (control.isCanceled) {
-            await _output.onCancel(control);
-            _emitRequestEvent(
-              TtsRequestEventType.requestStopped,
-              requestId: request.requestId,
-              state: TtsRequestState.stopped,
-            );
-          } else {
-            await _output.finalizeSession();
-            _emitRequestEvent(
-              TtsRequestEventType.requestCompleted,
-              requestId: request.requestId,
-              state: TtsRequestState.completed,
-            );
-          }
-
-          unawaited(item.controller.close());
-        } catch (error) {
-          final failure = _mapRequestFailure(error, request);
-          _emitRequestEvent(
-            TtsRequestEventType.requestFailed,
-            requestId: request.requestId,
-            state: TtsRequestState.failed,
-            error: failure.ttsError,
-            outputId: failure.outputId,
-            outputError: failure.outputError,
-          );
-          item.controller.addError(failure.ttsError);
-          unawaited(item.controller.close());
-
-          if (_config.queueFailurePolicy == TtsQueueFailurePolicy.failFast) {
-            _queueMode = _QueueMode.halted;
-            _emitQueueEvent(TtsQueueEventType.queueHalted,
-                requestId: request.requestId);
-            await _cancelPendingAfterFailure();
-            break;
-          }
-        } finally {
-          _activeControl = null;
-          _pauseBuffer.clear();
-          _pauseBufferBytes = 0;
-        }
-
-        if (_queueMode == _QueueMode.halted) {
-          break;
-        }
-      }
-    } finally {
-      _queueActivity = _QueueActivity.idle;
-    }
+    return _processQueueImpl(this);
   }
 
   _RequestFailure _mapRequestFailure(Object error, TtsRequest request) {
-    final outputFailure = error is TtsOutputFailure ? error : null;
-    final outputError = outputFailure?.error;
-    final baseError = outputError ?? (error is TtsError ? error : null);
-    final ttsError = baseError != null
-        ? TtsError(
-            code: baseError.code,
-            message: baseError.message,
-            requestId: baseError.requestId ?? request.requestId,
-            cause: baseError.cause,
-          )
-        : TtsError(
-            code: TtsErrorCode.internalError,
-            message: 'Request processing failed.',
-            requestId: request.requestId,
-            cause: error,
-          );
-
-    return _RequestFailure(
-      ttsError: ttsError,
-      outputId: outputFailure?.outputId,
-      outputError: outputError,
-    );
+    return _mapRequestFailureImpl(error, request);
   }
 
   Future<void> _cancelPendingAfterFailure() async {
-    final pending = _scheduler.drain();
-    for (final item in pending) {
-      _emitRequestEvent(
-        TtsRequestEventType.requestCanceled,
-        requestId: item.request.requestId,
-        state: TtsRequestState.canceled,
-      );
-      unawaited(item.controller.close());
-    }
+    return _cancelPendingAfterFailureImpl(this);
   }
 
   TtsAudioSpec _resolveAudioSpec(TtsRequest request) {
-    return _formatNegotiator.negotiateSpec(
-      engineCapabilities: _engine.supportedCapabilities,
-      outputCapabilities: _output.acceptedCapabilities,
-      preferredOrder: _config.preferredFormatOrder,
-      requestId: request.requestId,
-      preferredFormat: request.preferredFormat,
-      preferredSampleRateHz: request.options?.sampleRateHz,
-    );
+    return _resolveAudioSpecImpl(this, request);
   }
 
   Future<void> _flushPauseBuffer(
@@ -420,31 +240,11 @@ final class TtsService {
     TtsRequest request,
     SynthesisControl control,
   ) async {
-    final toFlush = List<TtsChunk>.of(_pauseBuffer);
-    _pauseBuffer.clear();
-    _pauseBufferBytes = 0;
-    for (final chunk in toFlush) {
-      if (control.isCanceled) break;
-      await _output.consumeChunk(chunk);
-      item.controller.add(chunk);
-      _emitRequestEvent(
-        TtsRequestEventType.requestChunkReceived,
-        requestId: request.requestId,
-        state: TtsRequestState.running,
-        chunk: chunk,
-      );
-    }
+    return _flushPauseBufferImpl(this, item, request, control);
   }
 
   void _emitQueueEvent(TtsQueueEventType type, {String? requestId}) {
-    _queueEventsController.add(
-      TtsQueueEvent(
-        type: type,
-        requestId: requestId,
-        timestamp: DateTime.now().toUtc(),
-        queueLength: _scheduler.length,
-      ),
-    );
+    _emitQueueEventImpl(this, type, requestId: requestId);
   }
 
   void _emitRequestEvent(
@@ -456,49 +256,25 @@ final class TtsService {
     String? outputId,
     TtsError? outputError,
   }) {
-    _requestEventsController.add(
-      TtsRequestEvent(
-        type: type,
-        requestId: requestId,
-        timestamp: DateTime.now().toUtc(),
-        state: state,
-        chunk: chunk,
-        error: error,
-        outputId: outputId,
-        outputError: outputError,
-      ),
+    _emitRequestEventImpl(
+      this,
+      type,
+      requestId: requestId,
+      state: state,
+      chunk: chunk,
+      error: error,
+      outputId: outputId,
+      outputError: outputError,
     );
   }
 
   void _ensureNotDisposed() {
-    if (_lifecycle == _ServiceLifecycle.disposed) {
-      throw StateError('TtsService is disposed.');
-    }
+    _state.ensureNotDisposed();
   }
 
   void _ensureReady() {
-    _ensureNotDisposed();
-    if (_lifecycle != _ServiceLifecycle.initialized) {
-      throw StateError('TtsService is not initialized. Call init() first.');
-    }
+    _state.ensureReady();
   }
-}
-
-enum _ServiceLifecycle {
-  created,
-  initialized,
-  disposed,
-}
-
-enum _QueueActivity {
-  idle,
-  processing,
-}
-
-enum _QueueMode {
-  running,
-  paused,
-  halted,
 }
 
 final class _QueuedRequest {
