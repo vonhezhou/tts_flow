@@ -20,8 +20,11 @@ final class TtsFormatNegotiator {
     if (intersection.isEmpty) {
       throw TtsError(
         code: TtsErrorCode.formatNegotiationFailed,
-        message:
-            'Engine and output do not share a common audio format. engineCapabilities: $engineCapabilities, outputCapabilities: $outputCapabilities',
+        message: 'Engine and output do not share a common audio format. '
+            'engineFormats: ${_sortedFormats(engineCapabilities)}, '
+            'outputFormats: ${_sortedFormats(outputCapabilities)}, '
+            'preferredFormat: $preferredFormat, '
+            'preferredOrder: $preferredOrder',
         requestId: requestId,
       );
     }
@@ -97,7 +100,10 @@ final class TtsFormatNegotiator {
 
     throw TtsError(
       code: TtsErrorCode.formatNegotiationFailed,
-      message: 'No compatible format found using preferred format order.',
+      message: 'No compatible format found using preferred format order. '
+          'sharedFormats: ${_sortedFormatSet(intersection)}, '
+          'preferredFormat: $preferredFormat, '
+          'preferredOrder: $preferredOrder',
       requestId: requestId,
     );
   }
@@ -144,7 +150,10 @@ final class TtsFormatNegotiator {
 
     throw TtsError(
       code: TtsErrorCode.formatNegotiationFailed,
-      message: 'PCM format selected but no compatible PCM descriptor exists.',
+      message: 'PCM format selected but no compatible PCM descriptor exists. '
+          'preferredSampleRateHz: $preferredSampleRateHz, '
+          'enginePcmCapabilities: $enginePcm, '
+          'outputPcmCapabilities: $outputPcm',
       requestId: requestId,
     );
   }
@@ -177,5 +186,15 @@ final class TtsFormatNegotiator {
       }
     }
     return values.first;
+  }
+
+  List<TtsAudioFormat> _sortedFormats(Set<AudioCapability> capabilities) {
+    return _sortedFormatSet(capabilities.map((c) => c.format).toSet());
+  }
+
+  List<TtsAudioFormat> _sortedFormatSet(Set<TtsAudioFormat> formats) {
+    final sorted = formats.toList();
+    sorted.sort((a, b) => a.index.compareTo(b.index));
+    return sorted;
   }
 }

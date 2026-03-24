@@ -107,6 +107,60 @@ void main() {
         ),
       );
     });
+
+    test('includes capability context when no shared format exists', () {
+      try {
+        negotiator.negotiateSpec(
+          engineCapabilities: {
+            const SimpleFormatCapability(format: TtsAudioFormat.mp3),
+          },
+          outputCapabilities: {
+            const SimpleFormatCapability(format: TtsAudioFormat.wav),
+          },
+          preferredOrder: const [TtsAudioFormat.wav],
+          requestId: 'n4',
+          preferredFormat: TtsAudioFormat.wav,
+        );
+        fail('Expected TtsError to be thrown.');
+      } on TtsError catch (error) {
+        expect(error.code, TtsErrorCode.formatNegotiationFailed);
+        expect(error.message, contains('engineFormats'));
+        expect(error.message, contains('outputFormats'));
+        expect(error.message, contains('preferredOrder'));
+      }
+    });
+
+    test('includes PCM capability context when descriptor mismatch occurs', () {
+      try {
+        negotiator.negotiateSpec(
+          engineCapabilities: {
+            PcmCapability(
+              sampleRatesHz: {16000},
+              bitsPerSample: {16},
+              channels: {1},
+              encodings: {PcmEncoding.signedInt},
+            ),
+          },
+          outputCapabilities: {
+            PcmCapability(
+              sampleRatesHz: {24000},
+              bitsPerSample: {16},
+              channels: {1},
+              encodings: {PcmEncoding.signedInt},
+            ),
+          },
+          preferredOrder: const [TtsAudioFormat.pcm],
+          requestId: 'n5',
+          preferredSampleRateHz: 24000,
+        );
+        fail('Expected TtsError to be thrown.');
+      } on TtsError catch (error) {
+        expect(error.code, TtsErrorCode.formatNegotiationFailed);
+        expect(error.message, contains('preferredSampleRateHz: 24000'));
+        expect(error.message, contains('enginePcmCapabilities'));
+        expect(error.message, contains('outputPcmCapabilities'));
+      }
+    });
   });
 
   group('M3 OpenAI engine adapter', () {

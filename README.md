@@ -5,9 +5,30 @@ flutter_uni_tts is a clean, extensible TTS framework for Dart and Flutter.
 Core design choices in this repository:
 
 - Fixed service wiring: each TtsService instance uses one engine and one output.
-- Request-scoped format negotiation: format is resolved per request.
-- Unified API: speak always returns Stream<TtsChunk>.
+- Request-scoped capability negotiation: audio spec is resolved per request.
+- Unified API: speak always returns a stream of `TtsChunk`.
 - FIFO queue semantics with halt-on-failure behavior.
+
+## Audio Negotiation
+
+Audio negotiation is capability-based and request-scoped.
+
+- Engines expose `supportedCapabilities`.
+- Outputs expose `acceptedCapabilities`.
+- `TtsFormatNegotiator` resolves a `TtsAudioSpec` for each request.
+- For PCM, negotiation intersects sample rates, bit depth, channels, and
+  encoding, then applies deterministic selection rules.
+
+Resolution priority:
+
+1. Request-level preferred format (`TtsRequest.preferredFormat`) if compatible.
+2. Service preferred order (`TtsServiceConfig.preferredFormatOrder`).
+3. For PCM descriptors, request preferred sample rate (`TtsOptions.sampleRateHz`)
+   when compatible, otherwise a deterministic fallback.
+
+When negotiation fails, `TtsErrorCode.formatNegotiationFailed` now includes
+diagnostic context in the message (shared formats/capabilities and preference
+inputs) to speed up integration debugging.
 
 ## Current Feature Set
 
