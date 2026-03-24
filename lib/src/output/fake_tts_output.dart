@@ -11,10 +11,15 @@ final class FakeTtsOutput implements TtsOutput {
   String get outputId => 'fake-output';
 
   @override
-  Set<TtsAudioFormat> get acceptedFormats => {
-        TtsAudioFormat.pcm,
-        TtsAudioFormat.wav,
-        TtsAudioFormat.mp3,
+  Set<AudioCapability> get acceptedCapabilities => {
+        PcmCapability(
+          sampleRatesHz: {16000, 22050, 24000, 44100, 48000},
+          bitsPerSample: {16},
+          channels: {1, 2},
+          encodings: {PcmEncoding.signedInt},
+        ),
+        const SimpleFormatCapability(format: TtsAudioFormat.wav),
+        const SimpleFormatCapability(format: TtsAudioFormat.mp3),
       };
 
   @override

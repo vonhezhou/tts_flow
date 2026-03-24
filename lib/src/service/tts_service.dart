@@ -144,8 +144,7 @@ final class TtsService {
         );
 
         try {
-          final resolvedFormat = _resolveFormat(request);
-          final audioSpec = _wrapAudioSpec(resolvedFormat, request);
+          final audioSpec = _resolveAudioSpec(request);
           await _output.initSession(
             TtsOutputSession(
               requestId: request.requestId,
@@ -288,28 +287,15 @@ final class TtsService {
     }
   }
 
-  TtsAudioFormat _resolveFormat(TtsRequest request) {
-    return _formatNegotiator.negotiate(
-      engineFormats: _engine.supportedFormats,
-      outputFormats: _output.acceptedFormats,
+  TtsAudioSpec _resolveAudioSpec(TtsRequest request) {
+    return _formatNegotiator.negotiateSpec(
+      engineCapabilities: _engine.supportedCapabilities,
+      outputCapabilities: _output.acceptedCapabilities,
       preferredOrder: _config.preferredFormatOrder,
       requestId: request.requestId,
       preferredFormat: request.preferredFormat,
+      preferredSampleRateHz: request.options?.sampleRateHz,
     );
-  }
-
-  TtsAudioSpec _wrapAudioSpec(TtsAudioFormat format, TtsRequest request) {
-    if (format == TtsAudioFormat.pcm) {
-      final sampleRateHz = request.options?.sampleRateHz ?? 24000;
-      final pcmDescriptor = PcmDescriptor(
-        sampleRateHz: sampleRateHz,
-        bitsPerSample: 16,
-        channels: 1,
-        encoding: PcmEncoding.signedInt,
-      );
-      return TtsAudioSpec(format: format, pcm: pcmDescriptor);
-    }
-    return TtsAudioSpec(format: format);
   }
 
   Future<void> _flushPauseBuffer(

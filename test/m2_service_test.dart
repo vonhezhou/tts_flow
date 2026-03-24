@@ -253,7 +253,9 @@ final class _AlwaysFailOutput implements TtsOutput {
   final String outputId;
 
   @override
-  Set<TtsAudioFormat> get acceptedFormats => {TtsAudioFormat.wav};
+  Set<AudioCapability> get acceptedCapabilities => {
+        const SimpleFormatCapability(format: TtsAudioFormat.wav),
+      };
 
   @override
   Future<void> initSession(TtsOutputSession session) async {}
@@ -300,7 +302,9 @@ final class _FailByRequestIdOutput implements TtsOutput {
   TtsOutputSession? _session;
 
   @override
-  Set<TtsAudioFormat> get acceptedFormats => {TtsAudioFormat.wav};
+  Set<AudioCapability> get acceptedCapabilities => {
+        const SimpleFormatCapability(format: TtsAudioFormat.wav),
+      };
 
   @override
   Future<void> initSession(TtsOutputSession session) async {

@@ -27,6 +27,10 @@ void main() {
       expect(speaker.playbackId, 'playback-spk-1');
       expect(speaker.playbackDuration, const Duration(milliseconds: 3));
       expect(backend.writtenBytes['playback-spk-1'], [1, 2, 3]);
+      expect(
+        backend.startedSpecs['playback-spk-1']?.format,
+        TtsAudioFormat.mp3,
+      );
     });
 
     test('onStop stops active playback', () async {
@@ -91,18 +95,21 @@ final class _FakeSpeakerBackend implements SpeakerBackend {
   final Map<String, String?> stopReasons = <String, String?>{};
 
   @override
-  Set<TtsAudioFormat> get supportedFormats => {
-        TtsAudioFormat.mp3,
-        TtsAudioFormat.wav,
+  Set<AudioCapability> get supportedCapabilities => {
+        const SimpleFormatCapability(format: TtsAudioFormat.mp3),
+        const SimpleFormatCapability(format: TtsAudioFormat.wav),
       };
+
+  final Map<String, TtsAudioSpec> startedSpecs = <String, TtsAudioSpec>{};
 
   @override
   Future<String> startPlayback({
     required String requestId,
-    required TtsAudioFormat format,
+    required TtsAudioSpec audioSpec,
   }) async {
     final playbackId = 'playback-$requestId';
     writtenBytes[playbackId] = <int>[];
+    startedSpecs[playbackId] = audioSpec;
     return playbackId;
   }
 

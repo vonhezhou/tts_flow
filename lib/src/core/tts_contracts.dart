@@ -130,7 +130,7 @@ final class CompositeOutputArtifact extends TtsOutputArtifact {
 abstract interface class TtsEngine {
   String get engineId;
   bool get supportsStreaming;
-  Set<TtsAudioFormat> get supportedFormats;
+  Set<AudioCapability> get supportedCapabilities;
 
   Stream<TtsChunk> synthesize(
     TtsRequest request,
@@ -149,7 +149,7 @@ abstract interface class TtsEngine {
 
 abstract interface class TtsOutput {
   String get outputId;
-  Set<TtsAudioFormat> get acceptedFormats;
+  Set<AudioCapability> get acceptedCapabilities;
 
   Future<void> initSession(TtsOutputSession session);
   Future<void> consumeChunk(TtsChunk chunk);
@@ -163,6 +163,28 @@ abstract interface class TtsOutput {
 
   Future<void> onStop(String reason);
   Future<void> dispose();
+}
+
+extension TtsEngineCapabilities on TtsEngine {
+  bool supportsSpec(TtsAudioSpec spec) {
+    for (final capability in supportedCapabilities) {
+      if (capability.supports(spec)) {
+        return true;
+      }
+    }
+    return false;
+  }
+}
+
+extension TtsOutputCapabilities on TtsOutput {
+  bool acceptsSpec(TtsAudioSpec spec) {
+    for (final capability in acceptedCapabilities) {
+      if (capability.supports(spec)) {
+        return true;
+      }
+    }
+    return false;
+  }
 }
 
 Never throwAsTtsError(Object error, {String? requestId}) {

@@ -10,7 +10,9 @@ final class MemoryOutput implements TtsOutput {
   final String outputId;
 
   @override
-  Set<TtsAudioFormat> get acceptedFormats => TtsAudioFormat.values.toSet();
+  Set<AudioCapability> get acceptedCapabilities => TtsAudioFormat.values
+      .map((format) => SimpleFormatCapability(format: format))
+      .toSet();
 
   TtsOutputSession? _session;
   BytesBuilder? _buffer;

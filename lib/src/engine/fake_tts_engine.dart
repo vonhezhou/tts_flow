@@ -20,10 +20,15 @@ final class FakeTtsEngine implements TtsEngine {
   final bool supportsStreaming;
 
   @override
-  Set<TtsAudioFormat> get supportedFormats => {
-        TtsAudioFormat.pcm,
-        TtsAudioFormat.wav,
-        TtsAudioFormat.mp3,
+  Set<AudioCapability> get supportedCapabilities => {
+        PcmCapability(
+          sampleRatesHz: {16000, 22050, 24000, 44100, 48000},
+          bitsPerSample: {16},
+          channels: {1, 2},
+          encodings: {PcmEncoding.signedInt},
+        ),
+        const SimpleFormatCapability(format: TtsAudioFormat.wav),
+        const SimpleFormatCapability(format: TtsAudioFormat.mp3),
       };
 
   final int chunkCount;

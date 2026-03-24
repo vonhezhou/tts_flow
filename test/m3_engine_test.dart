@@ -10,6 +10,63 @@ void main() {
   group('M3 format negotiator', () {
     const negotiator = TtsFormatNegotiator();
 
+    test('negotiates PCM descriptor honoring preferred sample rate', () {
+      final resolved = negotiator.negotiateSpec(
+        engineCapabilities: {
+          PcmCapability(
+            sampleRatesHz: {16000, 24000, 48000},
+            bitsPerSample: {16},
+            channels: {1},
+            encodings: {PcmEncoding.signedInt},
+          ),
+        },
+        outputCapabilities: {
+          PcmCapability(
+            sampleRatesHz: {22050, 24000},
+            bitsPerSample: {16},
+            channels: {1},
+            encodings: {PcmEncoding.signedInt},
+          ),
+        },
+        preferredOrder: const [TtsAudioFormat.pcm],
+        requestId: 'n0',
+        preferredSampleRateHz: 24000,
+      );
+
+      expect(resolved.format, TtsAudioFormat.pcm);
+      expect(resolved.requirePcm.sampleRateHz, 24000);
+      expect(resolved.requirePcm.bitsPerSample, 16);
+      expect(resolved.requirePcm.channels, 1);
+    });
+
+    test('negotiates PCM fallback sample rate when preferred not available',
+        () {
+      final resolved = negotiator.negotiateSpec(
+        engineCapabilities: {
+          PcmCapability(
+            sampleRatesHz: {16000, 22050},
+            bitsPerSample: {16},
+            channels: {1},
+            encodings: {PcmEncoding.signedInt},
+          ),
+        },
+        outputCapabilities: {
+          PcmCapability(
+            sampleRatesHz: {8000, 16000, 22050},
+            bitsPerSample: {16},
+            channels: {1},
+            encodings: {PcmEncoding.signedInt},
+          ),
+        },
+        preferredOrder: const [TtsAudioFormat.pcm],
+        requestId: 'n0b',
+        preferredSampleRateHz: 24000,
+      );
+
+      expect(resolved.format, TtsAudioFormat.pcm);
+      expect(resolved.requirePcm.sampleRateHz, 22050);
+    });
+
     test('uses request preferred format when available', () {
       final resolved = negotiator.negotiate(
         engineFormats: {TtsAudioFormat.mp3, TtsAudioFormat.wav},

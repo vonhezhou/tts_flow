@@ -65,10 +65,10 @@ class OpenAiTtsEngine implements TtsEngine {
   bool get supportsStreaming => true;
 
   @override
-  Set<TtsAudioFormat> get supportedFormats => {
-        TtsAudioFormat.mp3,
-        TtsAudioFormat.wav,
-        TtsAudioFormat.aac,
+  Set<AudioCapability> get supportedCapabilities => {
+        const SimpleFormatCapability(format: TtsAudioFormat.mp3),
+        const SimpleFormatCapability(format: TtsAudioFormat.wav),
+        const SimpleFormatCapability(format: TtsAudioFormat.aac),
       };
 
   @override

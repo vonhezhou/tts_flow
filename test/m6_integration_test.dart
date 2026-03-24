@@ -119,7 +119,9 @@ final class _FailingEngine implements TtsEngine {
   bool get supportsStreaming => true;
 
   @override
-  Set<TtsAudioFormat> get supportedFormats => {TtsAudioFormat.mp3};
+  Set<AudioCapability> get supportedCapabilities => {
+        const SimpleFormatCapability(format: TtsAudioFormat.mp3),
+      };
 
   @override
   Future<void> onPause() async {}

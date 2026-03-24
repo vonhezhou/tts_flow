@@ -49,10 +49,13 @@ final class CompositeOutput implements TtsOutput {
   final Map<String, TtsError> _outputErrors = <String, TtsError>{};
 
   @override
-  Set<TtsAudioFormat> get acceptedFormats {
-    var current = _outputs.first.acceptedFormats.toSet();
+  Set<AudioCapability> get acceptedCapabilities {
+    var current = _outputs.first.acceptedCapabilities.toSet();
     for (final output in _outputs.skip(1)) {
-      current = current.intersection(output.acceptedFormats);
+      final currentFormats = current.map((c) => c.format).toSet();
+      final outputFormats = output.acceptedCapabilities.map((c) => c.format);
+      final sharedFormats = currentFormats.intersection(outputFormats.toSet());
+      current = current.where((c) => sharedFormats.contains(c.format)).toSet();
     }
     return current;
   }

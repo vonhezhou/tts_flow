@@ -92,6 +92,127 @@ class TtsAudioSpec {
   int get hashCode => format.hashCode ^ pcm.hashCode;
 }
 
+/// Capability declaration used during format/spec negotiation.
+sealed class AudioCapability {
+  const AudioCapability({required this.format});
+
+  final TtsAudioFormat format;
+
+  bool supports(TtsAudioSpec spec) {
+    if (spec.format != format) {
+      return false;
+    }
+    return true;
+  }
+}
+
+/// Capability for non-PCM formats where only the format value is needed.
+final class SimpleFormatCapability extends AudioCapability {
+  const SimpleFormatCapability({required super.format});
+}
+
+/// Capability for PCM format that constrains descriptor fields.
+final class PcmCapability extends AudioCapability {
+  PcmCapability({
+    required Set<int> sampleRatesHz,
+    required Set<int> bitsPerSample,
+    required Set<int> channels,
+    required Set<PcmEncoding> encodings,
+  })  : sampleRatesHz = Set.unmodifiable(sampleRatesHz),
+        bitsPerSample = Set.unmodifiable(bitsPerSample),
+        channels = Set.unmodifiable(channels),
+        encodings = Set.unmodifiable(encodings),
+        super(format: TtsAudioFormat.pcm) {
+    if (sampleRatesHz.isEmpty) {
+      throw ArgumentError.value(
+        sampleRatesHz,
+        'sampleRatesHz',
+        'Must not be empty.',
+      );
+    }
+    if (bitsPerSample.isEmpty) {
+      throw ArgumentError.value(
+        bitsPerSample,
+        'bitsPerSample',
+        'Must not be empty.',
+      );
+    }
+    if (channels.isEmpty) {
+      throw ArgumentError.value(channels, 'channels', 'Must not be empty.');
+    }
+    if (encodings.isEmpty) {
+      throw ArgumentError.value(encodings, 'encodings', 'Must not be empty.');
+    }
+  }
+
+  final Set<int> sampleRatesHz;
+  final Set<int> bitsPerSample;
+  final Set<int> channels;
+  final Set<PcmEncoding> encodings;
+
+  @override
+  bool supports(TtsAudioSpec spec) {
+    if (!super.supports(spec)) {
+      return false;
+    }
+    final pcm = spec.pcm;
+    if (pcm == null) {
+      return false;
+    }
+    return sampleRatesHz.contains(pcm.sampleRateHz) &&
+        bitsPerSample.contains(pcm.bitsPerSample) &&
+        channels.contains(pcm.channels) &&
+        encodings.contains(pcm.encoding);
+  }
+
+  @override
+  String toString() {
+    return 'PcmCapability(sampleRatesHz: $sampleRatesHz, bitsPerSample: $bitsPerSample, channels: $channels, encodings: $encodings)';
+  }
+
+  @override
+  bool operator ==(Object other) {
+    return identical(this, other) ||
+        other is PcmCapability &&
+            _sameIntSet(sampleRatesHz, other.sampleRatesHz) &&
+            _sameIntSet(bitsPerSample, other.bitsPerSample) &&
+            _sameIntSet(channels, other.channels) &&
+            _sameEncodingSet(encodings, other.encodings);
+  }
+
+  @override
+  int get hashCode => Object.hash(
+        Object.hashAll(sampleRatesHz.toList()..sort()),
+        Object.hashAll(bitsPerSample.toList()..sort()),
+        Object.hashAll(channels.toList()..sort()),
+        Object.hashAll(encodings.toList()..sort((a, b) => a.index - b.index)),
+      );
+}
+
+bool _sameIntSet(Set<int> a, Set<int> b) {
+  if (a.length != b.length) {
+    return false;
+  }
+  for (final value in a) {
+    if (!b.contains(value)) {
+      return false;
+    }
+  }
+  return true;
+}
+
+bool _sameEncodingSet(Set<PcmEncoding> a, Set<PcmEncoding> b) {
+  if (a.length != b.length) {
+    return false;
+  }
+  for (final value in a) {
+    if (!b.contains(value)) {
+      return false;
+    }
+  }
+  return true;
+}
+
 /// A class representing a TTS voice with its associated properties.
 class TtsVoice {
   const TtsVoice({required this.voiceId});

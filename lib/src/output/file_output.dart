@@ -18,7 +18,9 @@ final class FileOutput implements TtsOutput {
   final String outputId;
 
   @override
-  Set<TtsAudioFormat> get acceptedFormats => TtsAudioFormat.values.toSet();
+  Set<AudioCapability> get acceptedCapabilities => TtsAudioFormat.values
+      .map((format) => SimpleFormatCapability(format: format))
+      .toSet();
 
   @override
   Future<void> initSession(TtsOutputSession session) async {

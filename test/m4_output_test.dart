@@ -186,7 +186,9 @@ final class _FailingTestOutput implements TtsOutput {
   final bool failOnConsume;
 
   @override
-  Set<TtsAudioFormat> get acceptedFormats => {TtsAudioFormat.wav};
+  Set<AudioCapability> get acceptedCapabilities => {
+        const SimpleFormatCapability(format: TtsAudioFormat.wav),
+      };
 
   @override
   Future<void> consumeChunk(TtsChunk chunk) async {

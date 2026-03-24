@@ -2,11 +2,11 @@ import '../core/tts_contracts.dart';
 import '../core/tts_models.dart';
 
 abstract interface class SpeakerBackend {
-  Set<TtsAudioFormat> get supportedFormats;
+  Set<AudioCapability> get supportedCapabilities;
 
   Future<String> startPlayback({
     required String requestId,
-    required TtsAudioFormat format,
+    required TtsAudioSpec audioSpec,
   });
 
   Future<void> appendAudio({
@@ -42,7 +42,8 @@ final class SpeakerOutput implements TtsOutput {
   final String outputId;
 
   @override
-  Set<TtsAudioFormat> get acceptedFormats => _backend.supportedFormats;
+  Set<AudioCapability> get acceptedCapabilities =>
+      _backend.supportedCapabilities;
 
   TtsOutputSession? _session;
   String? _playbackId;
@@ -52,7 +53,7 @@ final class SpeakerOutput implements TtsOutput {
     _session = session;
     _playbackId = await _backend.startPlayback(
       requestId: session.requestId,
-      format: session.audioSpec.format,
+      audioSpec: session.audioSpec,
     );
   }
 
