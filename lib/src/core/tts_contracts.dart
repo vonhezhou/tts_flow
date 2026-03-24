@@ -26,10 +26,10 @@ final class TtsServiceConfig {
   const TtsServiceConfig({
     this.preferredFormatOrder = const [
       TtsAudioFormat.mp3,
-      TtsAudioFormat.oggOpus,
+      TtsAudioFormat.opus,
       TtsAudioFormat.aac,
       TtsAudioFormat.wav,
-      TtsAudioFormat.pcm16,
+      TtsAudioFormat.pcm,
     ],
     this.queueFailurePolicy = TtsQueueFailurePolicy.failFast,
     this.pauseBufferPolicy = TtsPauseBufferPolicy.buffered,

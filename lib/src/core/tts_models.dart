@@ -1,18 +1,17 @@
 import 'dart:typed_data';
 
-enum TtsAudioFormat { pcm16, mp3, wav, oggOpus, aac }
+enum TtsAudioFormat { pcm, mp3, wav, opus, aac }
 
 enum TtsRequestState { queued, running, completed, failed, stopped, canceled }
 
-final class TtsVoice {
-  const TtsVoice({required this.voiceId, this.locale, this.tags = const []});
+/// A class representing a TTS voice with its associated properties.
+class TtsVoice {
+  const TtsVoice({required this.voiceId});
 
   final String voiceId;
-  final String? locale;
-  final List<String> tags;
 }
 
-final class TtsOptions {
+class TtsOptions {
   const TtsOptions({
     this.speed,
     this.pitch,
@@ -28,14 +27,14 @@ final class TtsOptions {
   final Duration? timeout;
 }
 
-final class TtsRequest {
+class TtsRequest {
   const TtsRequest({
     required this.requestId,
     required this.text,
     this.voice,
     this.preferredFormat,
     this.options,
-    this.metadata = const {},
+    this.params = const {},
   });
 
   final String requestId;
@@ -43,10 +42,10 @@ final class TtsRequest {
   final TtsVoice? voice;
   final TtsAudioFormat? preferredFormat;
   final TtsOptions? options;
-  final Map<String, Object?> metadata;
+  final Map<String, Object> params;
 }
 
-final class TtsChunk {
+class TtsChunk {
   const TtsChunk({
     required this.requestId,
     required this.sequenceNumber,

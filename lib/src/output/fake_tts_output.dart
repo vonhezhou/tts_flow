@@ -12,7 +12,7 @@ final class FakeTtsOutput implements TtsOutput {
 
   @override
   Set<TtsAudioFormat> get acceptedFormats => {
-        TtsAudioFormat.pcm16,
+        TtsAudioFormat.pcm,
         TtsAudioFormat.wav,
         TtsAudioFormat.mp3,
       };

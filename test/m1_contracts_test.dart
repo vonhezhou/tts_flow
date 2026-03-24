@@ -51,7 +51,7 @@ void main() {
       final output = FakeTtsOutput();
       const session = TtsOutputSession(
         requestId: 'r3',
-        resolvedFormat: TtsAudioFormat.pcm16,
+        resolvedFormat: TtsAudioFormat.pcm,
       );
 
       await output.initSession(session);
@@ -60,7 +60,7 @@ void main() {
           requestId: 'r3',
           sequenceNumber: 0,
           bytes: Uint8List.fromList([1, 2, 3]),
-          format: TtsAudioFormat.pcm16,
+          format: TtsAudioFormat.pcm,
           isLastChunk: true,
           timestamp: DateTime.now().toUtc(),
         ),
@@ -71,7 +71,7 @@ void main() {
 
       final memoryArtifact = artifact as MemoryOutputArtifact;
       expect(memoryArtifact.requestId, 'r3');
-      expect(memoryArtifact.resolvedFormat, TtsAudioFormat.pcm16);
+      expect(memoryArtifact.resolvedFormat, TtsAudioFormat.pcm);
       expect(memoryArtifact.totalBytes, 3);
     });
   });

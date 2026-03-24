@@ -126,13 +126,13 @@ final class FileOutput implements TtsOutput {
 
   String _extensionForFormat(TtsAudioFormat format) {
     switch (format) {
-      case TtsAudioFormat.pcm16:
+      case TtsAudioFormat.pcm:
         return 'pcm';
       case TtsAudioFormat.mp3:
         return 'mp3';
       case TtsAudioFormat.wav:
         return 'wav';
-      case TtsAudioFormat.oggOpus:
+      case TtsAudioFormat.opus:
         return 'ogg';
       case TtsAudioFormat.aac:
         return 'aac';

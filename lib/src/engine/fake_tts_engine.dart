@@ -21,7 +21,7 @@ final class FakeTtsEngine implements TtsEngine {
 
   @override
   Set<TtsAudioFormat> get supportedFormats => {
-        TtsAudioFormat.pcm16,
+        TtsAudioFormat.pcm,
         TtsAudioFormat.wav,
         TtsAudioFormat.mp3,
       };

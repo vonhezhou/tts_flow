@@ -26,7 +26,7 @@ void main() {
       final resolved = negotiator.negotiate(
         engineFormats: {TtsAudioFormat.aac, TtsAudioFormat.wav},
         outputFormats: {TtsAudioFormat.aac, TtsAudioFormat.wav},
-        preferredOrder: const [TtsAudioFormat.pcm16, TtsAudioFormat.wav],
+        preferredOrder: const [TtsAudioFormat.pcm, TtsAudioFormat.wav],
         requestId: 'n2',
       );
 

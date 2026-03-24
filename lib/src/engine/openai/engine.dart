@@ -194,13 +194,13 @@ class OpenAiTtsEngine implements TtsEngine {
   /// Override if a provider expects different format tokens.
   String mapFormat(TtsAudioFormat format) {
     switch (format) {
-      case TtsAudioFormat.pcm16:
+      case TtsAudioFormat.pcm:
         return 'pcm';
       case TtsAudioFormat.mp3:
         return 'mp3';
       case TtsAudioFormat.wav:
         return 'wav';
-      case TtsAudioFormat.oggOpus:
+      case TtsAudioFormat.opus:
         return 'opus';
       case TtsAudioFormat.aac:
         return 'aac';
