@@ -15,7 +15,7 @@ void main() {
           supportsStreaming: true,
           chunkCount: 3,
         ),
-        output: MemoryOutput(),
+        defaultOutput: MemoryOutput(),
       );
 
       await service.init();
@@ -36,7 +36,7 @@ void main() {
     test('queue halts and cancels pending requests after failure', () async {
       final service = TtsFlow(
         engine: _FailingEngine(),
-        output: MemoryOutput(),
+        defaultOutput: MemoryOutput(),
       );
 
       await service.init();
@@ -71,7 +71,7 @@ void main() {
             supportsStreaming: true,
             chunkCount: 3,
           ),
-          output: MulticastOutput(
+          defaultOutput: MulticastOutput(
             outputs: [
               MemoryOutput(outputId: 'memory'),
               FileOutput(outputId: 'file', outputDirectory: tempDir),

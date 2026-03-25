@@ -28,7 +28,7 @@ final class QueuedRequest {
 
 mixin TtsSourceMixin on TtsFlowEventBus {
   TtsEngine get engine;
-  TtsOutput get output;
+  TtsOutput? get defaultOutput;
   TtsFlowConfig get config;
 
   @protected
@@ -70,6 +70,7 @@ mixin TtsSourceMixin on TtsFlowEventBus {
     QueuedRequest item,
     TtsRequest request,
     SynthesisControl control,
+    TtsOutput effectiveOutput,
   ) async {
     final toFlush = List<TtsChunk>.of(state.pauseBuffer);
     state.clearPauseBuffer();
@@ -78,7 +79,7 @@ mixin TtsSourceMixin on TtsFlowEventBus {
       if (control.isCanceled) {
         break;
       }
-      await output.consumeChunk(chunk);
+      await effectiveOutput.consumeChunk(chunk);
       item.controller.add(chunk);
       emitRequestEvent(
         TtsRequestEventType.requestChunkReceived,
@@ -94,6 +95,8 @@ mixin TtsSourceMixin on TtsFlowEventBus {
     QueuedRequest item,
   ) async {
     final request = item.request;
+    final effectiveOutput = request.output ?? defaultOutput!;
+
     final control = SynthesisControl();
     state.activeControl = control;
 
@@ -106,7 +109,7 @@ mixin TtsSourceMixin on TtsFlowEventBus {
     );
 
     try {
-      final audioSpec = resolveAudioSpec(request);
+      final audioSpec = resolveAudioSpec(request, effectiveOutput);
       if (!engine.supportsSpec(audioSpec)) {
         throw TtsError(
           code: TtsErrorCode.formatNegotiationFailed,
@@ -115,15 +118,15 @@ mixin TtsSourceMixin on TtsFlowEventBus {
           requestId: request.requestId,
         );
       }
-      if (!output.acceptsSpec(audioSpec)) {
+      if (!effectiveOutput.acceptsSpec(audioSpec)) {
         throw TtsError(
           code: TtsErrorCode.formatNegotiationFailed,
           message:
-              'Negotiated audio spec is not accepted by output "${output.outputId}".',
+              'Negotiated audio spec is not accepted by output "${effectiveOutput.outputId}".',
           requestId: request.requestId,
         );
       }
-      await output.initSession(
+      await effectiveOutput.initSession(
         TtsOutputSession(
           requestId: request.requestId,
           audioSpec: audioSpec,
@@ -138,7 +141,8 @@ mixin TtsSourceMixin on TtsFlowEventBus {
         if (control.isCanceled) {
           break;
         }
-        await handleSynthesizedChunk(item, request, control, chunk);
+        await handleSynthesizedChunk(
+            item, request, control, chunk, effectiveOutput);
         if (control.isCanceled) {
           break;
         }
@@ -149,19 +153,19 @@ mixin TtsSourceMixin on TtsFlowEventBus {
           await Future<void>.delayed(const Duration(milliseconds: 20));
         }
         if (!control.isCanceled) {
-          await flushPauseBufferImpl(item, request, control);
+          await flushPauseBufferImpl(item, request, control, effectiveOutput);
         }
       }
 
       if (control.isCanceled) {
-        await output.onCancel(control);
+        await effectiveOutput.onCancel(control);
         emitRequestEvent(
           TtsRequestEventType.requestStopped,
           requestId: request.requestId,
           state: TtsRequestState.stopped,
         );
       } else {
-        await output.finalizeSession();
+        await effectiveOutput.finalizeSession();
         emitRequestEvent(
           TtsRequestEventType.requestCompleted,
           requestId: request.requestId,
@@ -205,10 +209,11 @@ mixin TtsSourceMixin on TtsFlowEventBus {
     TtsRequest request,
     SynthesisControl control,
     TtsChunk chunk,
+    TtsOutput effectiveOutput,
   ) async {
     // Flush buffered chunks before handling fresh chunks after resume.
     if (state.pauseBuffer.isNotEmpty && !state.isPaused) {
-      await flushPauseBufferImpl(item, request, control);
+      await flushPauseBufferImpl(item, request, control, effectiveOutput);
       if (control.isCanceled) {
         return;
       }
@@ -231,7 +236,7 @@ mixin TtsSourceMixin on TtsFlowEventBus {
       return;
     }
 
-    await output.consumeChunk(chunk);
+    await effectiveOutput.consumeChunk(chunk);
     item.controller.add(chunk);
     emitRequestEvent(
       TtsRequestEventType.requestChunkReceived,
@@ -255,10 +260,10 @@ mixin TtsSourceMixin on TtsFlowEventBus {
   }
 
   @protected
-  TtsAudioSpec resolveAudioSpec(TtsRequest request) {
+  TtsAudioSpec resolveAudioSpec(TtsRequest request, TtsOutput effectiveOutput) {
     return formatNegotiator.negotiateSpec(
       engineCapabilities: engine.supportedCapabilities,
-      outputCapabilities: output.acceptedCapabilities,
+      outputCapabilities: effectiveOutput.acceptedCapabilities,
       preferredOrder: config.preferredFormatOrder,
       requestId: request.requestId,
       preferredFormat: request.preferredFormat,

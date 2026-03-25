@@ -1,4 +1,5 @@
 import 'package:tts_flow_dart/src/core/audio_spec.dart';
+import 'package:tts_flow_dart/src/core/tts_output.dart';
 import 'package:tts_flow_dart/src/core/tts_voice.dart';
 
 enum TtsRequestState { queued, running, completed, failed, stopped, canceled }
@@ -43,6 +44,7 @@ class TtsRequest {
     this.preferredFormat,
     this.options,
     this.params = const {},
+    this.output,
   });
 
   final String requestId;
@@ -51,4 +53,5 @@ class TtsRequest {
   final TtsAudioFormat? preferredFormat;
   final TtsOptions? options;
   final Map<String, Object> params;
+  final TtsOutput? output;
 }

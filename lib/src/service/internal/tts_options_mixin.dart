@@ -1,5 +1,6 @@
 import 'package:meta/meta.dart';
 import 'package:tts_flow_dart/src/core/audio_spec.dart';
+import 'package:tts_flow_dart/src/core/tts_output.dart';
 import 'package:tts_flow_dart/src/core/tts_request.dart';
 import 'package:tts_flow_dart/src/core/tts_voice.dart';
 
@@ -51,6 +52,7 @@ mixin TtsOptionsMixin {
     required String requestId,
     required String text,
     required Map<String, Object> params,
+    TtsOutput? output,
   }) {
     return TtsRequest(
       requestId: requestId,
@@ -61,6 +63,7 @@ mixin TtsOptionsMixin {
       params: Map<String, Object>.unmodifiable(
         Map<String, Object>.from(params),
       ),
+      output: output,
     );
   }
 }

@@ -4,6 +4,7 @@ import 'package:meta/meta.dart';
 import 'package:tts_flow_dart/src/core/audio_spec.dart';
 import 'package:tts_flow_dart/src/core/tts_chunk.dart';
 import 'package:tts_flow_dart/src/core/tts_engine.dart';
+import 'package:tts_flow_dart/src/core/tts_errors.dart';
 import 'package:tts_flow_dart/src/core/tts_flow_config.dart';
 import 'package:tts_flow_dart/src/core/tts_output.dart';
 import 'package:tts_flow_dart/src/core/tts_policy.dart';
@@ -18,23 +19,23 @@ import 'internal/tts_options_mixin.dart';
 final class TtsFlow with TtsOptionsMixin, TtsFlowEventBus, TtsSourceMixin {
   TtsFlow({
     required TtsEngine engine,
-    required TtsOutput output,
+    TtsOutput? defaultOutput,
     TtsFlowConfig config = const TtsFlowConfig(),
   })  : _engine = engine,
-        _output = output,
+        _defaultOutput = defaultOutput,
         _config = config,
         options = const TtsOptions(),
         preferredFormat = config.preferredFormatOrder.first;
 
   final TtsEngine _engine;
-  final TtsOutput _output;
+  final TtsOutput? _defaultOutput;
   final TtsFlowConfig _config;
 
   @override
   TtsEngine get engine => _engine;
 
   @override
-  TtsOutput get output => _output;
+  TtsOutput? get defaultOutput => _defaultOutput;
 
   @override
   TtsFlowConfig get config => _config;
@@ -91,15 +92,25 @@ final class TtsFlow with TtsOptionsMixin, TtsFlowEventBus, TtsSourceMixin {
 
   Stream<TtsChunk> speak(
     String requestId,
-    String text, [
+    String text, {
     Map<String, Object> params = const <String, Object>{},
-  ]) {
+    TtsOutput? output,
+  }) {
     _ensureReady();
+
+    if (output == null && defaultOutput == null) {
+      throw TtsError(
+        code: TtsErrorCode.invalidRequest,
+        message: 'No effective output configured for request.',
+        requestId: requestId,
+      );
+    }
 
     final request = buildRequest(
       requestId: requestId,
       text: text,
       params: params,
+      output: output,
     );
 
     state.unhaltOnEnqueue();
@@ -167,7 +178,7 @@ final class TtsFlow with TtsOptionsMixin, TtsFlowEventBus, TtsSourceMixin {
     await clearQueue();
     await _awaitActiveRequestShutdown();
     await _engine.dispose();
-    await _output.dispose();
+    await _defaultOutput?.dispose();
     state.markDisposed();
     await eventBus.close();
   }

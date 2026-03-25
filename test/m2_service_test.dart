@@ -14,7 +14,7 @@ void main() {
           chunkCount: 2,
           chunkDelay: const Duration(milliseconds: 5),
         ),
-        output: FakeTtsOutput(),
+        defaultOutput: FakeTtsOutput(),
       );
 
       final started = <String>[];
@@ -46,7 +46,7 @@ void main() {
           chunkCount: 3,
           chunkDelay: const Duration(milliseconds: 10),
         ),
-        output: FakeTtsOutput(),
+        defaultOutput: FakeTtsOutput(),
       );
 
       await service.init();
@@ -73,7 +73,7 @@ void main() {
           chunkCount: 8,
           chunkDelay: const Duration(milliseconds: 5),
         ),
-        output: FakeTtsOutput(),
+        defaultOutput: FakeTtsOutput(),
       );
 
       final events = <TtsRequestEvent>[];
@@ -119,7 +119,7 @@ void main() {
           chunkCount: 2,
           chunkDelay: const Duration(milliseconds: 2),
         ),
-        output: MulticastOutput(
+        defaultOutput: MulticastOutput(
           outputs: [
             MemoryOutput(outputId: 'memory'),
             _AlwaysFailOutput(outputId: 'fail-output'),
@@ -160,7 +160,7 @@ void main() {
           chunkCount: 2,
           chunkDelay: const Duration(milliseconds: 2),
         ),
-        output: MulticastOutput(
+        defaultOutput: MulticastOutput(
           outputs: [
             _PcmOnlyOutput(outputId: 'pcm-16k', sampleRatesHz: {16000}),
             _PcmOnlyOutput(outputId: 'pcm-24k', sampleRatesHz: {24000}),
@@ -195,7 +195,7 @@ void main() {
           chunkCount: 2,
           chunkDelay: const Duration(milliseconds: 2),
         ),
-        output: _FailByRequestIdOutput(
+        defaultOutput: _FailByRequestIdOutput(
           outputId: 'selective-fail',
           failingRequestIds: {'first'},
         ),
@@ -237,7 +237,7 @@ void main() {
           chunkCount: 2,
           chunkDelay: const Duration(milliseconds: 5),
         ),
-        output: FakeTtsOutput(),
+        defaultOutput: FakeTtsOutput(),
       );
 
       final started = <String>[];
@@ -279,7 +279,7 @@ void main() {
           chunkCount: 8,
           chunkDelay: const Duration(milliseconds: 5),
         ),
-        output: output,
+        defaultOutput: output,
       );
 
       await service.init();
@@ -304,7 +304,7 @@ void main() {
           chunkCount: 20,
           chunkDelay: const Duration(milliseconds: 5),
         ),
-        output: output,
+        defaultOutput: output,
       );
 
       await service.init();
@@ -330,7 +330,7 @@ void main() {
           engineId: 'fake-engine',
           supportsStreaming: true,
         ),
-        output: FakeTtsOutput(),
+        defaultOutput: FakeTtsOutput(),
       );
 
       await service.init();
@@ -359,7 +359,7 @@ void main() {
       final streamedChunks = await service.speak(
         'defaults-applied',
         'request uses service defaults',
-        const {'style': 'news', 'emotion': 'calm'},
+        params: const {'style': 'news', 'emotion': 'calm'},
       ).toList();
       expect(streamedChunks, isNotEmpty);
 
@@ -372,13 +372,90 @@ void main() {
           engineId: 'fake-engine',
           supportsStreaming: true,
         ),
-        output: FakeTtsOutput(),
+        defaultOutput: FakeTtsOutput(),
       );
 
       expect(
         () => service.speak('not-ready', 'call before init'),
         throwsStateError,
       );
+
+      await service.dispose();
+    });
+
+    test('speak with output override routes audio only to override output',
+        () async {
+      final defaultOutput = _TrackingOutput(outputId: 'default');
+      final overrideOutput = _TrackingOutput(outputId: 'override');
+      final service = TtsFlow(
+        engine: FakeTtsEngine(
+          engineId: 'fake-engine',
+          supportsStreaming: true,
+          chunkCount: 3,
+          chunkDelay: const Duration(milliseconds: 2),
+        ),
+        defaultOutput: defaultOutput,
+      );
+
+      await service.init();
+
+      final chunks = await service
+          .speak('override-1', 'override output test', output: overrideOutput)
+          .toList();
+
+      expect(chunks, isNotEmpty);
+      expect(overrideOutput.consumedChunks, isNotEmpty);
+      expect(defaultOutput.consumedChunks, isEmpty);
+
+      await service.dispose();
+    });
+
+    test('no default output and no override fails request', () async {
+      final service = TtsFlow(
+        engine: FakeTtsEngine(
+          engineId: 'fake-engine',
+          supportsStreaming: true,
+          chunkCount: 2,
+          chunkDelay: const Duration(milliseconds: 2),
+        ),
+      );
+
+      await service.init();
+
+      expect(
+        () => service.speak('no-output', 'missing output'),
+        throwsA(
+          isA<TtsError>()
+              .having(
+                  (error) => error.code, 'code', TtsErrorCode.invalidRequest)
+              .having((error) => error.requestId, 'requestId', 'no-output'),
+        ),
+      );
+
+      await service.dispose();
+    });
+
+    test('no default output with per-request override works normally',
+        () async {
+      final overrideOutput = _TrackingOutput(outputId: 'override');
+      final service = TtsFlow(
+        engine: FakeTtsEngine(
+          engineId: 'fake-engine',
+          supportsStreaming: true,
+          chunkCount: 3,
+          chunkDelay: const Duration(milliseconds: 2),
+        ),
+      );
+
+      await service.init();
+
+      final chunks = await service
+          .speak('no-default-override', 'no default, use override',
+              output: overrideOutput)
+          .toList();
+
+      expect(chunks, isNotEmpty);
+      expect(overrideOutput.consumedChunks, isNotEmpty);
 
       await service.dispose();
     });
@@ -572,6 +649,55 @@ final class _PcmOnlyOutput implements TtsOutput {
     if (session == null) {
       throw StateError('No active output session.');
     }
+    return InMemoryAudioArtifact(
+      requestId: session.requestId,
+      audioSpec: session.audioSpec,
+      audioBytes: Uint8List(0),
+      totalBytes: 0,
+    );
+  }
+
+  @override
+  Future<void> onCancel(SynthesisControl control) async {
+    _session = null;
+  }
+
+  @override
+  Future<void> dispose() async {
+    _session = null;
+  }
+}
+
+final class _TrackingOutput implements TtsOutput {
+  _TrackingOutput({required this.outputId});
+
+  @override
+  final String outputId;
+
+  final List<TtsChunk> consumedChunks = [];
+  TtsOutputSession? _session;
+
+  @override
+  Set<AudioCapability> get acceptedCapabilities => {
+        const SimpleFormatCapability(format: TtsAudioFormat.wav),
+        const SimpleFormatCapability(format: TtsAudioFormat.mp3),
+      };
+
+  @override
+  Future<void> initSession(TtsOutputSession session) async {
+    _session = session;
+    consumedChunks.clear();
+  }
+
+  @override
+  Future<void> consumeChunk(TtsChunk chunk) async {
+    consumedChunks.add(chunk);
+  }
+
+  @override
+  Future<AudioArtifact> finalizeSession() async {
+    final session = _session;
+    if (session == null) throw StateError('No active session.');
     return InMemoryAudioArtifact(
       requestId: session.requestId,
       audioSpec: session.audioSpec,
