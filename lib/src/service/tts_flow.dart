@@ -195,11 +195,22 @@ final class TtsFlow {
 
     _state.activeControl?.cancel(CancelReason.serviceDispose);
     await clearQueue();
+    await _awaitActiveRequestShutdown();
     await _engine.dispose();
     await _output.dispose();
     _state.markDisposed();
     await _queueEventsController.close();
     await _requestEventsController.close();
+  }
+
+  Future<void> _awaitActiveRequestShutdown() async {
+    const pollInterval = Duration(milliseconds: 10);
+    const timeout = Duration(milliseconds: 500);
+    final deadline = DateTime.now().add(timeout);
+
+    while (_state.activeControl != null && DateTime.now().isBefore(deadline)) {
+      await Future<void>.delayed(pollInterval);
+    }
   }
 
   TtsRequest _buildRequest({

@@ -52,10 +52,10 @@ final class MulticastOutput implements TtsOutput {
   Set<AudioCapability> get acceptedCapabilities {
     var current = _outputs.first.acceptedCapabilities.toSet();
     for (final output in _outputs.skip(1)) {
-      final currentFormats = current.map((c) => c.format).toSet();
-      final outputFormats = output.acceptedCapabilities.map((c) => c.format);
-      final sharedFormats = currentFormats.intersection(outputFormats.toSet());
-      current = current.where((c) => sharedFormats.contains(c.format)).toSet();
+      current = _intersectCapabilities(current, output.acceptedCapabilities);
+      if (current.isEmpty) {
+        break;
+      }
     }
     return current;
   }
@@ -63,14 +63,13 @@ final class MulticastOutput implements TtsOutput {
   @override
   Future<void> initSession(TtsOutputSession session) async {
     _session = session;
-    _activeOutputs
-      ..clear()
-      ..addEntries(_outputs.map((output) => MapEntry(output.outputId, output)));
+    _activeOutputs.clear();
     _outputErrors.clear();
 
     for (final output in _outputs) {
       try {
         await output.initSession(session);
+        _activeOutputs[output.outputId] = output;
       } catch (error) {
         final converted = _toOutputError(
           error,
@@ -79,8 +78,14 @@ final class MulticastOutput implements TtsOutput {
           outputId: output.outputId,
         );
         _outputErrors[output.outputId] = converted;
-        _activeOutputs.remove(output.outputId);
         if (errorPolicy == CompositeOutputErrorPolicy.failFast) {
+          await _rollbackOutputs(
+            entries: _activeOutputs.entries.toList(),
+            requestId: session.requestId,
+            stage: 'initSession',
+            failingOutputId: output.outputId,
+          );
+          _clearSession();
           throw TtsOutputFailure(outputId: output.outputId, error: converted);
         }
       }
@@ -112,6 +117,13 @@ final class MulticastOutput implements TtsOutput {
         _outputErrors[entry.key] = converted;
         _activeOutputs.remove(entry.key);
         if (errorPolicy == CompositeOutputErrorPolicy.failFast) {
+          await _rollbackOutputs(
+            entries: _activeOutputs.entries.toList(),
+            requestId: session.requestId,
+            stage: 'consumeChunk',
+            failingOutputId: entry.key,
+          );
+          _clearSession();
           throw TtsOutputFailure(outputId: entry.key, error: converted);
         }
       }
@@ -142,6 +154,12 @@ final class MulticastOutput implements TtsOutput {
         _outputErrors[entry.key] = converted;
         _activeOutputs.remove(entry.key);
         if (errorPolicy == CompositeOutputErrorPolicy.failFast) {
+          await _rollbackOutputs(
+            entries: _activeOutputs.entries.toList(),
+            requestId: session.requestId,
+            stage: 'finalizeSession',
+            failingOutputId: entry.key,
+          );
           _clearSession();
           throw TtsOutputFailure(outputId: entry.key, error: converted);
         }
@@ -251,4 +269,198 @@ final class MulticastOutput implements TtsOutput {
     _session = null;
     _activeOutputs.clear();
   }
+
+  Future<void> _rollbackOutputs({
+    required List<MapEntry<String, TtsOutput>> entries,
+    required String? requestId,
+    required String stage,
+    required String failingOutputId,
+  }) async {
+    final rollbackControl = SynthesisControl()
+      ..cancel(
+        CancelReason.stopCurrent,
+        message:
+            'Rollback after failFast failure in $stage ($failingOutputId).',
+      );
+
+    for (final entry in entries) {
+      try {
+        await entry.value.onCancel(rollbackControl);
+      } catch (error) {
+        final converted = _toOutputError(
+          error,
+          requestId: requestId,
+          stage: '$stage.rollback.onCancel',
+          outputId: entry.key,
+        );
+        _outputErrors[entry.key] = converted;
+      } finally {
+        _activeOutputs.remove(entry.key);
+      }
+    }
+  }
+
+  Set<AudioCapability> _intersectCapabilities(
+    Set<AudioCapability> left,
+    Set<AudioCapability> right,
+  ) {
+    final rightByFormat = <TtsAudioFormat, List<AudioCapability>>{};
+    for (final capability in right) {
+      rightByFormat
+          .putIfAbsent(capability.format, () => <AudioCapability>[])
+          .add(capability);
+    }
+
+    final result = <AudioCapability>{};
+    for (final leftCapability in left) {
+      final candidates = rightByFormat[leftCapability.format];
+      if (candidates == null || candidates.isEmpty) {
+        continue;
+      }
+
+      if (leftCapability.format != TtsAudioFormat.pcm) {
+        result.add(SimpleFormatCapability(format: leftCapability.format));
+        continue;
+      }
+
+      if (leftCapability is! PcmCapability) {
+        continue;
+      }
+
+      for (final rightCapability in candidates) {
+        if (rightCapability is! PcmCapability) {
+          continue;
+        }
+        final intersected = _intersectPcmCapabilities(
+          leftCapability,
+          rightCapability,
+        );
+        if (intersected != null) {
+          result.add(intersected);
+        }
+      }
+    }
+
+    return result;
+  }
+
+  PcmCapability? _intersectPcmCapabilities(
+    PcmCapability left,
+    PcmCapability right,
+  ) {
+    final sampleRate = _intersectIntConstraint(
+      leftDiscrete: left.sampleRatesHz,
+      leftMin: left.minSampleRateHz,
+      leftMax: left.maxSampleRateHz,
+      rightDiscrete: right.sampleRatesHz,
+      rightMin: right.minSampleRateHz,
+      rightMax: right.maxSampleRateHz,
+    );
+    if (sampleRate == null) {
+      return null;
+    }
+
+    final bitDepth = _intersectIntConstraint(
+      leftDiscrete: left.bitsPerSample,
+      leftMin: left.minBitsPerSample,
+      leftMax: left.maxBitsPerSample,
+      rightDiscrete: right.bitsPerSample,
+      rightMin: right.minBitsPerSample,
+      rightMax: right.maxBitsPerSample,
+    );
+    if (bitDepth == null) {
+      return null;
+    }
+
+    final channels = _intersectIntConstraint(
+      leftDiscrete: left.channels,
+      leftMin: left.minChannels,
+      leftMax: left.maxChannels,
+      rightDiscrete: right.channels,
+      rightMin: right.minChannels,
+      rightMax: right.maxChannels,
+    );
+    if (channels == null) {
+      return null;
+    }
+
+    final encodings = left.encodings.intersection(right.encodings);
+    if (encodings.isEmpty) {
+      return null;
+    }
+
+    return PcmCapability(
+      sampleRatesHz: sampleRate.discrete,
+      minSampleRateHz: sampleRate.min,
+      maxSampleRateHz: sampleRate.max,
+      bitsPerSample: bitDepth.discrete,
+      minBitsPerSample: bitDepth.min,
+      maxBitsPerSample: bitDepth.max,
+      channels: channels.discrete,
+      minChannels: channels.min,
+      maxChannels: channels.max,
+      encodings: encodings,
+    );
+  }
+
+  _IntConstraint? _intersectIntConstraint({
+    required Set<int> leftDiscrete,
+    required int? leftMin,
+    required int? leftMax,
+    required Set<int> rightDiscrete,
+    required int? rightMin,
+    required int? rightMax,
+  }) {
+    final hasLeftRange = leftMin != null && leftMax != null;
+    final hasRightRange = rightMin != null && rightMax != null;
+
+    final min = hasLeftRange && hasRightRange
+        ? (leftMin > rightMin ? leftMin : rightMin)
+        : (hasLeftRange ? leftMin : (hasRightRange ? rightMin : null));
+    final max = hasLeftRange && hasRightRange
+        ? (leftMax < rightMax ? leftMax : rightMax)
+        : (hasLeftRange ? leftMax : (hasRightRange ? rightMax : null));
+
+    if (min != null && max != null && min > max) {
+      return null;
+    }
+
+    Set<int> discrete;
+    if (leftDiscrete.isNotEmpty && rightDiscrete.isNotEmpty) {
+      discrete = leftDiscrete.intersection(rightDiscrete);
+    } else if (leftDiscrete.isNotEmpty) {
+      discrete = leftDiscrete.toSet();
+    } else if (rightDiscrete.isNotEmpty) {
+      discrete = rightDiscrete.toSet();
+    } else {
+      discrete = <int>{};
+    }
+
+    if (discrete.isNotEmpty && min != null && max != null) {
+      discrete =
+          discrete.where((value) => value >= min && value <= max).toSet();
+    }
+
+    if (discrete.isEmpty && min == null && max == null) {
+      return null;
+    }
+    if (discrete.isEmpty &&
+        (leftDiscrete.isNotEmpty || rightDiscrete.isNotEmpty)) {
+      return null;
+    }
+
+    return _IntConstraint(discrete: discrete, min: min, max: max);
+  }
+}
+
+final class _IntConstraint {
+  const _IntConstraint({
+    required this.discrete,
+    required this.min,
+    required this.max,
+  });
+
+  final Set<int> discrete;
+  final int? min;
+  final int? max;
 }

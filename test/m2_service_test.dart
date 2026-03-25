@@ -1,8 +1,8 @@
 import 'dart:async';
 import 'dart:typed_data';
 
-import 'package:tts_flow_dart/tts_flow_dart.dart';
 import 'package:test/test.dart';
+import 'package:tts_flow_dart/tts_flow_dart.dart';
 
 void main() {
   group('M2 service', () {
@@ -151,6 +151,42 @@ void main() {
       await service.dispose();
     });
 
+    test('fails during negotiation when multicast children have disjoint PCM',
+        () async {
+      final service = TtsFlow(
+        engine: FakeTtsEngine(
+          engineId: 'fake-engine',
+          supportsStreaming: true,
+          chunkCount: 2,
+          chunkDelay: const Duration(milliseconds: 2),
+        ),
+        output: MulticastOutput(
+          outputs: [
+            _PcmOnlyOutput(outputId: 'pcm-16k', sampleRatesHz: {16000}),
+            _PcmOnlyOutput(outputId: 'pcm-24k', sampleRatesHz: {24000}),
+          ],
+          errorPolicy: CompositeOutputErrorPolicy.failFast,
+        ),
+      );
+
+      await service.init();
+
+      final stream = service.speak('pcm-disjoint', 'disjoint constraints');
+
+      await expectLater(
+        stream.toList(),
+        throwsA(
+          isA<TtsError>().having(
+            (error) => error.code,
+            'code',
+            TtsErrorCode.formatNegotiationFailed,
+          ),
+        ),
+      );
+
+      await service.dispose();
+    });
+
     test('continueOnError keeps pending queue after active failure', () async {
       final service = TtsFlow(
         engine: FakeTtsEngine(
@@ -256,6 +292,36 @@ void main() {
 
       expect(output.lastCancelReason, CancelReason.stopCurrent);
       await service.dispose();
+    });
+
+    test('dispose during paused active request forwards serviceDispose reason',
+        () async {
+      final output = _CaptureCancelOutput();
+      final service = TtsFlow(
+        engine: FakeTtsEngine(
+          engineId: 'fake-engine',
+          supportsStreaming: true,
+          chunkCount: 20,
+          chunkDelay: const Duration(milliseconds: 5),
+        ),
+        output: output,
+      );
+
+      await service.init();
+
+      final stream = service.speak(
+        'dispose-paused',
+        'this request should be canceled by service dispose while paused',
+      );
+
+      await Future<void>.delayed(const Duration(milliseconds: 12));
+      await service.pause();
+      await Future<void>.delayed(const Duration(milliseconds: 12));
+      await service.dispose();
+
+      final chunks = await stream.toList();
+      expect(chunks, isNotNull);
+      expect(output.lastCancelReason, CancelReason.serviceDispose);
     });
 
     test('service exposes engine available voices and defaults', () async {
@@ -467,5 +533,60 @@ final class _CaptureCancelOutput implements TtsOutput {
   Future<void> dispose() async {
     _session = null;
     _buffer.clear();
+  }
+}
+
+final class _PcmOnlyOutput implements TtsOutput {
+  _PcmOnlyOutput({
+    required this.outputId,
+    required Set<int> sampleRatesHz,
+  }) : _sampleRatesHz = Set<int>.from(sampleRatesHz);
+
+  @override
+  final String outputId;
+
+  final Set<int> _sampleRatesHz;
+  TtsOutputSession? _session;
+
+  @override
+  Set<AudioCapability> get acceptedCapabilities => {
+        PcmCapability(
+          sampleRatesHz: _sampleRatesHz,
+          bitsPerSample: const {16},
+          channels: const {1},
+          encodings: const {PcmEncoding.signedInt},
+        ),
+      };
+
+  @override
+  Future<void> initSession(TtsOutputSession session) async {
+    _session = session;
+  }
+
+  @override
+  Future<void> consumeChunk(TtsChunk chunk) async {}
+
+  @override
+  Future<AudioArtifact> finalizeSession() async {
+    final session = _session;
+    if (session == null) {
+      throw StateError('No active output session.');
+    }
+    return InMemoryAudioArtifact(
+      requestId: session.requestId,
+      audioSpec: session.audioSpec,
+      audioBytes: Uint8List(0),
+      totalBytes: 0,
+    );
+  }
+
+  @override
+  Future<void> onCancel(SynthesisControl control) async {
+    _session = null;
+  }
+
+  @override
+  Future<void> dispose() async {
+    _session = null;
   }
 }

@@ -315,17 +315,18 @@ final class PcmCapability extends AudioCapability {
     }
   }
 
-  PcmCapability.wavAnySampleRate({
-    required Set<int> bitsPerSample,
-    required Set<int> channels,
-    required Set<PcmEncoding> encodings,
-  }) : this(
+  PcmCapability.wav()
+      : this(
           sampleRatesHz: const <int>{},
           minSampleRateHz: wavMinSampleRateHz,
           maxSampleRateHz: wavMaxSampleRateHz,
-          bitsPerSample: bitsPerSample,
-          channels: channels,
-          encodings: encodings,
+          bitsPerSample: const <int>{},
+          minBitsPerSample: wavMinBitsPerSample,
+          maxBitsPerSample: wavMaxBitsPerSample,
+          channels: const <int>{},
+          minChannels: wavMinChannels,
+          maxChannels: wavMaxChannels,
+          encodings: Set.from(PcmEncoding.values),
         );
 
   final Set<int> sampleRatesHz;

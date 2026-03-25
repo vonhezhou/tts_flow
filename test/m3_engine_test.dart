@@ -1,10 +1,10 @@
 import 'dart:convert';
 import 'dart:typed_data';
 
-import 'package:tts_flow_dart/tts_flow_dart.dart';
 import 'package:http/http.dart' as http;
 import 'package:http/testing.dart';
 import 'package:test/test.dart';
+import 'package:tts_flow_dart/tts_flow_dart.dart';
 
 void main() {
   group('M3 format negotiator', () {
@@ -97,11 +97,7 @@ void main() {
     test('negotiates PCM using WAV full sample-rate range', () {
       final resolved = negotiator.negotiateSpec(
         engineCapabilities: {
-          PcmCapability.wavAnySampleRate(
-            bitsPerSample: {16},
-            channels: {1},
-            encodings: {PcmEncoding.signedInt},
-          ),
+          PcmCapability.wav(),
         },
         outputCapabilities: {
           PcmCapability(

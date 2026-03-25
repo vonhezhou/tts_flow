@@ -18,6 +18,22 @@ Future<bool> _processQueuedRequestImpl(
 
   try {
     final audioSpec = service._resolveAudioSpec(request);
+    if (!service._engine.supportsSpec(audioSpec)) {
+      throw TtsError(
+        code: TtsErrorCode.formatNegotiationFailed,
+        message:
+            'Negotiated audio spec is not supported by engine "${service._engine.engineId}".',
+        requestId: request.requestId,
+      );
+    }
+    if (!service._output.acceptsSpec(audioSpec)) {
+      throw TtsError(
+        code: TtsErrorCode.formatNegotiationFailed,
+        message:
+            'Negotiated audio spec is not accepted by output "${service._output.outputId}".',
+        requestId: request.requestId,
+      );
+    }
     await service._output.initSession(
       TtsOutputSession(
         requestId: request.requestId,

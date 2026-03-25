@@ -162,158 +162,138 @@ final class TtsFormatNegotiator {
     );
   }
 
-  int _pickSampleRate(
-    Set<int> sampleRates, {
-    int? preferredSampleRateHz,
-  }) {
-    if (preferredSampleRateHz != null &&
-        sampleRates.contains(preferredSampleRateHz)) {
-      return preferredSampleRateHz;
-    }
-    return _pickMaxInt(sampleRates);
-  }
-
   int? _resolveSampleRate({
     required PcmCapability engine,
     required PcmCapability output,
     int? preferredSampleRateHz,
   }) {
-    if (preferredSampleRateHz != null &&
-        engine.supportsSampleRateHz(preferredSampleRateHz) &&
-        output.supportsSampleRateHz(preferredSampleRateHz)) {
-      return preferredSampleRateHz;
-    }
-
-    if (engine.hasDiscreteSampleRates && output.hasDiscreteSampleRates) {
-      final shared = engine.sampleRatesHz.intersection(output.sampleRatesHz);
-      if (shared.isEmpty) {
-        return null;
-      }
-      return _pickSampleRate(shared,
-          preferredSampleRateHz: preferredSampleRateHz);
-    }
-
-    if (engine.hasDiscreteSampleRates) {
-      final candidates =
-          engine.sampleRatesHz.where(output.supportsSampleRateHz).toSet();
-      if (candidates.isEmpty) {
-        return null;
-      }
-      return _pickSampleRate(
-        candidates,
-        preferredSampleRateHz: preferredSampleRateHz,
-      );
-    }
-
-    if (output.hasDiscreteSampleRates) {
-      final candidates =
-          output.sampleRatesHz.where(engine.supportsSampleRateHz).toSet();
-      if (candidates.isEmpty) {
-        return null;
-      }
-      return _pickSampleRate(
-        candidates,
-        preferredSampleRateHz: preferredSampleRateHz,
-      );
-    }
-
-    final engineMin = engine.minSampleRateHz ?? wavMinSampleRateHz;
-    final engineMax = engine.maxSampleRateHz ?? wavMaxSampleRateHz;
-    final outputMin = output.minSampleRateHz ?? wavMinSampleRateHz;
-    final outputMax = output.maxSampleRateHz ?? wavMaxSampleRateHz;
-
-    final minShared = engineMin > outputMin ? engineMin : outputMin;
-    final maxShared = engineMax < outputMax ? engineMax : outputMax;
-    if (minShared > maxShared) {
-      return null;
-    }
-    return maxShared;
+    return _resolveIntDimension(
+      engineDiscrete: engine.sampleRatesHz,
+      engineHasDiscrete: engine.hasDiscreteSampleRates,
+      engineMin: engine.minSampleRateHz,
+      engineMax: engine.maxSampleRateHz,
+      engineSupports: engine.supportsSampleRateHz,
+      outputDiscrete: output.sampleRatesHz,
+      outputHasDiscrete: output.hasDiscreteSampleRates,
+      outputMin: output.minSampleRateHz,
+      outputMax: output.maxSampleRateHz,
+      outputSupports: output.supportsSampleRateHz,
+      domainMin: wavMinSampleRateHz,
+      domainMax: wavMaxSampleRateHz,
+      preferredValue: preferredSampleRateHz,
+    );
   }
 
   int? _resolveBitsPerSample({
     required PcmCapability engine,
     required PcmCapability output,
   }) {
-    if (engine.hasDiscreteBitsPerSample && output.hasDiscreteBitsPerSample) {
-      final shared = engine.bitsPerSample.intersection(output.bitsPerSample);
-      if (shared.isEmpty) {
-        return null;
-      }
-      return _pickMaxInt(shared);
-    }
-
-    if (engine.hasDiscreteBitsPerSample) {
-      final candidates =
-          engine.bitsPerSample.where(output.supportsBitsPerSample).toSet();
-      if (candidates.isEmpty) {
-        return null;
-      }
-      return _pickMaxInt(candidates);
-    }
-
-    if (output.hasDiscreteBitsPerSample) {
-      final candidates =
-          output.bitsPerSample.where(engine.supportsBitsPerSample).toSet();
-      if (candidates.isEmpty) {
-        return null;
-      }
-      return _pickMaxInt(candidates);
-    }
-
-    final engineMin = engine.minBitsPerSample ?? wavMinBitsPerSample;
-    final engineMax = engine.maxBitsPerSample ?? wavMaxBitsPerSample;
-    final outputMin = output.minBitsPerSample ?? wavMinBitsPerSample;
-    final outputMax = output.maxBitsPerSample ?? wavMaxBitsPerSample;
-
-    final minShared = engineMin > outputMin ? engineMin : outputMin;
-    final maxShared = engineMax < outputMax ? engineMax : outputMax;
-    if (minShared > maxShared) {
-      return null;
-    }
-    return maxShared;
+    return _resolveIntDimension(
+      engineDiscrete: engine.bitsPerSample,
+      engineHasDiscrete: engine.hasDiscreteBitsPerSample,
+      engineMin: engine.minBitsPerSample,
+      engineMax: engine.maxBitsPerSample,
+      engineSupports: engine.supportsBitsPerSample,
+      outputDiscrete: output.bitsPerSample,
+      outputHasDiscrete: output.hasDiscreteBitsPerSample,
+      outputMin: output.minBitsPerSample,
+      outputMax: output.maxBitsPerSample,
+      outputSupports: output.supportsBitsPerSample,
+      domainMin: wavMinBitsPerSample,
+      domainMax: wavMaxBitsPerSample,
+    );
   }
 
   int? _resolveChannelCount({
     required PcmCapability engine,
     required PcmCapability output,
   }) {
-    if (engine.hasDiscreteChannels && output.hasDiscreteChannels) {
-      final shared = engine.channels.intersection(output.channels);
+    return _resolveIntDimension(
+      engineDiscrete: engine.channels,
+      engineHasDiscrete: engine.hasDiscreteChannels,
+      engineMin: engine.minChannels,
+      engineMax: engine.maxChannels,
+      engineSupports: engine.supportsChannelCount,
+      outputDiscrete: output.channels,
+      outputHasDiscrete: output.hasDiscreteChannels,
+      outputMin: output.minChannels,
+      outputMax: output.maxChannels,
+      outputSupports: output.supportsChannelCount,
+      domainMin: wavMinChannels,
+      domainMax: wavMaxChannels,
+    );
+  }
+
+  int? _resolveIntDimension({
+    required Set<int> engineDiscrete,
+    required bool engineHasDiscrete,
+    required int? engineMin,
+    required int? engineMax,
+    required bool Function(int value) engineSupports,
+    required Set<int> outputDiscrete,
+    required bool outputHasDiscrete,
+    required int? outputMin,
+    required int? outputMax,
+    required bool Function(int value) outputSupports,
+    required int domainMin,
+    required int domainMax,
+    int? preferredValue,
+  }) {
+    if (preferredValue != null &&
+        engineSupports(preferredValue) &&
+        outputSupports(preferredValue)) {
+      return preferredValue;
+    }
+
+    if (engineHasDiscrete && outputHasDiscrete) {
+      final shared = engineDiscrete.intersection(outputDiscrete);
       if (shared.isEmpty) {
         return null;
       }
-      return _pickMaxInt(shared);
+      return _pickPreferredOrMax(shared, preferredValue: preferredValue);
     }
 
-    if (engine.hasDiscreteChannels) {
-      final candidates =
-          engine.channels.where(output.supportsChannelCount).toSet();
+    if (engineHasDiscrete) {
+      final candidates = engineDiscrete.where(outputSupports).toSet();
       if (candidates.isEmpty) {
         return null;
       }
-      return _pickMaxInt(candidates);
+      return _pickPreferredOrMax(candidates, preferredValue: preferredValue);
     }
 
-    if (output.hasDiscreteChannels) {
-      final candidates =
-          output.channels.where(engine.supportsChannelCount).toSet();
+    if (outputHasDiscrete) {
+      final candidates = outputDiscrete.where(engineSupports).toSet();
       if (candidates.isEmpty) {
         return null;
       }
-      return _pickMaxInt(candidates);
+      return _pickPreferredOrMax(candidates, preferredValue: preferredValue);
     }
 
-    final engineMin = engine.minChannels ?? wavMinChannels;
-    final engineMax = engine.maxChannels ?? wavMaxChannels;
-    final outputMin = output.minChannels ?? wavMinChannels;
-    final outputMax = output.maxChannels ?? wavMaxChannels;
+    final effectiveEngineMin = engineMin ?? domainMin;
+    final effectiveEngineMax = engineMax ?? domainMax;
+    final effectiveOutputMin = outputMin ?? domainMin;
+    final effectiveOutputMax = outputMax ?? domainMax;
 
-    final minShared = engineMin > outputMin ? engineMin : outputMin;
-    final maxShared = engineMax < outputMax ? engineMax : outputMax;
+    final minShared = effectiveEngineMin > effectiveOutputMin
+        ? effectiveEngineMin
+        : effectiveOutputMin;
+    final maxShared = effectiveEngineMax < effectiveOutputMax
+        ? effectiveEngineMax
+        : effectiveOutputMax;
     if (minShared > maxShared) {
       return null;
     }
     return maxShared;
+  }
+
+  int _pickPreferredOrMax(
+    Set<int> values, {
+    int? preferredValue,
+  }) {
+    if (preferredValue != null && values.contains(preferredValue)) {
+      return preferredValue;
+    }
+    return _pickMaxInt(values);
   }
 
   int _pickMaxInt(Set<int> values) {
