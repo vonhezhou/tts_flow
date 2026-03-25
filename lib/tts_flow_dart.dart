@@ -9,6 +9,7 @@ export 'src/core/tts_engine.dart';
 export 'src/core/tts_errors.dart';
 export 'src/core/tts_models.dart';
 export 'src/core/tts_output.dart';
+export 'src/core/tts_policy.dart';
 export 'src/engine/fake_tts_engine.dart';
 export 'src/engine/non_streaming_bridge.dart';
 export 'src/engine/openai_tts_engine.dart';
