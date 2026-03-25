@@ -1,8 +1,4 @@
-import 'dart:async';
-
-import 'package:tts_flow_dart/src/base/audio_capability.dart';
-import 'package:tts_flow_dart/src/base/audio_spec.dart';
-import 'package:tts_flow_dart/src/core/audio_artifact.dart';
+import 'package:tts_flow_dart/src/core/audio_spec.dart';
 
 import 'tts_errors.dart';
 import 'tts_models.dart';
@@ -92,71 +88,6 @@ final class TtsOutputSession {
   final TtsVoice? voice;
   final TtsOptions? options;
   final Map<String, Object> params;
-}
-
-abstract interface class TtsEngine {
-  String get engineId;
-  bool get supportsStreaming;
-  Set<AudioCapability> get supportedCapabilities;
-
-  /// Returns voices supported by this engine.
-  ///
-  /// When [locale] is provided, engines should prefer returning voices that
-  /// match the locale exactly (for example, en-US) or by language fallback
-  /// (for example, en). Engines may return an empty list when no locale match
-  /// is available.
-  Future<List<TtsVoice>> getAvailableVoices({String? locale});
-
-  /// Returns the engine default voice.
-  Future<TtsVoice> getDefaultVoice();
-
-  /// Returns a default voice for [locale] using engine-specific fallback.
-  ///
-  /// Engines should apply deterministic fallback, such as
-  /// exact locale -> language match -> global default voice.
-  Future<TtsVoice> getDefaultVoiceForLocale(String locale);
-
-  Stream<TtsChunk> synthesize(
-    TtsRequest request,
-    SynthesisControl control,
-    TtsAudioSpec resolvedFormat,
-  );
-
-  Future<void> dispose();
-}
-
-abstract interface class TtsOutput {
-  String get outputId;
-  Set<AudioCapability> get acceptedCapabilities;
-
-  Future<void> initSession(TtsOutputSession session);
-  Future<void> consumeChunk(TtsChunk chunk);
-  Future<AudioArtifact> finalizeSession();
-
-  Future<void> onCancel(SynthesisControl control);
-  Future<void> dispose();
-}
-
-extension TtsEngineCapabilities on TtsEngine {
-  bool supportsSpec(TtsAudioSpec spec) {
-    for (final capability in supportedCapabilities) {
-      if (capability.supports(spec)) {
-        return true;
-      }
-    }
-    return false;
-  }
-}
-
-extension TtsOutputCapabilities on TtsOutput {
-  bool acceptsSpec(TtsAudioSpec spec) {
-    for (final capability in acceptedCapabilities) {
-      if (capability.supports(spec)) {
-        return true;
-      }
-    }
-    return false;
-  }
 }
 
 Never throwAsTtsError(Object error, {String? requestId}) {

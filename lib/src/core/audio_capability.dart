@@ -1,5 +1,5 @@
-import 'package:tts_flow_dart/src/base/audio_spec.dart';
 import 'package:tts_flow_dart/src/base/pcm_descriptor.dart';
+import 'package:tts_flow_dart/src/core/audio_spec.dart';
 
 /// Capability declaration used during format/spec negotiation.
 sealed class AudioCapability {

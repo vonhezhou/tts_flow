@@ -820,10 +820,10 @@ void main() {
       final artifact = await output.finalizeSession();
 
       expect(artifact, isA<MulticastAudioArtifact>());
-      final Multicast = artifact as MulticastAudioArtifact;
-      expect(Multicast.artifacts.keys, contains('memory'));
-      expect(Multicast.artifacts.keys, isNot(contains('failing')));
-      expect(Multicast.outputErrors.keys, contains('failing'));
+      final multicast = artifact as MulticastAudioArtifact;
+      expect(multicast.artifacts.keys, contains('memory'));
+      expect(multicast.artifacts.keys, isNot(contains('failing')));
+      expect(multicast.outputErrors.keys, contains('failing'));
     });
 
     test('failFast throws TtsOutputFailure with output id', () async {

@@ -1,6 +1,6 @@
 import 'dart:typed_data';
 
-import 'package:tts_flow_dart/src/base/audio_spec.dart';
+import 'package:tts_flow_dart/src/core/audio_spec.dart';
 
 enum TtsRequestState { queued, running, completed, failed, stopped, canceled }
 

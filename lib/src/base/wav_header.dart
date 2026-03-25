@@ -1,6 +1,6 @@
 import 'dart:typed_data';
 
-import 'package:tts_flow_dart/src/base/pcm_descriptor.dart';
+import 'pcm_descriptor.dart';
 
 /// Canonical 44-byte RIFF/WAVE header model for PCM-compatible audio streams.
 class WavHeader {

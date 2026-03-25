@@ -1,4 +1,9 @@
-import 'package:tts_flow_dart/tts_flow_dart.dart';
+import 'package:tts_flow_dart/src/core/audio_artifact.dart';
+import 'package:tts_flow_dart/src/core/audio_capability.dart';
+import 'package:tts_flow_dart/src/core/audio_spec.dart';
+import 'package:tts_flow_dart/src/core/tts_contracts.dart';
+import 'package:tts_flow_dart/src/core/tts_models.dart';
+import 'package:tts_flow_dart/src/core/tts_output.dart';
 
 abstract interface class SpeakerBackend {
   Set<AudioCapability> get supportedCapabilities;
