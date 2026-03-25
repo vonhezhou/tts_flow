@@ -1,5 +1,17 @@
 part of 'package:tts_flow_dart/src/service/tts_flow.dart';
 
+final class _RequestFailure {
+  const _RequestFailure({
+    required this.ttsError,
+    required this.outputId,
+    required this.outputError,
+  });
+
+  final TtsError ttsError;
+  final String? outputId;
+  final TtsError? outputError;
+}
+
 _RequestFailure _mapRequestFailureImpl(Object error, TtsRequest request) {
   final outputFailure = error is TtsOutputFailure ? error : null;
   final outputError = outputFailure?.error;

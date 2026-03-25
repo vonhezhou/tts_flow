@@ -24,28 +24,25 @@ part 'internal/tts_flow_request_helpers.dart';
 part 'internal/tts_flow_request_runtime.dart';
 part 'internal/tts_flow_runtime.dart';
 part 'internal/tts_flow_state.dart';
-part 'internal/tts_flow_transitions.dart';
 
 final class TtsFlow with TtsOptionsMixin, TtsFlowEventBus {
   TtsFlow({
     required TtsEngine engine,
     required TtsOutput output,
-    TtsFlowConfig? config,
+    TtsFlowConfig config = const TtsFlowConfig(),
   })  : _engine = engine,
         _output = output,
-        _config = config ?? const TtsFlowConfig(),
+        _config = config,
         options = const TtsOptions(),
-        preferredFormat =
-            (config ?? const TtsFlowConfig()).preferredFormatOrder.first;
+        preferredFormat = config.preferredFormatOrder.first;
 
   final TtsEngine _engine;
   final TtsOutput _output;
   final TtsFlowConfig _config;
-  final TtsFormatNegotiator _formatNegotiator = const TtsFormatNegotiator();
-  final QueueScheduler<_QueuedRequest> _scheduler =
-      QueueScheduler<_QueuedRequest>();
+  final _formatNegotiator = const TtsFormatNegotiator();
+  final _scheduler = QueueScheduler<_QueuedRequest>();
 
-  final _TtsFlowState _state = _TtsFlowState();
+  final _state = _TtsFlowState();
 
   @protected
   @override
@@ -228,16 +225,4 @@ final class _QueuedRequest {
 
   final TtsRequest request;
   final StreamController<TtsChunk> controller;
-}
-
-final class _RequestFailure {
-  const _RequestFailure({
-    required this.ttsError,
-    required this.outputId,
-    required this.outputError,
-  });
-
-  final TtsError ttsError;
-  final String? outputId;
-  final TtsError? outputError;
 }
