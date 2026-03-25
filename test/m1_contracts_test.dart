@@ -175,6 +175,33 @@ void main() {
       expect(parsed.dataLengthBytes, 4096);
     });
 
+    test('wav header preserves non-byte-aligned uint16 bit depth field', () {
+      const header = WavHeader(
+        sampleRateHz: 44100,
+        bitsPerSample: 12,
+        channels: 1,
+        dataLengthBytes: 1200,
+      );
+
+      final parsed = WavHeader.parse(header.toBytes());
+
+      expect(parsed.bitsPerSample, 12);
+      expect(parsed.blockAlign, 2);
+      expect(parsed.byteRate, 88200);
+    });
+
+    test('wav header rejects channel count above stereo simplicity cap', () {
+      expect(
+        () => WavHeader(
+          sampleRateHz: 1,
+          bitsPerSample: 8,
+          channels: 3,
+          dataLengthBytes: 1,
+        ),
+        throwsA(isA<AssertionError>()),
+      );
+    });
+
     test('wav header parser rejects non-wav bytes', () {
       final invalid = Uint8List(44);
       expect(

@@ -119,24 +119,28 @@ final class TtsFormatNegotiator {
 
     for (final e in enginePcm) {
       for (final o in outputPcm) {
-        final sampleRates = e.sampleRatesHz.intersection(o.sampleRatesHz);
-        final bits = e.bitsPerSample.intersection(o.bitsPerSample);
-        final channels = e.channels.intersection(o.channels);
         final encodings = e.encodings.intersection(o.encodings);
 
-        if (sampleRates.isEmpty ||
-            bits.isEmpty ||
-            channels.isEmpty ||
-            encodings.isEmpty) {
+        if (encodings.isEmpty) {
           continue;
         }
 
-        final sampleRateHz = _pickSampleRate(
-          sampleRates,
+        final sampleRateHz = _resolveSampleRate(
+          engine: e,
+          output: o,
           preferredSampleRateHz: preferredSampleRateHz,
         );
-        final bitsPerSample = _pickMaxInt(bits);
-        final channelCount = _pickMaxInt(channels);
+        if (sampleRateHz == null) {
+          continue;
+        }
+        final bitsPerSample = _resolveBitsPerSample(engine: e, output: o);
+        if (bitsPerSample == null) {
+          continue;
+        }
+        final channelCount = _resolveChannelCount(engine: e, output: o);
+        if (channelCount == null) {
+          continue;
+        }
         final encoding = _pickEncoding(encodings);
 
         return PcmDescriptor(
@@ -167,6 +171,149 @@ final class TtsFormatNegotiator {
       return preferredSampleRateHz;
     }
     return _pickMaxInt(sampleRates);
+  }
+
+  int? _resolveSampleRate({
+    required PcmCapability engine,
+    required PcmCapability output,
+    int? preferredSampleRateHz,
+  }) {
+    if (preferredSampleRateHz != null &&
+        engine.supportsSampleRateHz(preferredSampleRateHz) &&
+        output.supportsSampleRateHz(preferredSampleRateHz)) {
+      return preferredSampleRateHz;
+    }
+
+    if (engine.hasDiscreteSampleRates && output.hasDiscreteSampleRates) {
+      final shared = engine.sampleRatesHz.intersection(output.sampleRatesHz);
+      if (shared.isEmpty) {
+        return null;
+      }
+      return _pickSampleRate(shared,
+          preferredSampleRateHz: preferredSampleRateHz);
+    }
+
+    if (engine.hasDiscreteSampleRates) {
+      final candidates =
+          engine.sampleRatesHz.where(output.supportsSampleRateHz).toSet();
+      if (candidates.isEmpty) {
+        return null;
+      }
+      return _pickSampleRate(
+        candidates,
+        preferredSampleRateHz: preferredSampleRateHz,
+      );
+    }
+
+    if (output.hasDiscreteSampleRates) {
+      final candidates =
+          output.sampleRatesHz.where(engine.supportsSampleRateHz).toSet();
+      if (candidates.isEmpty) {
+        return null;
+      }
+      return _pickSampleRate(
+        candidates,
+        preferredSampleRateHz: preferredSampleRateHz,
+      );
+    }
+
+    final engineMin = engine.minSampleRateHz ?? wavMinSampleRateHz;
+    final engineMax = engine.maxSampleRateHz ?? wavMaxSampleRateHz;
+    final outputMin = output.minSampleRateHz ?? wavMinSampleRateHz;
+    final outputMax = output.maxSampleRateHz ?? wavMaxSampleRateHz;
+
+    final minShared = engineMin > outputMin ? engineMin : outputMin;
+    final maxShared = engineMax < outputMax ? engineMax : outputMax;
+    if (minShared > maxShared) {
+      return null;
+    }
+    return maxShared;
+  }
+
+  int? _resolveBitsPerSample({
+    required PcmCapability engine,
+    required PcmCapability output,
+  }) {
+    if (engine.hasDiscreteBitsPerSample && output.hasDiscreteBitsPerSample) {
+      final shared = engine.bitsPerSample.intersection(output.bitsPerSample);
+      if (shared.isEmpty) {
+        return null;
+      }
+      return _pickMaxInt(shared);
+    }
+
+    if (engine.hasDiscreteBitsPerSample) {
+      final candidates =
+          engine.bitsPerSample.where(output.supportsBitsPerSample).toSet();
+      if (candidates.isEmpty) {
+        return null;
+      }
+      return _pickMaxInt(candidates);
+    }
+
+    if (output.hasDiscreteBitsPerSample) {
+      final candidates =
+          output.bitsPerSample.where(engine.supportsBitsPerSample).toSet();
+      if (candidates.isEmpty) {
+        return null;
+      }
+      return _pickMaxInt(candidates);
+    }
+
+    final engineMin = engine.minBitsPerSample ?? wavMinBitsPerSample;
+    final engineMax = engine.maxBitsPerSample ?? wavMaxBitsPerSample;
+    final outputMin = output.minBitsPerSample ?? wavMinBitsPerSample;
+    final outputMax = output.maxBitsPerSample ?? wavMaxBitsPerSample;
+
+    final minShared = engineMin > outputMin ? engineMin : outputMin;
+    final maxShared = engineMax < outputMax ? engineMax : outputMax;
+    if (minShared > maxShared) {
+      return null;
+    }
+    return maxShared;
+  }
+
+  int? _resolveChannelCount({
+    required PcmCapability engine,
+    required PcmCapability output,
+  }) {
+    if (engine.hasDiscreteChannels && output.hasDiscreteChannels) {
+      final shared = engine.channels.intersection(output.channels);
+      if (shared.isEmpty) {
+        return null;
+      }
+      return _pickMaxInt(shared);
+    }
+
+    if (engine.hasDiscreteChannels) {
+      final candidates =
+          engine.channels.where(output.supportsChannelCount).toSet();
+      if (candidates.isEmpty) {
+        return null;
+      }
+      return _pickMaxInt(candidates);
+    }
+
+    if (output.hasDiscreteChannels) {
+      final candidates =
+          output.channels.where(engine.supportsChannelCount).toSet();
+      if (candidates.isEmpty) {
+        return null;
+      }
+      return _pickMaxInt(candidates);
+    }
+
+    final engineMin = engine.minChannels ?? wavMinChannels;
+    final engineMax = engine.maxChannels ?? wavMaxChannels;
+    final outputMin = output.minChannels ?? wavMinChannels;
+    final outputMax = output.maxChannels ?? wavMaxChannels;
+
+    final minShared = engineMin > outputMin ? engineMin : outputMin;
+    final maxShared = engineMax < outputMax ? engineMax : outputMax;
+    if (minShared > maxShared) {
+      return null;
+    }
+    return maxShared;
   }
 
   int _pickMaxInt(Set<int> values) {

@@ -11,18 +11,24 @@ class WavHeader {
     required this.dataLengthBytes,
     this.encoding = PcmEncoding.signedInt,
   })  : assert(sampleRateHz > 0),
-        assert(bitsPerSample > 0),
-        assert(bitsPerSample % 8 == 0),
-        assert(channels > 0),
+        assert(sampleRateHz <= wavMaxSampleRateHz),
+        assert(bitsPerSample >= wavMinBitsPerSample),
+        assert(bitsPerSample <= wavMaxBitsPerSample),
+        assert(channels >= wavMinChannels),
+        assert(channels <= wavMaxChannels),
         assert(dataLengthBytes >= 0);
 
   /// Sample rate in Hz (e.g., 24000, 44100)
   final int sampleRateHz;
 
-  /// Bits per sample: 8, 16, 24, 32, or 64
+  /// Bits per sample stored in the WAV header as an unsigned 16-bit integer.
+  /// Common values are 8, 16, 24, 32, and 64.
   final int bitsPerSample;
 
-  /// Number of channels: 1 (mono), 2 (stereo), etc.
+  /// Number of channels.
+  ///
+  /// WAV stores this as an unsigned 16-bit integer, but this package limits
+  /// support to mono and stereo for simplicity.
   final int channels;
 
   /// Size in bytes of PCM payload following this header.
@@ -31,7 +37,7 @@ class WavHeader {
   /// Sample encoding type.
   final PcmEncoding encoding;
 
-  int get blockAlign => (channels * bitsPerSample) ~/ 8;
+  int get blockAlign => ((channels * bitsPerSample) + 7) ~/ 8;
 
   int get byteRate => sampleRateHz * blockAlign;
 
@@ -135,17 +141,23 @@ class WavHeader {
         'Must be >= 0.',
       );
     }
-    if (channels <= 0) {
-      throw ArgumentError.value(channels, 'channels', 'Must be > 0.');
+    if (channels < wavMinChannels || channels > wavMaxChannels) {
+      throw ArgumentError.value(
+        channels,
+        'channels',
+        'Must be within WAV range [$wavMinChannels, $wavMaxChannels].',
+      );
     }
     if (sampleRateHz <= 0) {
       throw ArgumentError.value(sampleRateHz, 'sampleRateHz', 'Must be > 0.');
     }
-    if (bitsPerSample <= 0 || bitsPerSample % 8 != 0) {
+    if (bitsPerSample < wavMinBitsPerSample ||
+        bitsPerSample > wavMaxBitsPerSample) {
       throw ArgumentError.value(
         bitsPerSample,
         'bitsPerSample',
-        'Must be a positive multiple of 8.',
+        'Must be within WAV range '
+            '[$wavMinBitsPerSample, $wavMaxBitsPerSample].',
       );
     }
 

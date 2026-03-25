@@ -67,6 +67,113 @@ void main() {
       expect(resolved.requirePcm.sampleRateHz, 22050);
     });
 
+    test('negotiates PCM using discrete-vs-range sample-rate constraints', () {
+      final resolved = negotiator.negotiateSpec(
+        engineCapabilities: {
+          PcmCapability(
+            sampleRatesHz: {16000, 24000, 48000},
+            bitsPerSample: {16},
+            channels: {1},
+            encodings: {PcmEncoding.signedInt},
+          ),
+        },
+        outputCapabilities: {
+          PcmCapability(
+            minSampleRateHz: 20000,
+            maxSampleRateHz: 96000,
+            bitsPerSample: {16},
+            channels: {1},
+            encodings: {PcmEncoding.signedInt},
+          ),
+        },
+        preferredOrder: const [TtsAudioFormat.pcm],
+        requestId: 'n0c',
+      );
+
+      expect(resolved.format, TtsAudioFormat.pcm);
+      expect(resolved.requirePcm.sampleRateHz, 48000);
+    });
+
+    test('negotiates PCM using WAV full sample-rate range', () {
+      final resolved = negotiator.negotiateSpec(
+        engineCapabilities: {
+          PcmCapability.wavAnySampleRate(
+            bitsPerSample: {16},
+            channels: {1},
+            encodings: {PcmEncoding.signedInt},
+          ),
+        },
+        outputCapabilities: {
+          PcmCapability(
+            sampleRatesHz: {8000, 22050, 24000},
+            bitsPerSample: {16},
+            channels: {1},
+            encodings: {PcmEncoding.signedInt},
+          ),
+        },
+        preferredOrder: const [TtsAudioFormat.pcm],
+        requestId: 'n0d',
+        preferredSampleRateHz: 22050,
+      );
+
+      expect(resolved.format, TtsAudioFormat.pcm);
+      expect(resolved.requirePcm.sampleRateHz, 22050);
+    });
+
+    test('negotiates PCM using discrete-vs-range bit-depth constraints', () {
+      final resolved = negotiator.negotiateSpec(
+        engineCapabilities: {
+          PcmCapability(
+            sampleRatesHz: {24000},
+            bitsPerSample: {16, 24, 32},
+            channels: {1},
+            encodings: {PcmEncoding.signedInt},
+          ),
+        },
+        outputCapabilities: {
+          PcmCapability(
+            sampleRatesHz: {24000},
+            minBitsPerSample: 20,
+            maxBitsPerSample: 40,
+            channels: {1},
+            encodings: {PcmEncoding.signedInt},
+          ),
+        },
+        preferredOrder: const [TtsAudioFormat.pcm],
+        requestId: 'n0e',
+      );
+
+      expect(resolved.format, TtsAudioFormat.pcm);
+      expect(resolved.requirePcm.bitsPerSample, 32);
+    });
+
+    test('negotiates PCM using discrete-vs-range channel constraints', () {
+      final resolved = negotiator.negotiateSpec(
+        engineCapabilities: {
+          PcmCapability(
+            sampleRatesHz: {24000},
+            bitsPerSample: {16},
+            channels: {1, 2},
+            encodings: {PcmEncoding.signedInt},
+          ),
+        },
+        outputCapabilities: {
+          PcmCapability(
+            sampleRatesHz: {24000},
+            bitsPerSample: {16},
+            minChannels: 2,
+            maxChannels: 2,
+            encodings: {PcmEncoding.signedInt},
+          ),
+        },
+        preferredOrder: const [TtsAudioFormat.pcm],
+        requestId: 'n0f',
+      );
+
+      expect(resolved.format, TtsAudioFormat.pcm);
+      expect(resolved.requirePcm.channels, 2);
+    });
+
     test('uses request preferred format when available', () {
       final resolved = negotiator.negotiate(
         engineFormats: {TtsAudioFormat.mp3, TtsAudioFormat.wav},
