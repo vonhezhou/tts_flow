@@ -1,3 +1,4 @@
+export 'src/core/mp3_frame_header.dart';
 export 'src/core/tts_contracts.dart';
 export 'src/core/tts_errors.dart';
 export 'src/core/tts_models.dart';
@@ -8,8 +9,10 @@ export 'src/engine/openai_tts_engine.dart';
 export 'src/output/fake_tts_output.dart';
 export 'src/output/file_output.dart';
 export 'src/output/memory_output.dart';
+export 'src/output/mp3_file_output.dart';
 export 'src/output/multicast_output.dart';
 export 'src/output/speaker_output.dart';
+export 'src/output/wav_file_output.dart';
 export 'src/service/format_negotiator.dart';
 export 'src/service/queue_scheduler.dart';
 export 'src/service/tts_events.dart';
