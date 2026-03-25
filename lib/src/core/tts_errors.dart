@@ -43,3 +43,15 @@ final class TtsOutputFailure implements Exception {
   String toString() =>
       'TtsOutputFailure(outputId: $outputId, error: ${error.toString()})';
 }
+
+Never throwAsTtsError(Object error, {String? requestId}) {
+  if (error is TtsError) {
+    throw error;
+  }
+  throw TtsError(
+    code: TtsErrorCode.internalError,
+    message: 'Unexpected error during TTS operation.',
+    requestId: requestId,
+    cause: error,
+  );
+}

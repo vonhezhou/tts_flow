@@ -1,8 +1,7 @@
 import 'dart:typed_data';
 
 import 'package:tts_flow_dart/src/core/audio_spec.dart';
-
-import '../core/tts_models.dart';
+import 'package:tts_flow_dart/src/core/tts_chunk.dart';
 
 final class NonStreamingBridge {
   const NonStreamingBridge._();

@@ -1,5 +1,7 @@
+import 'package:tts_flow_dart/src/core/tts_chunk.dart';
+
 import '../core/tts_errors.dart';
-import '../core/tts_models.dart';
+import '../core/tts_request.dart';
 
 enum TtsQueueEventType {
   requestEnqueued,

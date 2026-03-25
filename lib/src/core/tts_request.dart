@@ -1,23 +1,7 @@
-import 'dart:typed_data';
-
 import 'package:tts_flow_dart/src/core/audio_spec.dart';
+import 'package:tts_flow_dart/src/core/tts_voice.dart';
 
 enum TtsRequestState { queued, running, completed, failed, stopped, canceled }
-
-/// A class representing a TTS voice with its associated properties.
-class TtsVoice {
-  const TtsVoice({
-    required this.voiceId,
-    this.locale,
-    this.displayName,
-    this.isDefault = false,
-  });
-
-  final String voiceId;
-  final String? locale;
-  final String? displayName;
-  final bool isDefault;
-}
 
 class TtsOptions {
   const TtsOptions({
@@ -67,22 +51,4 @@ class TtsRequest {
   final TtsAudioFormat? preferredFormat;
   final TtsOptions? options;
   final Map<String, Object> params;
-}
-
-class TtsChunk {
-  const TtsChunk({
-    required this.requestId,
-    required this.sequenceNumber,
-    required this.bytes,
-    required this.audioSpec,
-    required this.isLastChunk,
-    required this.timestamp,
-  });
-
-  final String requestId;
-  final int sequenceNumber;
-  final Uint8List bytes;
-  final TtsAudioSpec audioSpec;
-  final bool isLastChunk;
-  final DateTime timestamp;
 }
