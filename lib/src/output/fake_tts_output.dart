@@ -1,11 +1,6 @@
 import 'dart:typed_data';
 
-import 'package:tts_flow_dart/src/base/audio_capability.dart';
-import 'package:tts_flow_dart/src/base/audio_spec.dart';
-import 'package:tts_flow_dart/src/base/pcm_descriptor.dart';
-
-import '../core/tts_contracts.dart';
-import '../core/tts_models.dart';
+import 'package:tts_flow_dart/tts_flow_dart.dart';
 
 final class FakeTtsOutput implements TtsOutput {
   TtsOutputSession? _session;

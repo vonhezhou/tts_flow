@@ -124,7 +124,7 @@ void main() {
             MemoryOutput(outputId: 'memory'),
             _AlwaysFailOutput(outputId: 'fail-output'),
           ],
-          errorPolicy: CompositeOutputErrorPolicy.failFast,
+          errorPolicy: MulticastOutputErrorPolicy.failFast,
         ),
       );
 
@@ -165,7 +165,7 @@ void main() {
             _PcmOnlyOutput(outputId: 'pcm-16k', sampleRatesHz: {16000}),
             _PcmOnlyOutput(outputId: 'pcm-24k', sampleRatesHz: {24000}),
           ],
-          errorPolicy: CompositeOutputErrorPolicy.failFast,
+          errorPolicy: MulticastOutputErrorPolicy.failFast,
         ),
       );
 

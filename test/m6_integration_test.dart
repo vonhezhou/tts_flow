@@ -61,7 +61,7 @@ void main() {
       await service.dispose();
     });
 
-    test('composite fanout writes file while streaming with failFast',
+    test('Multicast fanout writes file while streaming with failFast',
         () async {
       final tempDir = await Directory.systemTemp.createTemp('uni_tts_m6_');
       try {
@@ -76,7 +76,7 @@ void main() {
               MemoryOutput(outputId: 'memory'),
               FileOutput(outputId: 'file', outputDirectory: tempDir),
             ],
-            errorPolicy: CompositeOutputErrorPolicy.failFast,
+            errorPolicy: MulticastOutputErrorPolicy.failFast,
           ),
         );
 

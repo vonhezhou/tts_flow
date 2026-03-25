@@ -3,6 +3,7 @@ export 'src/base/audio_spec.dart';
 export 'src/base/mp3_frame_header.dart';
 export 'src/base/pcm_descriptor.dart';
 export 'src/base/wav_header.dart';
+export 'src/core/audio_artifact.dart';
 export 'src/core/tts_contracts.dart';
 export 'src/core/tts_errors.dart';
 export 'src/core/tts_models.dart';

@@ -777,7 +777,7 @@ void main() {
     });
   });
 
-  group('M4 composite output', () {
+  group('M4 Multicast output', () {
     test('acceptedCapabilities intersects PCM constraints across children', () {
       final output = MulticastOutput(
         outputs: [
@@ -803,11 +803,11 @@ void main() {
           MemoryOutput(outputId: 'memory'),
           _FailingTestOutput(outputId: 'failing', failOnConsume: true),
         ],
-        errorPolicy: CompositeOutputErrorPolicy.bestEffort,
+        errorPolicy: MulticastOutputErrorPolicy.bestEffort,
       );
 
       const session = TtsOutputSession(
-        requestId: 'composite-1',
+        requestId: 'Multicast-1',
         audioSpec: TtsAudioSpec(format: TtsAudioFormat.wav),
         voice: null,
         options: null,
@@ -815,15 +815,15 @@ void main() {
 
       await output.initSession(session);
       await output.consumeChunk(
-        _chunk('composite-1', 0, [1, 2, 3], TtsAudioFormat.wav, isLast: true),
+        _chunk('Multicast-1', 0, [1, 2, 3], TtsAudioFormat.wav, isLast: true),
       );
       final artifact = await output.finalizeSession();
 
-      expect(artifact, isA<CompositeAudioArtifact>());
-      final composite = artifact as CompositeAudioArtifact;
-      expect(composite.artifacts.keys, contains('memory'));
-      expect(composite.artifacts.keys, isNot(contains('failing')));
-      expect(composite.outputErrors.keys, contains('failing'));
+      expect(artifact, isA<MulticastAudioArtifact>());
+      final Multicast = artifact as MulticastAudioArtifact;
+      expect(Multicast.artifacts.keys, contains('memory'));
+      expect(Multicast.artifacts.keys, isNot(contains('failing')));
+      expect(Multicast.outputErrors.keys, contains('failing'));
     });
 
     test('failFast throws TtsOutputFailure with output id', () async {
@@ -832,11 +832,11 @@ void main() {
           MemoryOutput(outputId: 'memory'),
           _FailingTestOutput(outputId: 'failing', failOnConsume: true),
         ],
-        errorPolicy: CompositeOutputErrorPolicy.failFast,
+        errorPolicy: MulticastOutputErrorPolicy.failFast,
       );
 
       const session = TtsOutputSession(
-        requestId: 'composite-2',
+        requestId: 'Multicast-2',
         audioSpec: TtsAudioSpec(format: TtsAudioFormat.wav),
         voice: null,
         options: null,
@@ -845,7 +845,7 @@ void main() {
       await output.initSession(session);
       await expectLater(
         output.consumeChunk(
-          _chunk('composite-2', 0, [5], TtsAudioFormat.wav, isLast: true),
+          _chunk('Multicast-2', 0, [5], TtsAudioFormat.wav, isLast: true),
         ),
         throwsA(
           isA<TtsOutputFailure>().having(
@@ -868,11 +868,11 @@ void main() {
 
       final output = MulticastOutput(
         outputs: [initializedThenRolledBack, failingInit],
-        errorPolicy: CompositeOutputErrorPolicy.failFast,
+        errorPolicy: MulticastOutputErrorPolicy.failFast,
       );
 
       const session = TtsOutputSession(
-        requestId: 'composite-init-rollback',
+        requestId: 'Multicast-init-rollback',
         audioSpec: TtsAudioSpec(format: TtsAudioFormat.wav),
         voice: null,
         options: null,
@@ -902,11 +902,11 @@ void main() {
 
       final output = MulticastOutput(
         outputs: [successfulThenRolledBack, failingFinalize],
-        errorPolicy: CompositeOutputErrorPolicy.failFast,
+        errorPolicy: MulticastOutputErrorPolicy.failFast,
       );
 
       const session = TtsOutputSession(
-        requestId: 'composite-finalize-rollback',
+        requestId: 'Multicast-finalize-rollback',
         audioSpec: TtsAudioSpec(format: TtsAudioFormat.wav),
         voice: null,
         options: null,
@@ -914,7 +914,7 @@ void main() {
 
       await output.initSession(session);
       await output.consumeChunk(
-        _chunk('composite-finalize-rollback', 0, [1], TtsAudioFormat.wav,
+        _chunk('Multicast-finalize-rollback', 0, [1], TtsAudioFormat.wav,
             isLast: true),
       );
 

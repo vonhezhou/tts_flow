@@ -1,8 +1,8 @@
 import 'dart:async';
-import 'dart:typed_data';
 
 import 'package:tts_flow_dart/src/base/audio_capability.dart';
 import 'package:tts_flow_dart/src/base/audio_spec.dart';
+import 'package:tts_flow_dart/src/core/audio_artifact.dart';
 
 import 'tts_errors.dart';
 import 'tts_models.dart';
@@ -92,65 +92,6 @@ final class TtsOutputSession {
   final TtsVoice? voice;
   final TtsOptions? options;
   final Map<String, Object> params;
-}
-
-sealed class AudioArtifact {
-  const AudioArtifact({
-    required this.requestId,
-    required this.audioSpec,
-  });
-
-  final String requestId;
-  final TtsAudioSpec audioSpec;
-}
-
-final class InMemoryAudioArtifact extends AudioArtifact {
-  const InMemoryAudioArtifact({
-    required super.requestId,
-    required super.audioSpec,
-    required this.audioBytes,
-    required this.totalBytes,
-  });
-
-  final Uint8List audioBytes;
-  final int totalBytes;
-}
-
-final class FileAudioArtifact extends AudioArtifact {
-  const FileAudioArtifact({
-    required super.requestId,
-    required super.audioSpec,
-    required this.filePath,
-    required this.fileSizeBytes,
-  });
-
-  final String filePath;
-  final int fileSizeBytes;
-}
-
-final class PlaybackAudioArtifact extends AudioArtifact {
-  const PlaybackAudioArtifact({
-    required super.requestId,
-    required super.audioSpec,
-    required this.playbackId,
-    required this.playbackDuration,
-  });
-
-  final String playbackId;
-  final Duration playbackDuration;
-}
-
-final class CompositeAudioArtifact extends AudioArtifact {
-  CompositeAudioArtifact({
-    required super.requestId,
-    required super.audioSpec,
-    required Map<String, AudioArtifact> artifacts,
-    required Map<String, TtsError> outputErrors,
-  })  : artifacts = Map.unmodifiable(artifacts),
-        outputErrors = Map.unmodifiable(outputErrors);
-
-  final Map<String, AudioArtifact> artifacts;
-  final Map<String, TtsError> outputErrors;
 }
 
 abstract interface class TtsEngine {

@@ -1,17 +1,12 @@
-import 'package:tts_flow_dart/src/base/audio_capability.dart';
-import 'package:tts_flow_dart/src/base/audio_spec.dart';
+import 'package:tts_flow_dart/tts_flow_dart.dart';
 
-import '../core/tts_contracts.dart';
-import '../core/tts_errors.dart';
-import '../core/tts_models.dart';
-
-enum CompositeOutputErrorPolicy {
+enum MulticastOutputErrorPolicy {
   /// If any individual output fails,
-  /// the entire composite output fails immediately.
+  /// the entire Multicast output fails immediately.
   failFast,
 
   /// If any individual output fails,
-  /// the error is recorded but the composite output
+  /// the error is recorded but the Multicast output
   /// continues operating with the remaining outputs.
   bestEffort,
 }
@@ -22,7 +17,7 @@ final class MulticastOutput implements TtsOutput {
   MulticastOutput({
     required List<TtsOutput> outputs,
     this.outputId = 'multicast-output',
-    this.errorPolicy = CompositeOutputErrorPolicy.bestEffort,
+    this.errorPolicy = MulticastOutputErrorPolicy.bestEffort,
   }) : _outputs = List.unmodifiable(outputs) {
     if (_outputs.isEmpty) {
       throw ArgumentError.value(outputs, 'outputs', 'Must not be empty.');
@@ -45,7 +40,7 @@ final class MulticastOutput implements TtsOutput {
   @override
   final String outputId;
 
-  final CompositeOutputErrorPolicy errorPolicy;
+  final MulticastOutputErrorPolicy errorPolicy;
 
   TtsOutputSession? _session;
   final Map<String, TtsOutput> _activeOutputs = <String, TtsOutput>{};
@@ -81,7 +76,7 @@ final class MulticastOutput implements TtsOutput {
           outputId: output.outputId,
         );
         _outputErrors[output.outputId] = converted;
-        if (errorPolicy == CompositeOutputErrorPolicy.failFast) {
+        if (errorPolicy == MulticastOutputErrorPolicy.failFast) {
           await _rollbackOutputs(
             entries: _activeOutputs.entries.toList(),
             requestId: session.requestId,
@@ -101,7 +96,7 @@ final class MulticastOutput implements TtsOutput {
   Future<void> consumeChunk(TtsChunk chunk) async {
     final session = _session;
     if (session == null) {
-      throw StateError('CompositeOutput session is not initialized.');
+      throw StateError('MulticastOutput session is not initialized.');
     }
     if (chunk.requestId != session.requestId) {
       throw StateError('Chunk requestId does not match active session.');
@@ -119,7 +114,7 @@ final class MulticastOutput implements TtsOutput {
         );
         _outputErrors[entry.key] = converted;
         _activeOutputs.remove(entry.key);
-        if (errorPolicy == CompositeOutputErrorPolicy.failFast) {
+        if (errorPolicy == MulticastOutputErrorPolicy.failFast) {
           await _rollbackOutputs(
             entries: _activeOutputs.entries.toList(),
             requestId: session.requestId,
@@ -139,7 +134,7 @@ final class MulticastOutput implements TtsOutput {
   Future<AudioArtifact> finalizeSession() async {
     final session = _session;
     if (session == null) {
-      throw StateError('CompositeOutput session is not initialized.');
+      throw StateError('MulticastOutput session is not initialized.');
     }
 
     final artifacts = <String, AudioArtifact>{};
@@ -156,7 +151,7 @@ final class MulticastOutput implements TtsOutput {
         );
         _outputErrors[entry.key] = converted;
         _activeOutputs.remove(entry.key);
-        if (errorPolicy == CompositeOutputErrorPolicy.failFast) {
+        if (errorPolicy == MulticastOutputErrorPolicy.failFast) {
           await _rollbackOutputs(
             entries: _activeOutputs.entries.toList(),
             requestId: session.requestId,
@@ -175,7 +170,7 @@ final class MulticastOutput implements TtsOutput {
       throw TtsOutputFailure(outputId: first.key, error: first.value);
     }
 
-    final artifact = CompositeAudioArtifact(
+    final artifact = MulticastAudioArtifact(
       requestId: session.requestId,
       audioSpec: session.audioSpec,
       artifacts: artifacts,
@@ -200,7 +195,7 @@ final class MulticastOutput implements TtsOutput {
           outputId: entry.key,
         );
         _outputErrors[entry.key] = converted;
-        if (errorPolicy == CompositeOutputErrorPolicy.failFast) {
+        if (errorPolicy == MulticastOutputErrorPolicy.failFast) {
           _clearSession();
           throw TtsOutputFailure(outputId: entry.key, error: converted);
         }
@@ -229,7 +224,7 @@ final class MulticastOutput implements TtsOutput {
     }
     _clearSession();
     if (firstFailure != null &&
-        errorPolicy == CompositeOutputErrorPolicy.failFast) {
+        errorPolicy == MulticastOutputErrorPolicy.failFast) {
       throw firstFailure;
     }
   }

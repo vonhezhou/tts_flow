@@ -1,13 +1,7 @@
 import 'dart:io';
 import 'dart:typed_data';
 
-import 'package:tts_flow_dart/src/base/audio_capability.dart';
-import 'package:tts_flow_dart/src/base/audio_spec.dart';
-
-import '../base/mp3_frame_header.dart';
-import '../core/tts_contracts.dart';
-import '../core/tts_errors.dart';
-import '../core/tts_models.dart';
+import 'package:tts_flow_dart/tts_flow_dart.dart';
 
 final class Mp3FileOutput implements TtsOutput {
   Mp3FileOutput(
