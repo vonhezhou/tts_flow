@@ -15,10 +15,10 @@ enum CompositeOutputErrorPolicy {
 
 /// A TtsOutput that wraps multiple child outputs
 /// and forwards all calls to them.
-final class CompositeOutput implements TtsOutput {
-  CompositeOutput({
+final class MulticastOutput implements TtsOutput {
+  MulticastOutput({
     required List<TtsOutput> outputs,
-    this.outputId = 'composite-output',
+    this.outputId = 'multicast-output',
     this.errorPolicy = CompositeOutputErrorPolicy.bestEffort,
   }) : _outputs = List.unmodifiable(outputs) {
     if (_outputs.isEmpty) {

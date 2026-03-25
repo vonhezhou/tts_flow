@@ -119,7 +119,7 @@ void main() {
           chunkCount: 2,
           chunkDelay: const Duration(milliseconds: 2),
         ),
-        output: CompositeOutput(
+        output: MulticastOutput(
           outputs: [
             MemoryOutput(outputId: 'memory'),
             _AlwaysFailOutput(outputId: 'fail-output'),

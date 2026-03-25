@@ -130,7 +130,7 @@ void main() {
   group('M4 composite output', () {
     test('bestEffort finalizes successful outputs and records failures',
         () async {
-      final output = CompositeOutput(
+      final output = MulticastOutput(
         outputs: [
           MemoryOutput(outputId: 'memory'),
           _FailingTestOutput(outputId: 'failing', failOnConsume: true),
@@ -159,7 +159,7 @@ void main() {
     });
 
     test('failFast throws TtsOutputFailure with output id', () async {
-      final output = CompositeOutput(
+      final output = MulticastOutput(
         outputs: [
           MemoryOutput(outputId: 'memory'),
           _FailingTestOutput(outputId: 'failing', failOnConsume: true),

@@ -71,7 +71,7 @@ void main() {
             supportsStreaming: true,
             chunkCount: 3,
           ),
-          output: CompositeOutput(
+          output: MulticastOutput(
             outputs: [
               MemoryOutput(outputId: 'memory'),
               FileOutput(outputId: 'file', outputDirectory: tempDir),
