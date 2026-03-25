@@ -1,0 +1,305 @@
+import 'dart:async';
+import 'dart:developer';
+
+import 'package:meta/meta.dart';
+import 'package:tts_flow_dart/src/core/audio_spec.dart';
+import 'package:tts_flow_dart/src/core/synthesis_control.dart';
+import 'package:tts_flow_dart/src/core/tts_chunk.dart';
+import 'package:tts_flow_dart/src/core/tts_engine.dart';
+import 'package:tts_flow_dart/src/core/tts_errors.dart';
+import 'package:tts_flow_dart/src/core/tts_flow_config.dart';
+import 'package:tts_flow_dart/src/core/tts_output.dart';
+import 'package:tts_flow_dart/src/core/tts_output_session.dart';
+import 'package:tts_flow_dart/src/core/tts_policy.dart';
+import 'package:tts_flow_dart/src/core/tts_request.dart';
+import 'package:tts_flow_dart/src/service/format_negotiator.dart';
+import 'package:tts_flow_dart/src/service/queue_scheduler.dart';
+import 'package:tts_flow_dart/src/service/tts_events.dart';
+
+import 'tts_flow_event_mixin.dart';
+import 'tts_flow_state.dart';
+
+final class QueuedRequest {
+  const QueuedRequest({required this.request, required this.controller});
+
+  final TtsRequest request;
+  final StreamController<TtsChunk> controller;
+}
+
+mixin TtsSourceMixin on TtsFlowEventBus {
+  TtsEngine get engine;
+  TtsOutput get output;
+  TtsFlowConfig get config;
+
+  @protected
+  final formatNegotiator = const TtsFormatNegotiator();
+
+  @protected
+  final scheduler = QueueScheduler<QueuedRequest>();
+
+  @protected
+  final state = TtsFlowState();
+
+  @protected
+  Future<void> processQueue() async {
+    if (!state.tryEnterProcessing()) {
+      return;
+    }
+
+    try {
+      while (!scheduler.isEmpty && !state.isDisposed) {
+        // Pause gates starting the next request. Active request handling
+        // continues in-loop using buffering/passthrough policy.
+        if (state.isPaused) {
+          break;
+        }
+
+        final item = scheduler.dequeue();
+        final shouldStopQueue = await processQueuedRequest(item);
+        if (shouldStopQueue || state.isHalted) {
+          break;
+        }
+      }
+    } finally {
+      state.exitProcessing();
+    }
+  }
+
+  @protected
+  Future<void> flushPauseBufferImpl(
+    QueuedRequest item,
+    TtsRequest request,
+    SynthesisControl control,
+  ) async {
+    final toFlush = List<TtsChunk>.of(state.pauseBuffer);
+    state.clearPauseBuffer();
+
+    for (final chunk in toFlush) {
+      if (control.isCanceled) {
+        break;
+      }
+      await output.consumeChunk(chunk);
+      item.controller.add(chunk);
+      emitRequestEvent(
+        TtsRequestEventType.requestChunkReceived,
+        requestId: request.requestId,
+        state: TtsRequestState.running,
+        chunk: chunk,
+      );
+    }
+  }
+
+  @protected
+  Future<bool> processQueuedRequest(
+    QueuedRequest item,
+  ) async {
+    final request = item.request;
+    final control = SynthesisControl();
+    state.activeControl = control;
+
+    emitQueueEvent(TtsQueueEventType.requestDequeued,
+        queueLength: scheduler.length, requestId: request.requestId);
+    emitRequestEvent(
+      TtsRequestEventType.requestStarted,
+      requestId: request.requestId,
+      state: TtsRequestState.running,
+    );
+
+    try {
+      final audioSpec = resolveAudioSpec(request);
+      if (!engine.supportsSpec(audioSpec)) {
+        throw TtsError(
+          code: TtsErrorCode.formatNegotiationFailed,
+          message:
+              'Negotiated audio spec is not supported by engine "${engine.engineId}".',
+          requestId: request.requestId,
+        );
+      }
+      if (!output.acceptsSpec(audioSpec)) {
+        throw TtsError(
+          code: TtsErrorCode.formatNegotiationFailed,
+          message:
+              'Negotiated audio spec is not accepted by output "${output.outputId}".',
+          requestId: request.requestId,
+        );
+      }
+      await output.initSession(
+        TtsOutputSession(
+          requestId: request.requestId,
+          audioSpec: audioSpec,
+          voice: request.voice,
+          options: request.options,
+          params: request.params,
+        ),
+      );
+
+      await for (final chunk
+          in engine.synthesize(request, control, audioSpec)) {
+        if (control.isCanceled) {
+          break;
+        }
+        await handleSynthesizedChunk(item, request, control, chunk);
+        if (control.isCanceled) {
+          break;
+        }
+      }
+
+      if (!control.isCanceled && state.pauseBuffer.isNotEmpty) {
+        while (state.isPaused && !state.isDisposed && !control.isCanceled) {
+          await Future<void>.delayed(const Duration(milliseconds: 20));
+        }
+        if (!control.isCanceled) {
+          await flushPauseBufferImpl(item, request, control);
+        }
+      }
+
+      if (control.isCanceled) {
+        await output.onCancel(control);
+        emitRequestEvent(
+          TtsRequestEventType.requestStopped,
+          requestId: request.requestId,
+          state: TtsRequestState.stopped,
+        );
+      } else {
+        await output.finalizeSession();
+        emitRequestEvent(
+          TtsRequestEventType.requestCompleted,
+          requestId: request.requestId,
+          state: TtsRequestState.completed,
+        );
+      }
+
+      unawaited(item.controller.close());
+      return false;
+    } catch (error) {
+      final failure = _mapRequestFailure(error, request);
+      emitRequestEvent(
+        TtsRequestEventType.requestFailed,
+        requestId: request.requestId,
+        state: TtsRequestState.failed,
+        error: failure.ttsError,
+        outputId: failure.outputId,
+        outputError: failure.outputError,
+      );
+      item.controller.addError(failure.ttsError);
+      unawaited(item.controller.close());
+
+      if (config.queueFailurePolicy == TtsQueueFailurePolicy.failFast) {
+        state.haltQueue();
+        emitQueueEvent(TtsQueueEventType.queueHalted,
+            queueLength: scheduler.length, requestId: request.requestId);
+        await cancelPendingAfterFailure();
+        return true;
+      }
+
+      return false;
+    } finally {
+      state.activeControl = null;
+      state.clearPauseBuffer();
+    }
+  }
+
+  @protected
+  Future<void> handleSynthesizedChunk(
+    QueuedRequest item,
+    TtsRequest request,
+    SynthesisControl control,
+    TtsChunk chunk,
+  ) async {
+    // Flush buffered chunks before handling fresh chunks after resume.
+    if (state.pauseBuffer.isNotEmpty && !state.isPaused) {
+      await flushPauseBufferImpl(item, request, control);
+      if (control.isCanceled) {
+        return;
+      }
+    }
+
+    if (state.isPaused &&
+        config.pauseBufferPolicy == TtsPauseBufferPolicy.buffered) {
+      state.pauseBuffer.add(chunk);
+      final newBytes = state.pauseBufferBytes + chunk.bytes.length;
+      if (state.pauseBufferBytes <= config.pauseBufferMaxBytes &&
+          newBytes > config.pauseBufferMaxBytes) {
+        log(
+          'TTS pause buffer exceeded ${config.pauseBufferMaxBytes} '
+          'bytes (current: $newBytes); chunks continue to accumulate.',
+          name: 'tts_flow_dart',
+          level: 900,
+        );
+      }
+      state.pauseBufferBytes = newBytes;
+      return;
+    }
+
+    await output.consumeChunk(chunk);
+    item.controller.add(chunk);
+    emitRequestEvent(
+      TtsRequestEventType.requestChunkReceived,
+      requestId: request.requestId,
+      state: TtsRequestState.running,
+      chunk: chunk,
+    );
+  }
+
+  @protected
+  Future<void> cancelPendingAfterFailure() async {
+    final pending = scheduler.drain();
+    for (final item in pending) {
+      emitRequestEvent(
+        TtsRequestEventType.requestCanceled,
+        requestId: item.request.requestId,
+        state: TtsRequestState.canceled,
+      );
+      unawaited(item.controller.close());
+    }
+  }
+
+  @protected
+  TtsAudioSpec resolveAudioSpec(TtsRequest request) {
+    return formatNegotiator.negotiateSpec(
+      engineCapabilities: engine.supportedCapabilities,
+      outputCapabilities: output.acceptedCapabilities,
+      preferredOrder: config.preferredFormatOrder,
+      requestId: request.requestId,
+      preferredFormat: request.preferredFormat,
+      preferredSampleRateHz: request.options?.sampleRateHz,
+    );
+  }
+}
+
+_RequestFailure _mapRequestFailure(Object error, TtsRequest request) {
+  final outputFailure = error is TtsOutputFailure ? error : null;
+  final outputError = outputFailure?.error;
+  final baseError = outputError ?? (error is TtsError ? error : null);
+  final ttsError = baseError != null
+      ? TtsError(
+          code: baseError.code,
+          message: baseError.message,
+          requestId: baseError.requestId ?? request.requestId,
+          cause: baseError.cause,
+        )
+      : TtsError(
+          code: TtsErrorCode.internalError,
+          message: 'Request processing failed.',
+          requestId: request.requestId,
+          cause: error,
+        );
+
+  return _RequestFailure(
+    ttsError: ttsError,
+    outputId: outputFailure?.outputId,
+    outputError: outputError,
+  );
+}
+
+final class _RequestFailure {
+  const _RequestFailure({
+    required this.ttsError,
+    required this.outputId,
+    required this.outputError,
+  });
+
+  final TtsError ttsError;
+  final String? outputId;
+  final TtsError? outputError;
+}

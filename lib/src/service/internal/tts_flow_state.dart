@@ -1,17 +1,18 @@
-part of 'package:tts_flow_dart/src/service/tts_flow.dart';
+import 'package:tts_flow_dart/src/core/synthesis_control.dart';
+import 'package:tts_flow_dart/src/core/tts_chunk.dart';
 
-enum _ServiceLifecycle {
+enum ServiceLifecycle {
   created,
   initialized,
   disposed,
 }
 
-enum _QueueActivity {
+enum QueueActivity {
   idle,
   processing,
 }
 
-enum _QueueMode {
+enum QueueMode {
   running,
 
   // paused: new requests are accepted but not processed until resume() is called
@@ -21,18 +22,18 @@ enum _QueueMode {
   halted,
 }
 
-final class _TtsFlowState {
-  _ServiceLifecycle lifecycle = _ServiceLifecycle.created;
-  _QueueActivity queueActivity = _QueueActivity.idle;
-  _QueueMode queueMode = _QueueMode.running;
+final class TtsFlowState {
+  ServiceLifecycle lifecycle = ServiceLifecycle.created;
+  QueueActivity queueActivity = QueueActivity.idle;
+  QueueMode queueMode = QueueMode.running;
   SynthesisControl? activeControl;
   final List<TtsChunk> pauseBuffer = <TtsChunk>[];
   int pauseBufferBytes = 0;
 
-  bool get isInitialized => lifecycle == _ServiceLifecycle.initialized;
-  bool get isDisposed => lifecycle == _ServiceLifecycle.disposed;
-  bool get isPaused => queueMode == _QueueMode.paused;
-  bool get isHalted => queueMode == _QueueMode.halted;
+  bool get isInitialized => lifecycle == ServiceLifecycle.initialized;
+  bool get isDisposed => lifecycle == ServiceLifecycle.disposed;
+  bool get isPaused => queueMode == QueueMode.paused;
+  bool get isHalted => queueMode == QueueMode.halted;
 
   void clearPauseBuffer() {
     pauseBuffer.clear();
@@ -40,49 +41,49 @@ final class _TtsFlowState {
   }
 
   void markInitialized() {
-    lifecycle = _ServiceLifecycle.initialized;
+    lifecycle = ServiceLifecycle.initialized;
   }
 
   void markDisposed() {
     clearPauseBuffer();
     activeControl = null;
-    queueActivity = _QueueActivity.idle;
-    queueMode = _QueueMode.running;
-    lifecycle = _ServiceLifecycle.disposed;
+    queueActivity = QueueActivity.idle;
+    queueMode = QueueMode.running;
+    lifecycle = ServiceLifecycle.disposed;
   }
 
   bool tryEnterProcessing() {
-    if (queueActivity == _QueueActivity.processing || isDisposed) {
+    if (queueActivity == QueueActivity.processing || isDisposed) {
       return false;
     }
-    queueActivity = _QueueActivity.processing;
+    queueActivity = QueueActivity.processing;
     return true;
   }
 
   void exitProcessing() {
-    queueActivity = _QueueActivity.idle;
+    queueActivity = QueueActivity.idle;
   }
 
   void unhaltOnEnqueue() {
-    if (queueMode == _QueueMode.halted) {
-      queueMode = _QueueMode.running;
+    if (queueMode == QueueMode.halted) {
+      queueMode = QueueMode.running;
     }
   }
 
   void pauseQueue() {
-    if (queueMode != _QueueMode.halted) {
-      queueMode = _QueueMode.paused;
+    if (queueMode != QueueMode.halted) {
+      queueMode = QueueMode.paused;
     }
   }
 
   void resumeQueue() {
-    if (queueMode == _QueueMode.paused) {
-      queueMode = _QueueMode.running;
+    if (queueMode == QueueMode.paused) {
+      queueMode = QueueMode.running;
     }
   }
 
   void haltQueue() {
-    queueMode = _QueueMode.halted;
+    queueMode = QueueMode.halted;
   }
 
   void ensureNotDisposed() {
