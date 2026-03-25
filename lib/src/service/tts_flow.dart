@@ -8,28 +8,28 @@ import 'format_negotiator.dart';
 import 'queue_scheduler.dart';
 import 'tts_events.dart';
 
-part 'internal/tts_service_events.dart';
-part 'internal/tts_service_request_helpers.dart';
-part 'internal/tts_service_request_runtime.dart';
-part 'internal/tts_service_runtime.dart';
-part 'internal/tts_service_state.dart';
-part 'internal/tts_service_transitions.dart';
+part 'internal/tts_flow_events.dart';
+part 'internal/tts_flow_request_helpers.dart';
+part 'internal/tts_flow_request_runtime.dart';
+part 'internal/tts_flow_runtime.dart';
+part 'internal/tts_flow_state.dart';
+part 'internal/tts_flow_transitions.dart';
 
-final class TtsService {
-  TtsService({
+final class TtsFlow {
+  TtsFlow({
     required TtsEngine engine,
     required TtsOutput output,
-    TtsServiceConfig? config,
+    TtsFlowConfig? config,
   })  : _engine = engine,
         _output = output,
-        _config = config ?? const TtsServiceConfig(),
+        _config = config ?? const TtsFlowConfig(),
         _options = const TtsOptions(),
         _preferredFormat =
-            (config ?? const TtsServiceConfig()).preferredFormatOrder.first;
+            (config ?? const TtsFlowConfig()).preferredFormatOrder.first;
 
   final TtsEngine _engine;
   final TtsOutput _output;
-  final TtsServiceConfig _config;
+  final TtsFlowConfig _config;
   final TtsFormatNegotiator _formatNegotiator = const TtsFormatNegotiator();
   final QueueScheduler<_QueuedRequest> _scheduler =
       QueueScheduler<_QueuedRequest>();
@@ -39,7 +39,7 @@ final class TtsService {
   final StreamController<TtsRequestEvent> _requestEventsController =
       StreamController<TtsRequestEvent>.broadcast();
 
-  final _TtsServiceState _state = _TtsServiceState();
+  final _TtsFlowState _state = _TtsFlowState();
   late TtsVoice _voice;
   TtsOptions _options;
   TtsAudioFormat _preferredFormat;

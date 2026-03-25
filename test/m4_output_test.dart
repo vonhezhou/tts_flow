@@ -1,7 +1,7 @@
 import 'dart:io';
 import 'dart:typed_data';
 
-import 'package:flutter_uni_tts/flutter_uni_tts.dart';
+import 'package:tts_flow_dart/tts_flow_dart.dart';
 import 'package:test/test.dart';
 
 void main() {

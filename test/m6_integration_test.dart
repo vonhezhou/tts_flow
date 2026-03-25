@@ -2,14 +2,14 @@ import 'dart:async';
 import 'dart:io';
 import 'dart:typed_data';
 
-import 'package:flutter_uni_tts/flutter_uni_tts.dart';
+import 'package:tts_flow_dart/tts_flow_dart.dart';
 import 'package:test/test.dart';
 
 void main() {
   group('M6 integration', () {
     test('service emits chunks with resolved format using MemoryOutput',
         () async {
-      final service = TtsService(
+      final service = TtsFlow(
         engine: FakeTtsEngine(
           engineId: 'fake-engine',
           supportsStreaming: true,
@@ -34,7 +34,7 @@ void main() {
     });
 
     test('queue halts and cancels pending requests after failure', () async {
-      final service = TtsService(
+      final service = TtsFlow(
         engine: _FailingEngine(),
         output: MemoryOutput(),
       );
@@ -65,7 +65,7 @@ void main() {
         () async {
       final tempDir = await Directory.systemTemp.createTemp('uni_tts_m6_');
       try {
-        final service = TtsService(
+        final service = TtsFlow(
           engine: FakeTtsEngine(
             engineId: 'fake-engine',
             supportsStreaming: true,

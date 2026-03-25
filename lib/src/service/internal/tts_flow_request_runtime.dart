@@ -1,7 +1,7 @@
-part of 'package:flutter_uni_tts/src/service/tts_service.dart';
+part of 'package:tts_flow_dart/src/service/tts_flow.dart';
 
 Future<bool> _processQueuedRequestImpl(
-  TtsService service,
+  TtsFlow service,
   _QueuedRequest item,
 ) async {
   final request = item.request;
@@ -97,7 +97,7 @@ Future<bool> _processQueuedRequestImpl(
 }
 
 Future<void> _handleSynthesizedChunk(
-  TtsService service,
+  TtsFlow service,
   _QueuedRequest item,
   TtsRequest request,
   SynthesisControl control,
@@ -121,7 +121,7 @@ Future<void> _handleSynthesizedChunk(
       log(
         'TTS pause buffer exceeded ${service._config.pauseBufferMaxBytes} '
         'bytes (current: $newBytes); chunks continue to accumulate.',
-        name: 'flutter_uni_tts',
+        name: 'tts_flow_dart',
         level: 900,
       );
     }

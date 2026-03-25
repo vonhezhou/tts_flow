@@ -1,13 +1,13 @@
 import 'dart:async';
 import 'dart:typed_data';
 
-import 'package:flutter_uni_tts/flutter_uni_tts.dart';
+import 'package:tts_flow_dart/tts_flow_dart.dart';
 import 'package:test/test.dart';
 
 void main() {
   group('M2 service', () {
     test('processes requests in FIFO order', () async {
-      final service = TtsService(
+      final service = TtsFlow(
         engine: FakeTtsEngine(
           engineId: 'fake-engine',
           supportsStreaming: true,
@@ -39,7 +39,7 @@ void main() {
     });
 
     test('clearQueue cancels pending requests only', () async {
-      final service = TtsService(
+      final service = TtsFlow(
         engine: FakeTtsEngine(
           engineId: 'fake-engine',
           supportsStreaming: true,
@@ -66,7 +66,7 @@ void main() {
 
     test('stopCurrent stops active request and next request proceeds',
         () async {
-      final service = TtsService(
+      final service = TtsFlow(
         engine: FakeTtsEngine(
           engineId: 'fake-engine',
           supportsStreaming: true,
@@ -112,7 +112,7 @@ void main() {
     });
 
     test('requestFailed event includes output failure details', () async {
-      final service = TtsService(
+      final service = TtsFlow(
         engine: FakeTtsEngine(
           engineId: 'fake-engine',
           supportsStreaming: true,
@@ -152,7 +152,7 @@ void main() {
     });
 
     test('continueOnError keeps pending queue after active failure', () async {
-      final service = TtsService(
+      final service = TtsFlow(
         engine: FakeTtsEngine(
           engineId: 'fake-engine',
           supportsStreaming: true,
@@ -163,7 +163,7 @@ void main() {
           outputId: 'selective-fail',
           failingRequestIds: {'first'},
         ),
-        config: const TtsServiceConfig(
+        config: const TtsFlowConfig(
           queueFailurePolicy: TtsQueueFailurePolicy.continueOnError,
         ),
       );
@@ -194,7 +194,7 @@ void main() {
     });
 
     test('pause while idle defers start until resume', () async {
-      final service = TtsService(
+      final service = TtsFlow(
         engine: FakeTtsEngine(
           engineId: 'fake-engine',
           supportsStreaming: true,
@@ -236,7 +236,7 @@ void main() {
 
     test('stopCurrent forwards stopCurrent cancel reason to output', () async {
       final output = _CaptureCancelOutput();
-      final service = TtsService(
+      final service = TtsFlow(
         engine: FakeTtsEngine(
           engineId: 'fake-engine',
           supportsStreaming: true,
@@ -259,7 +259,7 @@ void main() {
     });
 
     test('service exposes engine available voices and defaults', () async {
-      final service = TtsService(
+      final service = TtsFlow(
         engine: FakeTtsEngine(
           engineId: 'fake-engine',
           supportsStreaming: true,
@@ -301,7 +301,7 @@ void main() {
     });
 
     test('speak requires init before usage', () async {
-      final service = TtsService(
+      final service = TtsFlow(
         engine: FakeTtsEngine(
           engineId: 'fake-engine',
           supportsStreaming: true,

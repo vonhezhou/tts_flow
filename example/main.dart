@@ -1,6 +1,6 @@
 import 'dart:io';
 
-import 'package:flutter_uni_tts/flutter_uni_tts.dart';
+import 'package:tts_flow_dart/tts_flow_dart.dart';
 
 Future<void> main() async {
   final apiKey = Platform.environment['OPENAI_API_KEY'];
@@ -21,7 +21,7 @@ Future<void> main() async {
           chunkDelay: const Duration(milliseconds: 5),
         );
 
-  final service = TtsService(
+  final service = TtsFlow(
     engine: engine,
     output: MemoryOutput(),
   );

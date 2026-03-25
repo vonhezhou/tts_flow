@@ -1,6 +1,6 @@
-part of 'package:flutter_uni_tts/src/service/tts_service.dart';
+part of 'package:tts_flow_dart/src/service/tts_flow.dart';
 
-final class _TtsServiceState {
+final class _TtsFlowState {
   _ServiceLifecycle lifecycle = _ServiceLifecycle.created;
   _QueueActivity queueActivity = _QueueActivity.idle;
   _QueueMode queueMode = _QueueMode.running;

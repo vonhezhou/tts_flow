@@ -24,15 +24,15 @@ enum TtsPauseBufferPolicy {
 
 /// Reason associated with cancellation of an active synthesis request.
 enum CancelReason {
-  /// Cancellation requested explicitly via [TtsService.stopCurrent].
+  /// Cancellation requested explicitly via [TtsFlow.stopCurrent].
   stopCurrent,
 
   /// Cancellation initiated because the service is being disposed.
   serviceDispose,
 }
 
-final class TtsServiceConfig {
-  const TtsServiceConfig({
+final class TtsFlowConfig {
+  const TtsFlowConfig({
     this.preferredFormatOrder = const [
       TtsAudioFormat.mp3,
       TtsAudioFormat.opus,

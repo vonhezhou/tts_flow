@@ -1,6 +1,6 @@
-part of 'package:flutter_uni_tts/src/service/tts_service.dart';
+part of 'package:tts_flow_dart/src/service/tts_flow.dart';
 
-extension _TtsServiceStateTransitions on _TtsServiceState {
+extension _TtsFlowStateTransitions on _TtsFlowState {
   void markInitialized() {
     lifecycle = _ServiceLifecycle.initialized;
   }
@@ -49,14 +49,14 @@ extension _TtsServiceStateTransitions on _TtsServiceState {
 
   void ensureNotDisposed() {
     if (isDisposed) {
-      throw StateError('TtsService is disposed.');
+      throw StateError('TtsFlow is disposed.');
     }
   }
 
   void ensureReady() {
     ensureNotDisposed();
     if (!isInitialized) {
-      throw StateError('TtsService is not initialized. Call init() first.');
+      throw StateError('TtsFlow is not initialized. Call init() first.');
     }
   }
 }

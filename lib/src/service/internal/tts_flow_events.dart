@@ -1,7 +1,7 @@
-part of 'package:flutter_uni_tts/src/service/tts_service.dart';
+part of 'package:tts_flow_dart/src/service/tts_flow.dart';
 
 void _emitQueueEventImpl(
-  TtsService service,
+  TtsFlow service,
   TtsQueueEventType type, {
   String? requestId,
 }) {
@@ -16,7 +16,7 @@ void _emitQueueEventImpl(
 }
 
 void _emitRequestEventImpl(
-  TtsService service,
+  TtsFlow service,
   TtsRequestEventType type, {
   required String requestId,
   TtsRequestState? state,

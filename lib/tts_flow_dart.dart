@@ -13,4 +13,4 @@ export 'src/output/speaker_output.dart';
 export 'src/service/format_negotiator.dart';
 export 'src/service/queue_scheduler.dart';
 export 'src/service/tts_events.dart';
-export 'src/service/tts_service.dart';
+export 'src/service/tts_flow.dart';

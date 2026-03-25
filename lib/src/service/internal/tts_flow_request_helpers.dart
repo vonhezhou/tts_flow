@@ -1,4 +1,4 @@
-part of 'package:flutter_uni_tts/src/service/tts_service.dart';
+part of 'package:tts_flow_dart/src/service/tts_flow.dart';
 
 _RequestFailure _mapRequestFailureImpl(Object error, TtsRequest request) {
   final outputFailure = error is TtsOutputFailure ? error : null;
@@ -25,7 +25,7 @@ _RequestFailure _mapRequestFailureImpl(Object error, TtsRequest request) {
   );
 }
 
-Future<void> _cancelPendingAfterFailureImpl(TtsService service) async {
+Future<void> _cancelPendingAfterFailureImpl(TtsFlow service) async {
   final pending = service._scheduler.drain();
   for (final item in pending) {
     service._emitRequestEvent(
@@ -37,7 +37,7 @@ Future<void> _cancelPendingAfterFailureImpl(TtsService service) async {
   }
 }
 
-TtsAudioSpec _resolveAudioSpecImpl(TtsService service, TtsRequest request) {
+TtsAudioSpec _resolveAudioSpecImpl(TtsFlow service, TtsRequest request) {
   return service._formatNegotiator.negotiateSpec(
     engineCapabilities: service._engine.supportedCapabilities,
     outputCapabilities: service._output.acceptedCapabilities,

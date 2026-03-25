@@ -1,6 +1,6 @@
-part of 'package:flutter_uni_tts/src/service/tts_service.dart';
+part of 'package:tts_flow_dart/src/service/tts_flow.dart';
 
-Future<void> _processQueueImpl(TtsService service) async {
+Future<void> _processQueueImpl(TtsFlow service) async {
   if (!service._state.tryEnterProcessing()) {
     return;
   }
@@ -25,7 +25,7 @@ Future<void> _processQueueImpl(TtsService service) async {
 }
 
 Future<void> _flushPauseBufferImpl(
-  TtsService service,
+  TtsFlow service,
   _QueuedRequest item,
   TtsRequest request,
   SynthesisControl control,

@@ -1,10 +1,10 @@
-# flutter_uni_tts
+# tts_flow_dart
 
-flutter_uni_tts is a clean, extensible TTS framework for Dart and Flutter.
+tts_flow_dart is a clean, extensible TTS framework for Dart and Flutter.
 
 Core design choices in this repository:
 
-- Fixed service wiring: each TtsService instance uses one engine and one output.
+- Fixed service wiring: each TtsFlow instance uses one engine and one output.
 - Service-scoped defaults: voice/options/format are configured once per service.
 - Unified API: speak(requestId, text, [params]) always returns a stream of `TtsChunk`.
 - FIFO queue semantics with halt-on-failure behavior.
@@ -21,8 +21,8 @@ Audio negotiation is capability-based and request-scoped.
 
 Resolution priority:
 
-1. Service-level preferred format (`TtsService.preferredFormat`) if compatible.
-2. Service preferred order (`TtsServiceConfig.preferredFormatOrder`).
+1. Service-level preferred format (`TtsFlow.preferredFormat`) if compatible.
+2. Service preferred order (`TtsFlowConfig.preferredFormatOrder`).
 3. For PCM descriptors, service options sample rate (`TtsOptions.sampleRateHz`)
   when compatible, otherwise a deterministic fallback.
 
@@ -63,9 +63,9 @@ model-scoped catalog (different models support different voice sets). You can
 supply per-model overrides via `voiceCatalogOverrides`.
 
 ```dart
-import 'package:flutter_uni_tts/flutter_uni_tts.dart';
+import 'package:tts_flow_dart/tts_flow_dart.dart';
 
-Future<void> inspectVoices(TtsService service) async {
+Future<void> inspectVoices(TtsFlow service) async {
   final voices = await service.getAvailableVoices();
   final defaultVoice = await service.getDefaultVoice();
   final usDefault = await service.getDefaultVoiceForLocale('en-US');
@@ -79,10 +79,10 @@ Future<void> inspectVoices(TtsService service) async {
 ## Quick Start
 
 ```dart
-import 'package:flutter_uni_tts/flutter_uni_tts.dart';
+import 'package:tts_flow_dart/tts_flow_dart.dart';
 
 Future<void> main() async {
- final service = TtsService(
+ final service = TtsFlow(
   engine: FakeTtsEngine(
    engineId: 'fake-engine',
    supportsStreaming: true,
@@ -133,7 +133,7 @@ outputs such as memory and file at the same time.
 ```dart
 import 'dart:io';
 
-import 'package:flutter_uni_tts/flutter_uni_tts.dart';
+import 'package:tts_flow_dart/tts_flow_dart.dart';
 
 Future<void> main() async {
   final tempDir = await Directory.systemTemp.createTemp('uni_tts_fanout_');
@@ -146,7 +146,7 @@ Future<void> main() async {
     errorPolicy: CompositeOutputErrorPolicy.bestEffort,
   );
 
-  final service = TtsService(
+  final service = TtsFlow(
     engine: FakeTtsEngine(
       engineId: 'fake-engine',
       supportsStreaming: true,
