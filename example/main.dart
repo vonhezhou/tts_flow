@@ -23,7 +23,7 @@ Future<void> main() async {
 
   final service = TtsFlow(
     engine: engine,
-    defaultOutput: MemoryOutput(),
+    defaultOutput: NullOutput(),
   );
   await service.init();
 

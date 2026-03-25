@@ -79,6 +79,48 @@ void main() {
     });
   });
 
+  group('M4 null output', () {
+    test('discards bytes and returns empty artifact payload', () async {
+      final output = NullOutput();
+      const session = TtsOutputSession(
+        requestId: 'null-1',
+        audioSpec: TtsAudioSpec(format: TtsAudioFormat.wav),
+        voice: null,
+        options: null,
+      );
+
+      await output.initSession(session);
+      await output
+          .consumeChunk(_chunk('null-1', 0, [1, 2], TtsAudioFormat.wav));
+      await output.consumeChunk(
+        _chunk('null-1', 1, [3], TtsAudioFormat.wav, isLast: true),
+      );
+
+      final artifact = await output.finalizeSession() as InMemoryAudioArtifact;
+      expect(artifact.requestId, 'null-1');
+      expect(artifact.audioSpec.format, TtsAudioFormat.wav);
+      expect(artifact.totalBytes, 0);
+      expect(artifact.audioBytes, isEmpty);
+    });
+
+    test('rejects chunk requestId mismatch', () async {
+      final output = NullOutput();
+      const session = TtsOutputSession(
+        requestId: 'null-2',
+        audioSpec: TtsAudioSpec(format: TtsAudioFormat.mp3),
+        voice: null,
+        options: null,
+      );
+
+      await output.initSession(session);
+
+      await expectLater(
+        output.consumeChunk(_chunk('other', 0, [9], TtsAudioFormat.mp3)),
+        throwsA(isA<StateError>()),
+      );
+    });
+  });
+
   group('M4 file output', () {
     test('writes temp file then finalizes atomically', () async {
       final tempDir =

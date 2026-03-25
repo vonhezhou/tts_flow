@@ -35,6 +35,7 @@ inputs) to speed up integration debugging.
 - Pluggable engine contract via TtsEngine.
 - Pluggable output contract via TtsOutput.
 - Built-in outputs:
+  - NullOutput (/dev/null-style sink)
   - MemoryOutput
   - FileOutput
   - MulticastOutput (fanout to multiple outputs)
@@ -88,7 +89,7 @@ Future<void> main() async {
    supportsStreaming: true,
    chunkCount: 3,
   ),
-  output: MemoryOutput(),
+  output: NullOutput(),
  );
  
  await service.init();
@@ -128,7 +129,7 @@ dart run example/main.dart
 ## MulticastOutput (Multi-output Fanout)
 
 Use `MulticastOutput` when you want one synthesis request to write to multiple
-outputs such as memory and file at the same time.
+outputs such as null and file at the same time.
 
 ```dart
 import 'dart:io';
@@ -140,7 +141,7 @@ Future<void> main() async {
 
   final output = MulticastOutput(
     outputs: [
-      MemoryOutput(outputId: 'memory'),
+      NullOutput(outputId: 'null'),
       FileOutput(outputId: 'file', outputDirectory: tempDir),
     ],
     errorPolicy: MulticastOutputErrorPolicy.bestEffort,

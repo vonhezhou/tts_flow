@@ -14,7 +14,7 @@ void main() {
           chunkCount: 2,
           chunkDelay: const Duration(milliseconds: 5),
         ),
-        defaultOutput: FakeTtsOutput(),
+        defaultOutput: NullOutput(),
       );
 
       final started = <String>[];
@@ -46,7 +46,7 @@ void main() {
           chunkCount: 3,
           chunkDelay: const Duration(milliseconds: 10),
         ),
-        defaultOutput: FakeTtsOutput(),
+        defaultOutput: NullOutput(),
       );
 
       await service.init();
@@ -73,7 +73,7 @@ void main() {
           chunkCount: 8,
           chunkDelay: const Duration(milliseconds: 5),
         ),
-        defaultOutput: FakeTtsOutput(),
+        defaultOutput: NullOutput(),
       );
 
       final events = <TtsRequestEvent>[];
@@ -237,7 +237,7 @@ void main() {
           chunkCount: 2,
           chunkDelay: const Duration(milliseconds: 5),
         ),
-        defaultOutput: FakeTtsOutput(),
+        defaultOutput: NullOutput(),
       );
 
       final started = <String>[];
@@ -330,7 +330,7 @@ void main() {
           engineId: 'fake-engine',
           supportsStreaming: true,
         ),
-        defaultOutput: FakeTtsOutput(),
+        defaultOutput: NullOutput(),
       );
 
       await service.init();
@@ -372,7 +372,7 @@ void main() {
           engineId: 'fake-engine',
           supportsStreaming: true,
         ),
-        defaultOutput: FakeTtsOutput(),
+        defaultOutput: NullOutput(),
       );
 
       expect(

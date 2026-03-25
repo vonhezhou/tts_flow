@@ -60,8 +60,9 @@ void main() {
       expect(chunks.last.isLastChunk, isTrue);
     });
 
-    test('fake output returns memory artifact with resolved format', () async {
-      final output = FakeTtsOutput();
+    test('null output discards bytes while preserving resolved format',
+        () async {
+      final output = NullOutput();
       const session = TtsOutputSession(
         requestId: 'r3',
         audioSpec: TtsAudioSpec(format: TtsAudioFormat.pcm),
@@ -87,7 +88,7 @@ void main() {
       final memoryArtifact = artifact as InMemoryAudioArtifact;
       expect(memoryArtifact.requestId, 'r3');
       expect(memoryArtifact.audioSpec.format, TtsAudioFormat.pcm);
-      expect(memoryArtifact.totalBytes, 3);
+      expect(memoryArtifact.totalBytes, 0);
     });
 
     test('fake engine reports available voices and global default', () async {
