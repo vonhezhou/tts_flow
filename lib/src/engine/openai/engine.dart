@@ -2,6 +2,8 @@ import 'dart:convert';
 import 'dart:typed_data';
 
 import 'package:http/http.dart' as http;
+import 'package:tts_flow_dart/src/base/audio_capability.dart';
+import 'package:tts_flow_dart/src/base/audio_spec.dart';
 
 import '../../core/tts_contracts.dart';
 import '../../core/tts_errors.dart';

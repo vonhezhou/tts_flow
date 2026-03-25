@@ -1,10 +1,14 @@
 import 'dart:io';
 import 'dart:typed_data';
 
+import 'package:tts_flow_dart/src/base/audio_capability.dart';
+import 'package:tts_flow_dart/src/base/audio_spec.dart';
+import 'package:tts_flow_dart/src/base/pcm_descriptor.dart';
+
+import '../base/wav_header.dart';
 import '../core/tts_contracts.dart';
 import '../core/tts_errors.dart';
 import '../core/tts_models.dart';
-import '../core/wav_header.dart';
 
 const int _defaultWavSampleRateHz = 24000;
 const int _defaultWavBitsPerSample = 16;

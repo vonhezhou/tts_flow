@@ -2,8 +2,8 @@ import 'dart:async';
 import 'dart:io';
 import 'dart:typed_data';
 
-import 'package:tts_flow_dart/tts_flow_dart.dart';
 import 'package:test/test.dart';
+import 'package:tts_flow_dart/tts_flow_dart.dart';
 
 void main() {
   group('M6 integration', () {

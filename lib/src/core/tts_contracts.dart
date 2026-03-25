@@ -1,6 +1,9 @@
 import 'dart:async';
 import 'dart:typed_data';
 
+import 'package:tts_flow_dart/src/base/audio_capability.dart';
+import 'package:tts_flow_dart/src/base/audio_spec.dart';
+
 import 'tts_errors.dart';
 import 'tts_models.dart';
 

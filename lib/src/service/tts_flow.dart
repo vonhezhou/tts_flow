@@ -1,12 +1,13 @@
 import 'dart:async';
 import 'dart:developer';
 
-import '../core/tts_contracts.dart';
-import '../core/tts_errors.dart';
-import '../core/tts_models.dart';
-import 'format_negotiator.dart';
-import 'queue_scheduler.dart';
-import 'tts_events.dart';
+import 'package:tts_flow_dart/src/base/audio_spec.dart';
+import 'package:tts_flow_dart/src/core/tts_contracts.dart';
+import 'package:tts_flow_dart/src/core/tts_errors.dart';
+import 'package:tts_flow_dart/src/core/tts_models.dart';
+import 'package:tts_flow_dart/src/service/format_negotiator.dart';
+import 'package:tts_flow_dart/src/service/queue_scheduler.dart';
+import 'package:tts_flow_dart/src/service/tts_events.dart';
 
 part 'internal/tts_flow_events.dart';
 part 'internal/tts_flow_request_helpers.dart';

@@ -1,5 +1,8 @@
 import 'dart:io';
 
+import 'package:tts_flow_dart/src/base/audio_capability.dart';
+import 'package:tts_flow_dart/src/base/audio_spec.dart';
+
 import '../core/tts_contracts.dart';
 import '../core/tts_errors.dart';
 import '../core/tts_models.dart';
