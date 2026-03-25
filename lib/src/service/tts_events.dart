@@ -1,7 +1,6 @@
 import 'package:tts_flow_dart/src/core/tts_chunk.dart';
-
-import '../core/tts_errors.dart';
-import '../core/tts_request.dart';
+import 'package:tts_flow_dart/src/core/tts_errors.dart';
+import 'package:tts_flow_dart/src/core/tts_request.dart';
 
 enum TtsQueueEventType {
   requestEnqueued,
@@ -20,7 +19,9 @@ enum TtsRequestEventType {
   requestCanceled,
 }
 
-final class TtsQueueEvent {
+abstract class TtsFlowEvent {}
+
+final class TtsQueueEvent implements TtsFlowEvent {
   const TtsQueueEvent({
     required this.type,
     required this.timestamp,
@@ -34,7 +35,7 @@ final class TtsQueueEvent {
   final String? requestId;
 }
 
-final class TtsRequestEvent {
+final class TtsRequestEvent implements TtsFlowEvent {
   const TtsRequestEvent({
     required this.type,
     required this.requestId,

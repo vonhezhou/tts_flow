@@ -8,9 +8,9 @@ Future<bool> _processQueuedRequestImpl(
   final control = SynthesisControl();
   service._state.activeControl = control;
 
-  service._emitQueueEvent(TtsQueueEventType.requestDequeued,
-      requestId: request.requestId);
-  service._emitRequestEvent(
+  service.emitQueueEvent(TtsQueueEventType.requestDequeued,
+      queueLength: service._scheduler.length, requestId: request.requestId);
+  service.emitRequestEvent(
     TtsRequestEventType.requestStarted,
     requestId: request.requestId,
     state: TtsRequestState.running,
@@ -68,14 +68,14 @@ Future<bool> _processQueuedRequestImpl(
 
     if (control.isCanceled) {
       await service._output.onCancel(control);
-      service._emitRequestEvent(
+      service.emitRequestEvent(
         TtsRequestEventType.requestStopped,
         requestId: request.requestId,
         state: TtsRequestState.stopped,
       );
     } else {
       await service._output.finalizeSession();
-      service._emitRequestEvent(
+      service.emitRequestEvent(
         TtsRequestEventType.requestCompleted,
         requestId: request.requestId,
         state: TtsRequestState.completed,
@@ -86,7 +86,7 @@ Future<bool> _processQueuedRequestImpl(
     return false;
   } catch (error) {
     final failure = service._mapRequestFailure(error, request);
-    service._emitRequestEvent(
+    service.emitRequestEvent(
       TtsRequestEventType.requestFailed,
       requestId: request.requestId,
       state: TtsRequestState.failed,
@@ -99,8 +99,8 @@ Future<bool> _processQueuedRequestImpl(
 
     if (service._config.queueFailurePolicy == TtsQueueFailurePolicy.failFast) {
       service._state.haltQueue();
-      service._emitQueueEvent(TtsQueueEventType.queueHalted,
-          requestId: request.requestId);
+      service.emitQueueEvent(TtsQueueEventType.queueHalted,
+          queueLength: service._scheduler.length, requestId: request.requestId);
       await service._cancelPendingAfterFailure();
       return true;
     }
@@ -147,7 +147,7 @@ Future<void> _handleSynthesizedChunk(
 
   await service._output.consumeChunk(chunk);
   item.controller.add(chunk);
-  service._emitRequestEvent(
+  service.emitRequestEvent(
     TtsRequestEventType.requestChunkReceived,
     requestId: request.requestId,
     state: TtsRequestState.running,

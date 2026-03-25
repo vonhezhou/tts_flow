@@ -1,6 +1,7 @@
 import 'dart:async';
 import 'dart:developer';
 
+import 'package:meta/meta.dart';
 import 'package:tts_flow_dart/src/core/audio_spec.dart';
 import 'package:tts_flow_dart/src/core/synthesis_control.dart';
 import 'package:tts_flow_dart/src/core/tts_chunk.dart';
@@ -16,14 +17,16 @@ import 'package:tts_flow_dart/src/service/format_negotiator.dart';
 import 'package:tts_flow_dart/src/service/queue_scheduler.dart';
 import 'package:tts_flow_dart/src/service/tts_events.dart';
 
-part 'internal/tts_flow_events.dart';
+import 'internal/tts_flow_event_mixin.dart';
+import 'internal/tts_options_mixin.dart';
+
 part 'internal/tts_flow_request_helpers.dart';
 part 'internal/tts_flow_request_runtime.dart';
 part 'internal/tts_flow_runtime.dart';
 part 'internal/tts_flow_state.dart';
 part 'internal/tts_flow_transitions.dart';
 
-final class TtsFlow {
+final class TtsFlow with TtsOptionsMixin, TtsFlowEventBus {
   TtsFlow({
     required TtsEngine engine,
     required TtsOutput output,
@@ -31,8 +34,8 @@ final class TtsFlow {
   })  : _engine = engine,
         _output = output,
         _config = config ?? const TtsFlowConfig(),
-        _options = const TtsOptions(),
-        _preferredFormat =
+        options = const TtsOptions(),
+        preferredFormat =
             (config ?? const TtsFlowConfig()).preferredFormatOrder.first;
 
   final TtsEngine _engine;
@@ -42,69 +45,31 @@ final class TtsFlow {
   final QueueScheduler<_QueuedRequest> _scheduler =
       QueueScheduler<_QueuedRequest>();
 
-  final StreamController<TtsQueueEvent> _queueEventsController =
-      StreamController<TtsQueueEvent>.broadcast();
-  final StreamController<TtsRequestEvent> _requestEventsController =
-      StreamController<TtsRequestEvent>.broadcast();
-
   final _TtsFlowState _state = _TtsFlowState();
-  late TtsVoice _voice;
-  TtsOptions _options;
-  TtsAudioFormat _preferredFormat;
 
-  Stream<TtsQueueEvent> get queueEvents => _queueEventsController.stream;
-  Stream<TtsRequestEvent> get requestEvents => _requestEventsController.stream;
+  @protected
+  @override
+  final eventBus = StreamController<TtsFlowEvent>.broadcast();
+
+  @protected
+  @override
+  TtsOptions options;
+
+  @override
+  TtsAudioFormat preferredFormat;
+
+  @override
+  late TtsVoice voice;
+
+  Stream<TtsQueueEvent> get queueEvents => eventBus.stream
+      .where((event) => event is TtsQueueEvent)
+      .cast<TtsQueueEvent>();
+  Stream<TtsRequestEvent> get requestEvents => eventBus.stream
+      .where((event) => event is TtsRequestEvent)
+      .cast<TtsRequestEvent>();
+
   bool get isPaused => _state.isPaused;
   bool get isInitialized => _state.isInitialized;
-
-  TtsVoice get voice => _voice;
-
-  set voice(TtsVoice value) {
-    _ensureNotDisposed();
-    _voice = value;
-  }
-
-  double? get speed => _options.speed;
-
-  set speed(double? value) {
-    _ensureNotDisposed();
-    _options = _options.copyWith(speed: value);
-  }
-
-  double? get pitch => _options.pitch;
-
-  set pitch(double? value) {
-    _ensureNotDisposed();
-    _options = _options.copyWith(pitch: value);
-  }
-
-  double? get volume => _options.volume;
-
-  set volume(double? value) {
-    _ensureNotDisposed();
-    _options = _options.copyWith(volume: value);
-  }
-
-  int? get sampleRateHz => _options.sampleRateHz;
-
-  set sampleRateHz(int? value) {
-    _ensureNotDisposed();
-    _options = _options.copyWith(sampleRateHz: value);
-  }
-
-  Duration? get timeout => _options.timeout;
-
-  set timeout(Duration? value) {
-    _ensureNotDisposed();
-    _options = _options.copyWith(timeout: value);
-  }
-
-  TtsAudioFormat get preferredFormat => _preferredFormat;
-
-  set preferredFormat(TtsAudioFormat value) {
-    _ensureNotDisposed();
-    _preferredFormat = value;
-  }
 
   Future<void> init() async {
     _ensureNotDisposed();
@@ -112,7 +77,8 @@ final class TtsFlow {
       return;
     }
 
-    _voice = await _engine.getDefaultVoice();
+    voice = await _engine.getDefaultVoice();
+
     _state.markInitialized();
   }
 
@@ -138,7 +104,7 @@ final class TtsFlow {
   ]) {
     _ensureReady();
 
-    final request = _buildRequest(
+    final request = buildRequest(
       requestId: requestId,
       text: text,
       params: params,
@@ -150,13 +116,16 @@ final class TtsFlow {
     final queued = _QueuedRequest(request: request, controller: controller);
     _scheduler.enqueue(queued);
 
-    _emitRequestEvent(
+    emitRequestEvent(
       TtsRequestEventType.requestQueued,
       requestId: request.requestId,
       state: TtsRequestState.queued,
     );
-    _emitQueueEvent(TtsQueueEventType.requestEnqueued,
-        requestId: request.requestId);
+    emitQueueEvent(
+      TtsQueueEventType.requestEnqueued,
+      queueLength: _scheduler.length,
+      requestId: request.requestId,
+    );
 
     unawaited(_processQueue());
     return controller.stream;
@@ -182,7 +151,7 @@ final class TtsFlow {
     _ensureNotDisposed();
     final pending = _scheduler.drain();
     for (final item in pending) {
-      _emitRequestEvent(
+      emitRequestEvent(
         TtsRequestEventType.requestCanceled,
         requestId: item.request.requestId,
         state: TtsRequestState.canceled,
@@ -191,7 +160,8 @@ final class TtsFlow {
     }
 
     if (pending.isNotEmpty) {
-      _emitQueueEvent(TtsQueueEventType.queueCleared);
+      emitQueueEvent(TtsQueueEventType.queueCleared,
+          queueLength: _scheduler.length);
     }
     return pending.length;
   }
@@ -207,8 +177,7 @@ final class TtsFlow {
     await _engine.dispose();
     await _output.dispose();
     _state.markDisposed();
-    await _queueEventsController.close();
-    await _requestEventsController.close();
+    await eventBus.close();
   }
 
   Future<void> _awaitActiveRequestShutdown() async {
@@ -219,23 +188,6 @@ final class TtsFlow {
     while (_state.activeControl != null && DateTime.now().isBefore(deadline)) {
       await Future<void>.delayed(pollInterval);
     }
-  }
-
-  TtsRequest _buildRequest({
-    required String requestId,
-    required String text,
-    required Map<String, Object> params,
-  }) {
-    return TtsRequest(
-      requestId: requestId,
-      text: text,
-      voice: _voice,
-      preferredFormat: _preferredFormat,
-      options: _options,
-      params: Map<String, Object>.unmodifiable(
-        Map<String, Object>.from(params),
-      ),
-    );
   }
 
   Future<void> _processQueue() async {
@@ -260,31 +212,6 @@ final class TtsFlow {
     SynthesisControl control,
   ) async {
     return _flushPauseBufferImpl(this, item, request, control);
-  }
-
-  void _emitQueueEvent(TtsQueueEventType type, {String? requestId}) {
-    _emitQueueEventImpl(this, type, requestId: requestId);
-  }
-
-  void _emitRequestEvent(
-    TtsRequestEventType type, {
-    required String requestId,
-    TtsRequestState? state,
-    TtsChunk? chunk,
-    TtsError? error,
-    String? outputId,
-    TtsError? outputError,
-  }) {
-    _emitRequestEventImpl(
-      this,
-      type,
-      requestId: requestId,
-      state: state,
-      chunk: chunk,
-      error: error,
-      outputId: outputId,
-      outputError: outputError,
-    );
   }
 
   void _ensureNotDisposed() {

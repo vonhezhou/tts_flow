@@ -28,7 +28,7 @@ _RequestFailure _mapRequestFailureImpl(Object error, TtsRequest request) {
 Future<void> _cancelPendingAfterFailureImpl(TtsFlow service) async {
   final pending = service._scheduler.drain();
   for (final item in pending) {
-    service._emitRequestEvent(
+    service.emitRequestEvent(
       TtsRequestEventType.requestCanceled,
       requestId: item.request.requestId,
       state: TtsRequestState.canceled,

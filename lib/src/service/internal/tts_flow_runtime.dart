@@ -38,7 +38,7 @@ Future<void> _flushPauseBufferImpl(
     }
     await service._output.consumeChunk(chunk);
     item.controller.add(chunk);
-    service._emitRequestEvent(
+    service.emitRequestEvent(
       TtsRequestEventType.requestChunkReceived,
       requestId: request.requestId,
       state: TtsRequestState.running,
