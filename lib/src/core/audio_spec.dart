@@ -1,12 +1,12 @@
 import 'package:tts_flow_dart/src/base/pcm_descriptor.dart';
 
-enum TtsAudioFormat { pcm, mp3, wav, opus, aac }
+enum TtsAudioFormat { pcm, mp3, opus, aac }
 
 /// Unified audio format specification carrying both the format type and optional PCM descriptor.
 class TtsAudioSpec {
   const TtsAudioSpec({required this.format, this.pcm});
 
-  /// The audio format type (mp3, pcm, wav, opus, aac)
+  /// The audio format type (mp3, pcm, opus, aac)
   final TtsAudioFormat format;
 
   /// PCM descriptor (non-null only when format == TtsAudioFormat.pcm)

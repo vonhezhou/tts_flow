@@ -9,44 +9,30 @@ import 'package:tts_flow_dart/src/engine/file/file_content_provider.dart';
 
 enum _WavProviderInputKind { wavFile, rawPcm }
 
-enum WavChunkOutputFormat { wav, pcm }
-
-/// Streams WAV-framed chunks from either an existing WAV file or raw PCM file.
-///
-/// By default every yielded chunk is framed as
-/// `[44-byte WAV header][PCM payload]` so each chunk is self-describing.
-/// When [chunkOutputFormat] is set to [WavChunkOutputFormat.pcm], `readChunks`
-/// returns raw PCM payload bytes instead.
+/// Streams raw PCM chunks from either an existing WAV file or raw PCM file.
 final class WavFileContentProvider implements FileContentProvider {
-  WavFileContentProvider.fromWav(
-    this.filePath, {
-    this.chunkOutputFormat = WavChunkOutputFormat.wav,
-  })  : _kind = _WavProviderInputKind.wavFile,
+  WavFileContentProvider.fromWav(this.filePath)
+      : _kind = _WavProviderInputKind.wavFile,
         _pcmDescriptor = _readWavDescriptorSync(filePath);
 
   WavFileContentProvider.fromPcm(
     this.filePath,
-    PcmDescriptor descriptor, {
-    this.chunkOutputFormat = WavChunkOutputFormat.wav,
-  })  : _kind = _WavProviderInputKind.rawPcm,
+    PcmDescriptor descriptor,
+  )   : _kind = _WavProviderInputKind.rawPcm,
         _pcmDescriptor = descriptor;
 
   final String filePath;
   final _WavProviderInputKind _kind;
   final PcmDescriptor _pcmDescriptor;
-  final WavChunkOutputFormat chunkOutputFormat;
 
   @override
   TtsAudioSpec get audioSpec => TtsAudioSpec(
-        format: chunkOutputFormat == WavChunkOutputFormat.wav
-            ? TtsAudioFormat.wav
-            : TtsAudioFormat.pcm,
+        format: TtsAudioFormat.pcm,
         pcm: _pcmDescriptor,
       );
 
   @override
   Set<AudioCapability> get supportedCapabilities => const {
-        SimpleFormatCapability(format: TtsAudioFormat.wav),
         SimpleFormatCapability(format: TtsAudioFormat.pcm),
       };
 
@@ -78,19 +64,7 @@ final class WavFileContentProvider implements FileContentProvider {
         if (chunk.isEmpty) {
           break;
         }
-        final payload = Uint8List.fromList(chunk);
-        if (chunkOutputFormat == WavChunkOutputFormat.pcm) {
-          yield payload;
-          continue;
-        }
-        final chunkHeader = WavHeader.fromPcmDescriptor(
-          _pcmDescriptor,
-          dataLengthBytes: payload.length,
-        ).toBytes();
-        final framed = Uint8List(chunkHeader.length + payload.length)
-          ..setAll(0, chunkHeader)
-          ..setAll(chunkHeader.length, payload);
-        yield framed;
+        yield Uint8List.fromList(chunk);
       }
     } finally {
       await raf.close();

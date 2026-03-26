@@ -19,14 +19,14 @@ void main() {
       );
 
       await service.init();
-      service.preferredFormat = TtsAudioFormat.wav;
+      service.preferredFormat = TtsAudioFormat.pcm;
 
       final chunks =
           await service.speak('i-1', 'integration sample text').toList();
 
       expect(chunks, isNotEmpty);
       expect(
-          chunks.every((chunk) => chunk.audioSpec.format == TtsAudioFormat.wav),
+          chunks.every((chunk) => chunk.audioSpec.format == TtsAudioFormat.pcm),
           isTrue);
       expect(chunks.last.isLastChunk, isTrue);
 
@@ -74,14 +74,17 @@ void main() {
           defaultOutput: MulticastOutput(
             outputs: [
               MemoryOutput(outputId: 'memory'),
-              FileOutput(outputId: 'file', outputDirectory: tempDir),
+              WavFileOutput(
+                '${tempDir.path}${Platform.pathSeparator}fanout-m6-1.wav',
+                outputId: 'file',
+              ),
             ],
             errorPolicy: MulticastOutputErrorPolicy.failFast,
           ),
         );
 
         await service.init();
-        service.preferredFormat = TtsAudioFormat.wav;
+        service.preferredFormat = TtsAudioFormat.pcm;
 
         final chunks = await service
             .speak('fanout-m6-1', 'fanout integration request')

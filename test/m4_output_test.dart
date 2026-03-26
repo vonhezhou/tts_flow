@@ -30,21 +30,21 @@ void main() {
       final output = MemoryOutput();
       const session = TtsOutputSession(
         requestId: 'mem-1',
-        audioSpec: TtsAudioSpec(format: TtsAudioFormat.wav),
+        audioSpec: TtsAudioSpec(format: TtsAudioFormat.pcm),
         voice: null,
         options: null,
       );
 
       await output.initSession(session);
-      await output.consumeChunk(_chunk('mem-1', 0, [1, 2], TtsAudioFormat.wav));
+      await output.consumeChunk(_chunk('mem-1', 0, [1, 2], TtsAudioFormat.pcm));
       await output.consumeChunk(
-          _chunk('mem-1', 1, [3], TtsAudioFormat.wav, isLast: true));
+          _chunk('mem-1', 1, [3], TtsAudioFormat.pcm, isLast: true));
       final artifact = await output.finalizeSession();
 
       expect(artifact, isA<InMemoryAudioArtifact>());
       final mem = artifact as InMemoryAudioArtifact;
       expect(mem.requestId, 'mem-1');
-      expect(mem.audioSpec.format, TtsAudioFormat.wav);
+      expect(mem.audioSpec.format, TtsAudioFormat.pcm);
       expect(mem.totalBytes, 3);
       expect(mem.audioBytes, Uint8List.fromList([1, 2, 3]));
     });
@@ -66,12 +66,12 @@ void main() {
       await output.initSession(
         const TtsOutputSession(
             requestId: 'b',
-            audioSpec: TtsAudioSpec(format: TtsAudioFormat.wav),
+            audioSpec: TtsAudioSpec(format: TtsAudioFormat.pcm),
             voice: null,
             options: null),
       );
       await output
-          .consumeChunk(_chunk('b', 0, [7], TtsAudioFormat.wav, isLast: true));
+          .consumeChunk(_chunk('b', 0, [7], TtsAudioFormat.pcm, isLast: true));
       final second = await output.finalizeSession() as InMemoryAudioArtifact;
 
       expect(first.audioBytes, Uint8List.fromList([8, 8]));
@@ -84,21 +84,21 @@ void main() {
       final output = NullOutput();
       const session = TtsOutputSession(
         requestId: 'null-1',
-        audioSpec: TtsAudioSpec(format: TtsAudioFormat.wav),
+        audioSpec: TtsAudioSpec(format: TtsAudioFormat.pcm),
         voice: null,
         options: null,
       );
 
       await output.initSession(session);
       await output
-          .consumeChunk(_chunk('null-1', 0, [1, 2], TtsAudioFormat.wav));
+          .consumeChunk(_chunk('null-1', 0, [1, 2], TtsAudioFormat.pcm));
       await output.consumeChunk(
-        _chunk('null-1', 1, [3], TtsAudioFormat.wav, isLast: true),
+        _chunk('null-1', 1, [3], TtsAudioFormat.pcm, isLast: true),
       );
 
       final artifact = await output.finalizeSession() as InMemoryAudioArtifact;
       expect(artifact.requestId, 'null-1');
-      expect(artifact.audioSpec.format, TtsAudioFormat.wav);
+      expect(artifact.audioSpec.format, TtsAudioFormat.pcm);
       expect(artifact.totalBytes, 0);
       expect(artifact.audioBytes, isEmpty);
     });
@@ -162,14 +162,14 @@ void main() {
         final output = FileOutput(outputDirectory: tempDir);
         const session = TtsOutputSession(
           requestId: 'file-2',
-          audioSpec: TtsAudioSpec(format: TtsAudioFormat.wav),
+          audioSpec: TtsAudioSpec(format: TtsAudioFormat.pcm),
           voice: null,
           options: null,
         );
 
         await output.initSession(session);
         await output
-            .consumeChunk(_chunk('file-2', 0, [9, 9], TtsAudioFormat.wav));
+            .consumeChunk(_chunk('file-2', 0, [9, 9], TtsAudioFormat.pcm));
         final control = SynthesisControl()
           ..cancel(CancelReason.stopCurrent, message: 'test-stop');
         await output.onCancel(control);
@@ -198,31 +198,34 @@ void main() {
             '${tempDir.path}${Platform.pathSeparator}fixed-output.wav';
         final output = WavFileOutput(outputPath);
 
-        const session = TtsOutputSession(
-          requestId: 'wav-1',
-          audioSpec: TtsAudioSpec(format: TtsAudioFormat.wav),
-          voice: null,
-          options: TtsOptions(sampleRateHz: 16000),
-        );
         const descriptor = PcmDescriptor(
           sampleRateHz: 16000,
           bitsPerSample: 16,
           channels: 1,
         );
+        const session = TtsOutputSession(
+          requestId: 'wav-1',
+          audioSpec: TtsAudioSpec(
+            format: TtsAudioFormat.pcm,
+            pcm: descriptor,
+          ),
+          voice: null,
+          options: TtsOptions(sampleRateHz: 16000),
+        );
 
         await output.initSession(session);
         await output.consumeChunk(
-          _wavChunk('wav-1', 0, [1, 2, 3], descriptor),
+          _pcmChunk('wav-1', 0, [1, 2, 3], descriptor),
         );
         await output.consumeChunk(
-          _wavChunk('wav-1', 1, [4], descriptor, isLast: true),
+          _pcmChunk('wav-1', 1, [4], descriptor, isLast: true),
         );
 
         final artifact = await output.finalizeSession();
         expect(artifact, isA<FileAudioArtifact>());
 
         final fileArtifact = artifact as FileAudioArtifact;
-        expect(fileArtifact.audioSpec.format, TtsAudioFormat.wav);
+        expect(fileArtifact.audioSpec.format, TtsAudioFormat.pcm);
         expect(fileArtifact.filePath, outputPath);
         expect(fileArtifact.fileSizeBytes, 48);
         expect(await File('$outputPath.backup.tmp').exists(), isFalse);
@@ -466,17 +469,15 @@ void main() {
             '${tempDir.path}${Platform.pathSeparator}finalize-fail.wav';
         final output = WavFileOutput(outputPath);
 
-        await output.initSession(
-          const TtsOutputSession(
-            requestId: 'wav-finalize-fail-1',
-            audioSpec: TtsAudioSpec(format: TtsAudioFormat.wav),
-            voice: null,
-            options: TtsOptions(sampleRateHz: -1),
-          ),
-        );
-
         await expectLater(
-          output.finalizeSession(),
+          output.initSession(
+            const TtsOutputSession(
+              requestId: 'wav-finalize-fail-1',
+              audioSpec: TtsAudioSpec(format: TtsAudioFormat.pcm),
+              voice: null,
+              options: TtsOptions(sampleRateHz: -1),
+            ),
+          ),
           throwsA(
             isA<TtsError>().having(
               (error) => error.code,
@@ -522,20 +523,23 @@ void main() {
         final outputPath = '${tempDir.path}${Platform.pathSeparator}cancel.wav';
         final output = WavFileOutput(outputPath);
 
-        const session = TtsOutputSession(
-          requestId: 'wav-2',
-          audioSpec: TtsAudioSpec(format: TtsAudioFormat.wav),
-          voice: null,
-          options: null,
-        );
         const descriptor = PcmDescriptor(
           sampleRateHz: 24000,
           bitsPerSample: 16,
           channels: 1,
         );
+        const session = TtsOutputSession(
+          requestId: 'wav-2',
+          audioSpec: TtsAudioSpec(
+            format: TtsAudioFormat.pcm,
+            pcm: descriptor,
+          ),
+          voice: null,
+          options: null,
+        );
 
         await output.initSession(session);
-        await output.consumeChunk(_wavChunk('wav-2', 0, [5], descriptor));
+        await output.consumeChunk(_pcmChunk('wav-2', 0, [5], descriptor));
 
         final control = SynthesisControl()
           ..cancel(CancelReason.stopCurrent, message: 'test-cancel');
@@ -578,7 +582,7 @@ void main() {
         );
 
         final artifact = await output.finalizeSession() as FileAudioArtifact;
-        expect(artifact.audioSpec.format, TtsAudioFormat.wav);
+        expect(artifact.audioSpec.format, TtsAudioFormat.pcm);
         expect(artifact.filePath, outputPath);
         expect(artifact.fileSizeBytes, 48);
 
@@ -610,12 +614,15 @@ void main() {
         await output.initSession(
           const TtsOutputSession(
             requestId: 'append-1',
-            audioSpec: TtsAudioSpec(format: TtsAudioFormat.wav),
+            audioSpec: TtsAudioSpec(
+              format: TtsAudioFormat.pcm,
+              pcm: descriptor,
+            ),
             voice: null,
             options: null,
           ),
         );
-        await output.consumeChunk(_wavChunk('append-1', 0, [1, 2], descriptor));
+        await output.consumeChunk(_pcmChunk('append-1', 0, [1, 2], descriptor));
         await output.finalizeSession();
 
         await output.initSession(
@@ -634,7 +641,7 @@ void main() {
         );
 
         final artifact = await output.finalizeSession() as FileAudioArtifact;
-        expect(artifact.audioSpec.format, TtsAudioFormat.wav);
+        expect(artifact.audioSpec.format, TtsAudioFormat.pcm);
         expect(artifact.fileSizeBytes, 49);
 
         final fileBytes = await File(outputPath).readAsBytes();
@@ -850,14 +857,14 @@ void main() {
 
       const session = TtsOutputSession(
         requestId: 'Multicast-1',
-        audioSpec: TtsAudioSpec(format: TtsAudioFormat.wav),
+        audioSpec: TtsAudioSpec(format: TtsAudioFormat.pcm),
         voice: null,
         options: null,
       );
 
       await output.initSession(session);
       await output.consumeChunk(
-        _chunk('Multicast-1', 0, [1, 2, 3], TtsAudioFormat.wav, isLast: true),
+        _chunk('Multicast-1', 0, [1, 2, 3], TtsAudioFormat.pcm, isLast: true),
       );
       final artifact = await output.finalizeSession();
 
@@ -879,7 +886,7 @@ void main() {
 
       const session = TtsOutputSession(
         requestId: 'Multicast-2',
-        audioSpec: TtsAudioSpec(format: TtsAudioFormat.wav),
+        audioSpec: TtsAudioSpec(format: TtsAudioFormat.pcm),
         voice: null,
         options: null,
       );
@@ -887,7 +894,7 @@ void main() {
       await output.initSession(session);
       await expectLater(
         output.consumeChunk(
-          _chunk('Multicast-2', 0, [5], TtsAudioFormat.wav, isLast: true),
+          _chunk('Multicast-2', 0, [5], TtsAudioFormat.pcm, isLast: true),
         ),
         throwsA(
           isA<TtsOutputFailure>().having(
@@ -915,7 +922,7 @@ void main() {
 
       const session = TtsOutputSession(
         requestId: 'Multicast-init-rollback',
-        audioSpec: TtsAudioSpec(format: TtsAudioFormat.wav),
+        audioSpec: TtsAudioSpec(format: TtsAudioFormat.pcm),
         voice: null,
         options: null,
       );
@@ -949,14 +956,14 @@ void main() {
 
       const session = TtsOutputSession(
         requestId: 'Multicast-finalize-rollback',
-        audioSpec: TtsAudioSpec(format: TtsAudioFormat.wav),
+        audioSpec: TtsAudioSpec(format: TtsAudioFormat.pcm),
         voice: null,
         options: null,
       );
 
       await output.initSession(session);
       await output.consumeChunk(
-        _chunk('Multicast-finalize-rollback', 0, [1], TtsAudioFormat.wav,
+        _chunk('Multicast-finalize-rollback', 0, [1], TtsAudioFormat.pcm,
             isLast: true),
       );
 
@@ -994,7 +1001,7 @@ final class _FailingTestOutput implements TtsOutput {
 
   @override
   Set<AudioCapability> get acceptedCapabilities => {
-        const SimpleFormatCapability(format: TtsAudioFormat.wav),
+        const SimpleFormatCapability(format: TtsAudioFormat.pcm),
       };
 
   @override
@@ -1099,34 +1106,6 @@ TtsChunk _chunk(
     sequenceNumber: seq,
     bytes: Uint8List.fromList(bytes),
     audioSpec: TtsAudioSpec(format: format),
-    isLastChunk: isLast,
-    timestamp: DateTime.now().toUtc(),
-  );
-}
-
-TtsChunk _wavChunk(
-  String requestId,
-  int seq,
-  List<int> payload,
-  PcmDescriptor descriptor, {
-  bool isLast = false,
-}) {
-  final payloadBytes = Uint8List.fromList(payload);
-  final headerBytes = WavHeader.fromPcmDescriptor(
-    descriptor,
-    dataLengthBytes: payloadBytes.length,
-  ).toBytes();
-
-  final framedBytes = Uint8List(headerBytes.length + payloadBytes.length)
-    ..setRange(0, headerBytes.length, headerBytes)
-    ..setRange(headerBytes.length, headerBytes.length + payloadBytes.length,
-        payloadBytes);
-
-  return TtsChunk(
-    requestId: requestId,
-    sequenceNumber: seq,
-    bytes: framedBytes,
-    audioSpec: const TtsAudioSpec(format: TtsAudioFormat.wav),
     isLastChunk: isLast,
     timestamp: DateTime.now().toUtc(),
   );

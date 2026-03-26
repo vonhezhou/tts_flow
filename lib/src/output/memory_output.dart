@@ -1,5 +1,6 @@
 import 'dart:typed_data';
 
+import 'package:tts_flow_dart/src/base/pcm_descriptor.dart';
 import 'package:tts_flow_dart/src/core/audio_artifact.dart';
 import 'package:tts_flow_dart/src/core/audio_capability.dart';
 import 'package:tts_flow_dart/src/core/audio_spec.dart';
@@ -15,9 +16,17 @@ final class MemoryOutput implements TtsOutput {
   final String outputId;
 
   @override
-  Set<AudioCapability> get acceptedCapabilities => TtsAudioFormat.values
-      .map((format) => SimpleFormatCapability(format: format))
-      .toSet();
+  Set<AudioCapability> get acceptedCapabilities => {
+        PcmCapability(
+          sampleRatesHz: {16000, 22050, 24000, 44100, 48000},
+          bitsPerSample: {16},
+          channels: {1, 2},
+          encodings: {PcmEncoding.signedInt},
+        ),
+        const SimpleFormatCapability(format: TtsAudioFormat.mp3),
+        const SimpleFormatCapability(format: TtsAudioFormat.opus),
+        const SimpleFormatCapability(format: TtsAudioFormat.aac),
+      };
 
   TtsOutputSession? _session;
   BytesBuilder? _buffer;

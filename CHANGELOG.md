@@ -11,6 +11,22 @@
 
 ## Unreleased
 
+- Breaking: `TtsAudioFormat.wav` has been removed from the enum. Engines that
+  previously advertised `wav` output now advertise `pcm` and strip the WAV
+  header internally before yielding chunks to the flow.
+- Breaking: `WavChunkOutputFormat` enum has been removed from
+  `WavFileContentProvider`. Both constructors now always emit raw PCM chunks
+  (the `fromWav` constructor skips the 44-byte RIFF header automatically).
+- `OpenAiTtsEngine` now exposes a `PcmCapability` for PCM negotiation. When
+  the resolved format is `pcm`, the engine buffers the WAV container returned
+  by the API, validates the header once, and streams pure PCM bytes.
+- `WavFileOutput` has been updated to accept only `PcmCapability` chunks.
+  It writes the 44-byte RIFF/WAV header on finalisation and produces a
+  valid `.wav` file, but internally the wire format is always `pcm`.
+- `MemoryOutput` now advertises explicit `PcmCapability` (descriptor-aware)
+  instead of the previous wildcard `SimpleFormatCapability` set. This ensures
+  correct PCM descriptor resolution when used inside `MulticastOutput`.
+
 - Breaking: `TtsFlow.speak(TtsRequest)` was replaced by
  `speak(String requestId, String text, [Map<String, Object> params])`.
 - Breaking: `TtsFlow` now requires explicit `init()` before `speak` and

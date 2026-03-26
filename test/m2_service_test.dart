@@ -349,7 +349,7 @@ void main() {
       service.volume = 0.8;
       service.sampleRateHz = 24000;
       service.timeout = const Duration(seconds: 10);
-      service.preferredFormat = TtsAudioFormat.wav;
+      service.preferredFormat = TtsAudioFormat.pcm;
       expect(service.speed, 1.1);
       expect(service.pitch, 0.9);
       expect(service.volume, 0.8);
@@ -470,7 +470,7 @@ final class _AlwaysFailOutput implements TtsOutput {
 
   @override
   Set<AudioCapability> get acceptedCapabilities => {
-        const SimpleFormatCapability(format: TtsAudioFormat.wav),
+        const SimpleFormatCapability(format: TtsAudioFormat.pcm),
       };
 
   @override
@@ -513,7 +513,7 @@ final class _FailByRequestIdOutput implements TtsOutput {
 
   @override
   Set<AudioCapability> get acceptedCapabilities => {
-        const SimpleFormatCapability(format: TtsAudioFormat.wav),
+        const SimpleFormatCapability(format: TtsAudioFormat.pcm),
       };
 
   @override
@@ -568,7 +568,7 @@ final class _CaptureCancelOutput implements TtsOutput {
 
   @override
   Set<AudioCapability> get acceptedCapabilities => {
-        const SimpleFormatCapability(format: TtsAudioFormat.wav),
+        const SimpleFormatCapability(format: TtsAudioFormat.pcm),
         const SimpleFormatCapability(format: TtsAudioFormat.mp3),
       };
 
@@ -679,7 +679,7 @@ final class _TrackingOutput implements TtsOutput {
 
   @override
   Set<AudioCapability> get acceptedCapabilities => {
-        const SimpleFormatCapability(format: TtsAudioFormat.wav),
+        const SimpleFormatCapability(format: TtsAudioFormat.pcm),
         const SimpleFormatCapability(format: TtsAudioFormat.mp3),
       };
 

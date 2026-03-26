@@ -41,7 +41,7 @@ Future<void> main() async {
     print('request: ${event.type} req=${event.requestId}');
   });
 
-  service.preferredFormat = TtsAudioFormat.wav;
+  service.preferredFormat = TtsAudioFormat.pcm;
   final first = service.speak('example-1', 'First request uses preferred WAV.');
 
   service.preferredFormat = TtsAudioFormat.mp3;

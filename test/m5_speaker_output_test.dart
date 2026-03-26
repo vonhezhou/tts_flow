@@ -42,12 +42,12 @@ void main() {
       await output.initSession(
         const TtsOutputSession(
           requestId: 'spk-2',
-          audioSpec: TtsAudioSpec(format: TtsAudioFormat.wav),
+          audioSpec: TtsAudioSpec(format: TtsAudioFormat.pcm),
           voice: null,
           options: null,
         ),
       );
-      await output.consumeChunk(_chunk('spk-2', [9], TtsAudioFormat.wav));
+      await output.consumeChunk(_chunk('spk-2', [9], TtsAudioFormat.pcm));
       final control = SynthesisControl()
         ..cancel(CancelReason.stopCurrent, message: 'manual-stop');
       await output.onCancel(control);
@@ -74,12 +74,12 @@ void main() {
       await output.initSession(
         const TtsOutputSession(
           requestId: 'spk-b',
-          audioSpec: TtsAudioSpec(format: TtsAudioFormat.wav),
+          audioSpec: TtsAudioSpec(format: TtsAudioFormat.pcm),
           voice: null,
           options: null,
         ),
       );
-      await output.consumeChunk(_chunk('spk-b', [7, 8], TtsAudioFormat.wav));
+      await output.consumeChunk(_chunk('spk-b', [7, 8], TtsAudioFormat.pcm));
       await output.finalizeSession();
 
       expect(backend.writtenBytes['playback-spk-a'], [4]);
@@ -107,7 +107,7 @@ final class _FakeSpeakerBackend implements SpeakerBackend {
   @override
   Set<AudioCapability> get supportedCapabilities => {
         const SimpleFormatCapability(format: TtsAudioFormat.mp3),
-        const SimpleFormatCapability(format: TtsAudioFormat.wav),
+        const SimpleFormatCapability(format: TtsAudioFormat.pcm),
       };
 
   final Map<String, TtsAudioSpec> startedSpecs = <String, TtsAudioSpec>{};

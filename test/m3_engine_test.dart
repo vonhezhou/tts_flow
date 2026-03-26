@@ -174,9 +174,9 @@ void main() {
 
     test('uses request preferred format when available', () {
       final resolved = negotiator.negotiate(
-        engineFormats: {TtsAudioFormat.mp3, TtsAudioFormat.wav},
+        engineFormats: {TtsAudioFormat.mp3, TtsAudioFormat.pcm},
         outputFormats: {TtsAudioFormat.mp3},
-        preferredOrder: const [TtsAudioFormat.wav, TtsAudioFormat.mp3],
+        preferredOrder: const [TtsAudioFormat.pcm, TtsAudioFormat.mp3],
         requestId: 'n1',
         preferredFormat: TtsAudioFormat.mp3,
       );
@@ -186,21 +186,21 @@ void main() {
 
     test('uses deterministic fallback order when preferred not available', () {
       final resolved = negotiator.negotiate(
-        engineFormats: {TtsAudioFormat.aac, TtsAudioFormat.wav},
-        outputFormats: {TtsAudioFormat.aac, TtsAudioFormat.wav},
-        preferredOrder: const [TtsAudioFormat.pcm, TtsAudioFormat.wav],
+        engineFormats: {TtsAudioFormat.aac, TtsAudioFormat.mp3},
+        outputFormats: {TtsAudioFormat.aac, TtsAudioFormat.mp3},
+        preferredOrder: const [TtsAudioFormat.pcm, TtsAudioFormat.aac],
         requestId: 'n2',
       );
 
-      expect(resolved, TtsAudioFormat.wav);
+      expect(resolved, TtsAudioFormat.aac);
     });
 
     test('throws formatNegotiationFailed when intersection is empty', () {
       expect(
         () => negotiator.negotiate(
           engineFormats: {TtsAudioFormat.mp3},
-          outputFormats: {TtsAudioFormat.wav},
-          preferredOrder: const [TtsAudioFormat.wav],
+          outputFormats: {TtsAudioFormat.pcm},
+          preferredOrder: const [TtsAudioFormat.pcm],
           requestId: 'n3',
         ),
         throwsA(
@@ -220,11 +220,11 @@ void main() {
             const SimpleFormatCapability(format: TtsAudioFormat.mp3),
           },
           outputCapabilities: {
-            const SimpleFormatCapability(format: TtsAudioFormat.wav),
+            const SimpleFormatCapability(format: TtsAudioFormat.pcm),
           },
-          preferredOrder: const [TtsAudioFormat.wav],
+          preferredOrder: const [TtsAudioFormat.pcm],
           requestId: 'n4',
-          preferredFormat: TtsAudioFormat.wav,
+          preferredFormat: TtsAudioFormat.pcm,
         );
         fail('Expected TtsError to be thrown.');
       } on TtsError catch (error) {
@@ -342,7 +342,7 @@ void main() {
             .synthesize(
               const TtsRequest(requestId: 'fx3', text: 'ignored'),
               SynthesisControl(),
-              const TtsAudioSpec(format: TtsAudioFormat.wav),
+              const TtsAudioSpec(format: TtsAudioFormat.pcm),
             )
             .drain(),
         throwsA(
@@ -502,7 +502,7 @@ void main() {
   });
 
   group('M3 WAV file content provider', () {
-    test('fromWav wraps each PCM chunk with a WAV header', () async {
+    test('fromWav returns raw PCM chunks', () async {
       final tempDir = await Directory.systemTemp.createTemp('tts-wav-file-');
       try {
         final file = File('${tempDir.path}/sample.wav');
@@ -522,18 +522,15 @@ void main() {
         final chunks = await provider.readChunks(4).toList();
 
         expect(chunks, hasLength(2));
-        final firstHeader = WavHeader.parse(chunks[0]);
-        final secondHeader = WavHeader.parse(chunks[1]);
-        expect(firstHeader.dataLengthBytes, 4);
-        expect(secondHeader.dataLengthBytes, 2);
-        expect(chunks[0].sublist(44), [1, 2, 3, 4]);
-        expect(chunks[1].sublist(44), [5, 6]);
+        expect(provider.audioSpec.format, TtsAudioFormat.pcm);
+        expect(chunks[0], [1, 2, 3, 4]);
+        expect(chunks[1], [5, 6]);
       } finally {
         await tempDir.delete(recursive: true);
       }
     });
 
-    test('fromPcm wraps raw PCM bytes in WAV headers', () async {
+    test('fromPcm returns raw PCM bytes', () async {
       final tempDir = await Directory.systemTemp.createTemp('tts-wav-pcm-');
       try {
         final file = File('${tempDir.path}/sample.pcm');
@@ -549,50 +546,15 @@ void main() {
         final chunks = await provider.readChunks(3).toList();
 
         expect(chunks, hasLength(2));
-        final firstHeader = WavHeader.parse(chunks[0]);
-        final secondHeader = WavHeader.parse(chunks[1]);
-        expect(firstHeader.sampleRateHz, 16000);
-        expect(firstHeader.dataLengthBytes, 3);
-        expect(secondHeader.dataLengthBytes, 2);
-        expect(chunks[0].sublist(44), [10, 20, 30]);
-        expect(chunks[1].sublist(44), [40, 50]);
-      } finally {
-        await tempDir.delete(recursive: true);
-      }
-    });
-
-    test('fromWav can return raw PCM chunks', () async {
-      final tempDir = await Directory.systemTemp.createTemp('tts-wav-raw-out-');
-      try {
-        final file = File('${tempDir.path}/sample.wav');
-        final pcm = Uint8List.fromList([7, 8, 9, 10, 11]);
-        final descriptor = const PcmDescriptor(
-          sampleRateHz: 24000,
-          bitsPerSample: 16,
-          channels: 1,
-        );
-        final sourceHeader = WavHeader.fromPcmDescriptor(
-          descriptor,
-          dataLengthBytes: pcm.length,
-        ).toBytes();
-        await file.writeAsBytes([...sourceHeader, ...pcm]);
-
-        final provider = WavFileContentProvider.fromWav(
-          file.path,
-          chunkOutputFormat: WavChunkOutputFormat.pcm,
-        );
-        final chunks = await provider.readChunks(3).toList();
-
         expect(provider.audioSpec.format, TtsAudioFormat.pcm);
-        expect(chunks, hasLength(2));
-        expect(chunks[0], [7, 8, 9]);
-        expect(chunks[1], [10, 11]);
+        expect(chunks[0], [10, 20, 30]);
+        expect(chunks[1], [40, 50]);
       } finally {
         await tempDir.delete(recursive: true);
       }
     });
 
-    test('fromPcm can return raw PCM chunks', () async {
+    test('fromPcm streams chunked raw PCM consistently', () async {
       final tempDir = await Directory.systemTemp.createTemp('tts-pcm-raw-out-');
       try {
         final file = File('${tempDir.path}/sample.pcm');
@@ -606,7 +568,6 @@ void main() {
             bitsPerSample: 16,
             channels: 1,
           ),
-          chunkOutputFormat: WavChunkOutputFormat.pcm,
         );
         final chunks = await provider.readChunks(2).toList();
 

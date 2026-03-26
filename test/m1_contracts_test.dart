@@ -28,13 +28,13 @@ void main() {
 
       final chunks = await engine
           .synthesize(
-              request, control, TtsAudioSpec(format: TtsAudioFormat.wav))
+              request, control, TtsAudioSpec(format: TtsAudioFormat.pcm))
           .toList();
 
       expect(chunks, hasLength(1));
       expect(chunks.first.sequenceNumber, 0);
       expect(chunks.first.isLastChunk, isTrue);
-      expect(chunks.first.audioSpec.format, TtsAudioFormat.wav);
+      expect(chunks.first.audioSpec.format, TtsAudioFormat.pcm);
     });
 
     test('fake engine emits multiple ordered chunks', () async {

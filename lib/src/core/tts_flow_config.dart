@@ -7,7 +7,6 @@ final class TtsFlowConfig {
       TtsAudioFormat.mp3,
       TtsAudioFormat.opus,
       TtsAudioFormat.aac,
-      TtsAudioFormat.wav,
       TtsAudioFormat.pcm,
     ],
     this.queueFailurePolicy = TtsQueueFailurePolicy.failFast,

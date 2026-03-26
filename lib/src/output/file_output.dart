@@ -1,5 +1,7 @@
 import 'dart:io';
 
+import 'package:tts_flow_dart/src/base/pcm_descriptor.dart';
+import 'package:tts_flow_dart/src/base/wav_header.dart';
 import 'package:tts_flow_dart/src/core/audio_artifact.dart';
 import 'package:tts_flow_dart/src/core/audio_capability.dart';
 import 'package:tts_flow_dart/src/core/audio_spec.dart';
@@ -8,6 +10,10 @@ import 'package:tts_flow_dart/src/core/tts_chunk.dart';
 import 'package:tts_flow_dart/src/core/tts_errors.dart';
 import 'package:tts_flow_dart/src/core/tts_output.dart';
 import 'package:tts_flow_dart/src/core/tts_output_session.dart';
+
+const int _defaultPcmSampleRateHz = 24000;
+const int _defaultPcmBitsPerSample = 16;
+const int _defaultPcmChannels = 1;
 
 final class FileOutput implements TtsOutput {
   FileOutput({
@@ -81,15 +87,38 @@ final class FileOutput implements TtsOutput {
       if (await targetFile.exists()) {
         await targetFile.delete();
       }
-      final moved = await tempFile.rename(finalPath);
-      final size = await moved.length();
 
+      File finalFile;
+      if (session.audioSpec.format == TtsAudioFormat.pcm) {
+        final descriptor = _resolvePcmDescriptor(session);
+        final payloadLength = await tempFile.length();
+        final header = WavHeader.fromPcmDescriptor(
+          descriptor,
+          dataLengthBytes: payloadLength,
+        );
+        final targetSink = targetFile.openWrite();
+        try {
+          targetSink.add(header.toBytes());
+          await for (final chunk in tempFile.openRead()) {
+            targetSink.add(chunk);
+          }
+          await targetSink.flush();
+        } finally {
+          await targetSink.close();
+        }
+        await tempFile.delete();
+        finalFile = targetFile;
+      } else {
+        finalFile = await tempFile.rename(finalPath);
+      }
+
+      final size = await finalFile.length();
       _state.clear();
 
       return FileAudioArtifact(
         requestId: session.requestId,
         audioSpec: session.audioSpec,
-        filePath: moved.path,
+        filePath: finalFile.path,
         fileSizeBytes: size,
       );
     } catch (error) {
@@ -128,16 +157,26 @@ final class FileOutput implements TtsOutput {
   String _extensionForFormat(TtsAudioFormat format) {
     switch (format) {
       case TtsAudioFormat.pcm:
-        return 'pcm';
+        return 'wav';
       case TtsAudioFormat.mp3:
         return 'mp3';
-      case TtsAudioFormat.wav:
-        return 'wav';
       case TtsAudioFormat.opus:
         return 'ogg';
       case TtsAudioFormat.aac:
         return 'aac';
     }
+  }
+
+  PcmDescriptor _resolvePcmDescriptor(TtsOutputSession session) {
+    if (session.audioSpec.pcm != null) {
+      return session.audioSpec.pcm!;
+    }
+    return PcmDescriptor(
+      sampleRateHz: session.options?.sampleRateHz ?? _defaultPcmSampleRateHz,
+      bitsPerSample: _defaultPcmBitsPerSample,
+      channels: _defaultPcmChannels,
+      encoding: PcmEncoding.signedInt,
+    );
   }
 }
 

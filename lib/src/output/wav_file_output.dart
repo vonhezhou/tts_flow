@@ -30,17 +30,15 @@ final class WavFileOutput implements TtsOutput {
 
   @override
   Set<AudioCapability> get acceptedCapabilities => {
-        const SimpleFormatCapability(format: TtsAudioFormat.wav),
-        const SimpleFormatCapability(format: TtsAudioFormat.pcm),
+        PcmCapability.wav(),
       };
 
   @override
   Future<void> initSession(TtsOutputSession session) async {
-    if (session.audioSpec.format != TtsAudioFormat.wav &&
-        session.audioSpec.format != TtsAudioFormat.pcm) {
+    if (session.audioSpec.format != TtsAudioFormat.pcm) {
       throw TtsError(
         code: TtsErrorCode.unsupportedFormat,
-        message: 'WavFileOutput only accepts WAV or PCM audio format.',
+        message: 'WavFileOutput only accepts PCM audio format.',
         requestId: session.requestId,
       );
     }
@@ -199,7 +197,7 @@ final class WavFileOutput implements TtsOutput {
       return FileAudioArtifact(
         requestId: session.requestId,
         audioSpec: TtsAudioSpec(
-          format: TtsAudioFormat.wav,
+          format: TtsAudioFormat.pcm,
           pcm: descriptor,
         ),
         filePath: targetFile.path,
@@ -420,28 +418,6 @@ final class WavFileOutput implements TtsOutput {
     required TtsOutputSession session,
   }) {
     final chunkFormat = chunk.audioSpec.format;
-    if (chunkFormat == TtsAudioFormat.wav) {
-      try {
-        final header = WavHeader.parse(chunk.bytes);
-        if (chunk.bytes.length < 44) {
-          throw const FormatException(
-              'WAV chunk is shorter than 44-byte header.');
-        }
-        final payload = Uint8List.fromList(chunk.bytes.sublist(44));
-        return _ParsedWavChunk(
-          descriptor: header.toPcmDescriptor(),
-          payload: payload,
-        );
-      } catch (error) {
-        throw TtsError(
-          code: TtsErrorCode.outputWriteFailed,
-          message: 'Expected WAV-framed bytes in WAV chunk for WavFileOutput.',
-          requestId: session.requestId,
-          cause: error,
-        );
-      }
-    }
-
     if (chunkFormat == TtsAudioFormat.pcm) {
       final descriptor = chunk.audioSpec.pcm ??
           session.audioSpec.pcm ??

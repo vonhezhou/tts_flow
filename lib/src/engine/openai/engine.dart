@@ -2,6 +2,7 @@ import 'dart:convert';
 import 'dart:typed_data';
 
 import 'package:http/http.dart' as http;
+import 'package:tts_flow_dart/src/base/pcm_descriptor.dart';
 import 'package:tts_flow_dart/src/core/audio_capability.dart';
 import 'package:tts_flow_dart/src/core/audio_spec.dart';
 import 'package:tts_flow_dart/src/core/synthesis_control.dart';
@@ -117,9 +118,18 @@ class OpenAiTtsEngine implements TtsEngine {
   @override
   Set<AudioCapability> get supportedCapabilities => {
         const SimpleFormatCapability(format: TtsAudioFormat.mp3),
-        const SimpleFormatCapability(format: TtsAudioFormat.wav),
         const SimpleFormatCapability(format: TtsAudioFormat.aac),
+        PcmCapability(
+          sampleRatesHz: {_openAiPcmSampleRateHz},
+          bitsPerSample: {_openAiPcmBitsPerSample},
+          channels: {_openAiPcmChannels},
+          encodings: {PcmEncoding.signedInt},
+        ),
       };
+
+  static const int _openAiPcmSampleRateHz = 24000;
+  static const int _openAiPcmBitsPerSample = 16;
+  static const int _openAiPcmChannels = 1;
 
   @override
   Future<List<TtsVoice>> getAvailableVoices({String? locale}) async {
@@ -306,8 +316,6 @@ class OpenAiTtsEngine implements TtsEngine {
         return 'pcm';
       case TtsAudioFormat.mp3:
         return 'mp3';
-      case TtsAudioFormat.wav:
-        return 'wav';
       case TtsAudioFormat.opus:
         return 'opus';
       case TtsAudioFormat.aac:
