@@ -5,7 +5,7 @@
 - M1: Added core contracts, models, and fake engine/output for validation.
 - M2: Added TtsFlow FIFO queue orchestration, request/queue events, and control APIs.
 - M3: Added request-scoped format negotiation and OpenAI non-streaming engine adapter.
-- M4: Added production MemoryOutput and FileOutput with request-scoped session isolation.
+- M4: Added production MemoryOutput and (Wav/Mp3/Aac)FileOutput with request-scoped session isolation.
 - M5: Added SpeakerOutput baseline with backend abstraction and playback session artifact.
 - M6: Added integration-style service tests, improved docs, and example application flow.
 

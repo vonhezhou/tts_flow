@@ -20,7 +20,6 @@ export 'src/engine/file_tts_engine.dart';
 export 'src/engine/non_streaming_bridge.dart';
 export 'src/engine/openai_tts_engine.dart';
 export 'src/output/aac_file_output.dart';
-export 'src/output/file_output.dart';
 export 'src/output/memory_output.dart';
 export 'src/output/mp3_file_output.dart';
 export 'src/output/multicast_output.dart';

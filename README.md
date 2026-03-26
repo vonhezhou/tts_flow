@@ -37,7 +37,7 @@ inputs) to speed up integration debugging.
 - Built-in outputs:
   - NullOutput (/dev/null-style sink)
   - MemoryOutput
-  - FileOutput
+  - Mp3/Wav/AacFileOutput
   - MulticastOutput (fanout to multiple outputs)
   - SpeakerOutput (backend abstraction baseline)
 - Built-in adapters/utilities:
@@ -251,7 +251,7 @@ Future<void> main() async {
   final output = MulticastOutput(
     outputs: [
       NullOutput(outputId: 'null'),
-      FileOutput(outputId: 'file', outputDirectory: tempDir),
+      WaveFileOutput(outputId: 'file', outputDirectory: tempDir),
     ],
     errorPolicy: MulticastOutputErrorPolicy.bestEffort,
   );
