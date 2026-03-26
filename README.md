@@ -84,7 +84,7 @@ import 'package:tts_flow_dart/tts_flow_dart.dart';
 
 Future<void> main() async {
  final service = TtsFlow(
-  engine: FakeTtsEngine(
+  engine: SineTtsEngine(
    engineId: 'fake-engine',
    supportsStreaming: true,
    chunkCount: 3,
@@ -218,7 +218,7 @@ Future<void> playWavOrPcm() async {
 
 See example flow in example/main.dart.
 
-By default the example uses FakeTtsEngine.
+By default the example uses SineTtsEngine.
 If OPENAI_API_KEY is set, it automatically switches to OpenAiTtsEngine.
 
 Run it with:
@@ -257,7 +257,7 @@ Future<void> main() async {
   );
 
   final service = TtsFlow(
-    engine: FakeTtsEngine(
+    engine: SineTtsEngine(
       engineId: 'fake-engine',
       supportsStreaming: true,
       chunkCount: 3,

@@ -14,7 +14,7 @@ Future<void> main() async {
             initialBackoff: const Duration(milliseconds: 250),
           ),
         )
-      : FakeTtsEngine(
+      : SineTtsEngine(
           engineId: 'fake-engine',
           supportsStreaming: true,
           chunkCount: 3,

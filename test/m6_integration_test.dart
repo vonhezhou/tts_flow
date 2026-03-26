@@ -10,7 +10,7 @@ void main() {
     test('service emits chunks with resolved format using MemoryOutput',
         () async {
       final service = TtsFlow(
-        engine: FakeTtsEngine(
+        engine: SineTtsEngine(
           engineId: 'fake-engine',
           supportsStreaming: true,
           chunkCount: 3,
@@ -66,7 +66,7 @@ void main() {
       final tempDir = await Directory.systemTemp.createTemp('uni_tts_m6_');
       try {
         final service = TtsFlow(
-          engine: FakeTtsEngine(
+          engine: SineTtsEngine(
             engineId: 'fake-engine',
             supportsStreaming: true,
             chunkCount: 3,

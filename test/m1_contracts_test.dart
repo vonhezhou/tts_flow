@@ -17,7 +17,7 @@ void main() {
     });
 
     test('fake engine emits one chunk when chunkCount is 1', () async {
-      final engine = FakeTtsEngine(
+      final engine = SineTtsEngine(
         engineId: 'fake-engine',
         supportsStreaming: false,
         chunkCount: 1,
@@ -38,7 +38,7 @@ void main() {
     });
 
     test('fake engine emits multiple ordered chunks', () async {
-      final engine = FakeTtsEngine(
+      final engine = SineTtsEngine(
         engineId: 'fake-engine',
         supportsStreaming: true,
         chunkCount: 3,
@@ -92,7 +92,7 @@ void main() {
     });
 
     test('fake engine reports available voices and global default', () async {
-      final engine = FakeTtsEngine(
+      final engine = SineTtsEngine(
         engineId: 'fake-engine',
         supportsStreaming: false,
       );
@@ -107,7 +107,7 @@ void main() {
     });
 
     test('fake engine resolves locale default voice with fallback', () async {
-      final engine = FakeTtsEngine(
+      final engine = SineTtsEngine(
         engineId: 'fake-engine',
         supportsStreaming: false,
       );

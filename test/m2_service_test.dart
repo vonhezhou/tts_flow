@@ -8,7 +8,7 @@ void main() {
   group('M2 service', () {
     test('processes requests in FIFO order', () async {
       final service = TtsFlow(
-        engine: FakeTtsEngine(
+        engine: SineTtsEngine(
           engineId: 'fake-engine',
           supportsStreaming: true,
           chunkCount: 2,
@@ -40,7 +40,7 @@ void main() {
 
     test('clearQueue cancels pending requests only', () async {
       final service = TtsFlow(
-        engine: FakeTtsEngine(
+        engine: SineTtsEngine(
           engineId: 'fake-engine',
           supportsStreaming: true,
           chunkCount: 3,
@@ -67,7 +67,7 @@ void main() {
     test('stopCurrent stops active request and next request proceeds',
         () async {
       final service = TtsFlow(
-        engine: FakeTtsEngine(
+        engine: SineTtsEngine(
           engineId: 'fake-engine',
           supportsStreaming: true,
           chunkCount: 8,
@@ -113,7 +113,7 @@ void main() {
 
     test('requestFailed event includes output failure details', () async {
       final service = TtsFlow(
-        engine: FakeTtsEngine(
+        engine: SineTtsEngine(
           engineId: 'fake-engine',
           supportsStreaming: true,
           chunkCount: 2,
@@ -154,7 +154,7 @@ void main() {
     test('fails during negotiation when multicast children have disjoint PCM',
         () async {
       final service = TtsFlow(
-        engine: FakeTtsEngine(
+        engine: SineTtsEngine(
           engineId: 'fake-engine',
           supportsStreaming: true,
           chunkCount: 2,
@@ -189,7 +189,7 @@ void main() {
 
     test('continueOnError keeps pending queue after active failure', () async {
       final service = TtsFlow(
-        engine: FakeTtsEngine(
+        engine: SineTtsEngine(
           engineId: 'fake-engine',
           supportsStreaming: true,
           chunkCount: 2,
@@ -231,7 +231,7 @@ void main() {
 
     test('pause while idle defers start until resume', () async {
       final service = TtsFlow(
-        engine: FakeTtsEngine(
+        engine: SineTtsEngine(
           engineId: 'fake-engine',
           supportsStreaming: true,
           chunkCount: 2,
@@ -273,7 +273,7 @@ void main() {
     test('stopCurrent forwards stopCurrent cancel reason to output', () async {
       final output = _CaptureCancelOutput();
       final service = TtsFlow(
-        engine: FakeTtsEngine(
+        engine: SineTtsEngine(
           engineId: 'fake-engine',
           supportsStreaming: true,
           chunkCount: 8,
@@ -298,7 +298,7 @@ void main() {
         () async {
       final output = _CaptureCancelOutput();
       final service = TtsFlow(
-        engine: FakeTtsEngine(
+        engine: SineTtsEngine(
           engineId: 'fake-engine',
           supportsStreaming: true,
           chunkCount: 20,
@@ -326,7 +326,7 @@ void main() {
 
     test('service exposes engine available voices and defaults', () async {
       final service = TtsFlow(
-        engine: FakeTtsEngine(
+        engine: SineTtsEngine(
           engineId: 'fake-engine',
           supportsStreaming: true,
         ),
@@ -368,7 +368,7 @@ void main() {
 
     test('speak requires init before usage', () async {
       final service = TtsFlow(
-        engine: FakeTtsEngine(
+        engine: SineTtsEngine(
           engineId: 'fake-engine',
           supportsStreaming: true,
         ),
@@ -388,7 +388,7 @@ void main() {
       final defaultOutput = _TrackingOutput(outputId: 'default');
       final overrideOutput = _TrackingOutput(outputId: 'override');
       final service = TtsFlow(
-        engine: FakeTtsEngine(
+        engine: SineTtsEngine(
           engineId: 'fake-engine',
           supportsStreaming: true,
           chunkCount: 3,
@@ -412,7 +412,7 @@ void main() {
 
     test('no default output and no override fails request', () async {
       final service = TtsFlow(
-        engine: FakeTtsEngine(
+        engine: SineTtsEngine(
           engineId: 'fake-engine',
           supportsStreaming: true,
           chunkCount: 2,
@@ -439,7 +439,7 @@ void main() {
         () async {
       final overrideOutput = _TrackingOutput(outputId: 'override');
       final service = TtsFlow(
-        engine: FakeTtsEngine(
+        engine: SineTtsEngine(
           engineId: 'fake-engine',
           supportsStreaming: true,
           chunkCount: 3,

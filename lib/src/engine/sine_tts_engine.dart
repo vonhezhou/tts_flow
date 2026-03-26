@@ -1,5 +1,5 @@
 import 'dart:async';
-import 'dart:convert';
+import 'dart:math' as math;
 import 'dart:typed_data';
 
 import 'package:tts_flow_dart/src/base/pcm_descriptor.dart';
@@ -11,8 +11,8 @@ import 'package:tts_flow_dart/src/core/tts_engine.dart';
 import 'package:tts_flow_dart/src/core/tts_request.dart';
 import 'package:tts_flow_dart/src/core/tts_voice.dart';
 
-final class FakeTtsEngine implements TtsEngine {
-  FakeTtsEngine({
+final class SineTtsEngine implements TtsEngine {
+  SineTtsEngine({
     required this.engineId,
     required this.supportsStreaming,
     this.chunkCount = 1,
@@ -92,7 +92,27 @@ final class FakeTtsEngine implements TtsEngine {
     SynthesisControl control,
     TtsAudioSpec resolvedFormat,
   ) async* {
-    final payload = utf8.encode(request.text);
+    final pcm = resolvedFormat.format == TtsAudioFormat.pcm
+        ? resolvedFormat.requirePcm
+        : const PcmDescriptor(
+            sampleRateHz: 24000, bitsPerSample: 16, channels: 1);
+
+    const frequency = 440.0; // A4 tone
+    const amplitude = 16384; // 50% of 16-bit signed max
+    final wordCount = request.text.trim().split(RegExp(r'\s+')).length;
+    final durationSeconds = math.max(0.1, wordCount * 0.3);
+    final sampleCount = (pcm.sampleRateHz * durationSeconds).round();
+    final sineBuffer = Int16List(sampleCount * pcm.channels);
+    for (var s = 0; s < sampleCount; s++) {
+      final value =
+          (amplitude * math.sin(2 * math.pi * frequency * s / pcm.sampleRateHz))
+              .round();
+      for (var c = 0; c < pcm.channels; c++) {
+        sineBuffer[s * pcm.channels + c] = value;
+      }
+    }
+
+    final payload = sineBuffer.buffer.asUint8List();
     final total = payload.length;
     final size = (total / chunkCount).ceil();
 
