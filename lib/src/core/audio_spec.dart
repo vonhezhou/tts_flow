@@ -1,6 +1,19 @@
 import 'package:tts_flow_dart/src/base/pcm_descriptor.dart';
 
-enum TtsAudioFormat { pcm, mp3, opus, aac }
+enum TtsAudioFormat {
+  /// raw interleaved PCM data,
+  /// with format details specified in the [pcm] field of [TtsAudioSpec]
+  pcm,
+
+  /// mp3 frames, no ID3 v1/v2 tags
+  mp3,
+
+  /// opus packets in ogg container
+  opus,
+
+  /// aac frames with ADTS header
+  aac
+}
 
 /// Unified audio format specification carrying both the format type and optional PCM descriptor.
 class TtsAudioSpec {

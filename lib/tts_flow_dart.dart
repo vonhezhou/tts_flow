@@ -1,3 +1,4 @@
+export 'src/base/adts_frame_header.dart';
 export 'src/base/mp3_frame_header.dart';
 export 'src/base/pcm_descriptor.dart';
 export 'src/base/wav_header.dart';
@@ -18,6 +19,7 @@ export 'src/engine/fake_tts_engine.dart';
 export 'src/engine/file_tts_engine.dart';
 export 'src/engine/non_streaming_bridge.dart';
 export 'src/engine/openai_tts_engine.dart';
+export 'src/output/aac_file_output.dart';
 export 'src/output/file_output.dart';
 export 'src/output/memory_output.dart';
 export 'src/output/mp3_file_output.dart';
