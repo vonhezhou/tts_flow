@@ -105,6 +105,115 @@ Future<void> main() async {
 }
 ```
 
+## FileTtsEngine Providers
+
+Use `FileTtsEngine` when you want deterministic playback from pre-existing
+audio content instead of synthesizing text dynamically.
+
+### 1) In-memory bytes (`RawBytesContentProvider`)
+
+```dart
+import 'dart:typed_data';
+
+import 'package:tts_flow_dart/tts_flow_dart.dart';
+
+Future<void> playFixedBytes() async {
+  final payload = Uint8List.fromList([1, 2, 3, 4, 5, 6]);
+
+  final engine = FileTtsEngine(
+    engineId: 'fixed-bytes',
+    provider: RawBytesContentProvider(
+      bytes: payload,
+      audioSpec: const TtsAudioSpec(format: TtsAudioFormat.mp3),
+    ),
+    chunkSizeBytes: 3,
+    maxBytesPerSecond: 8000,
+  );
+
+  final chunks = await engine
+      .synthesize(
+        const TtsRequest(requestId: 'raw-1', text: 'ignored input text'),
+        SynthesisControl(),
+        const TtsAudioSpec(format: TtsAudioFormat.mp3),
+      )
+      .toList();
+
+  print('chunks: ${chunks.length}');
+}
+```
+
+### 2) MP3 file provider (`Mp3FileContentProvider`)
+
+`Mp3FileContentProvider` strips ID3v2 header bytes and trailing ID3v1 footer
+bytes (`TAG`) before streaming audio payload.
+
+```dart
+import 'package:tts_flow_dart/tts_flow_dart.dart';
+
+Future<void> playMp3File() async {
+  final engine = FileTtsEngine(
+    engineId: 'file-mp3',
+    provider: Mp3FileContentProvider('assets/prompt.mp3'),
+    chunkSizeBytes: 4096,
+    maxBytesPerSecond: 32000,
+  );
+
+  final stream = engine.synthesize(
+    const TtsRequest(requestId: 'mp3-1', text: 'ignored input text'),
+    SynthesisControl(),
+    const TtsAudioSpec(format: TtsAudioFormat.mp3),
+  );
+
+  await stream.drain();
+}
+```
+
+### 3) WAV provider (`WavFileContentProvider`)
+
+Each emitted chunk is wrapped as a self-contained WAV blob
+`[44-byte WAV header][chunk PCM bytes]`.
+
+```dart
+import 'package:tts_flow_dart/tts_flow_dart.dart';
+
+Future<void> playWavOrPcm() async {
+  final wavEngine = FileTtsEngine(
+    engineId: 'file-wav',
+    provider: WavFileContentProvider.fromWav('assets/voice.wav'),
+    chunkSizeBytes: 2048,
+  );
+
+  final pcmEngine = FileTtsEngine(
+    engineId: 'file-pcm',
+    provider: WavFileContentProvider.fromPcm(
+      'assets/raw_16k_mono.pcm',
+      const PcmDescriptor(
+        sampleRateHz: 16000,
+        bitsPerSample: 16,
+        channels: 1,
+      ),
+    ),
+    chunkSizeBytes: 2048,
+  );
+
+  await wavEngine
+      .synthesize(
+        const TtsRequest(requestId: 'wav-1', text: 'ignored'),
+        SynthesisControl(),
+        const TtsAudioSpec(format: TtsAudioFormat.wav),
+      )
+      .drain();
+
+  await pcmEngine
+      .synthesize(
+        const TtsRequest(requestId: 'pcm-1', text: 'ignored'),
+        SynthesisControl(),
+        const TtsAudioSpec(format: TtsAudioFormat.wav),
+      )
+      .drain();
+}
+```
+
 ## Example
 
 See example flow in example/main.dart.

@@ -56,7 +56,7 @@ final class Mp3FrameHeader {
       return null;
     }
 
-    final startOffset = _computeAudioStartOffset(bytes);
+    final startOffset = audioStartOffset(bytes);
     if (startOffset == null || startOffset > bytes.length - 4) {
       return null;
     }
@@ -71,7 +71,7 @@ final class Mp3FrameHeader {
     return null;
   }
 
-  static int? _computeAudioStartOffset(Uint8List bytes) {
+  static int? audioStartOffset(Uint8List bytes) {
     if (bytes.length < 3) {
       return 0;
     }
