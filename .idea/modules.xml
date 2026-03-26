@@ -4,6 +4,8 @@
     <modules>
 <module fileurl="file://$PROJECT_DIR$/packages/tts_flow_dart/melos_tts_flow_dart.iml" filepath="$PROJECT_DIR$/packages/tts_flow_dart/melos_tts_flow_dart.iml"/>
 <module fileurl="file://$PROJECT_DIR$/apps/tts_flow_dart_example/melos_tts_flow_dart_example.iml" filepath="$PROJECT_DIR$/apps/tts_flow_dart_example/melos_tts_flow_dart_example.iml"/>
+<module fileurl="file://$PROJECT_DIR$/packages/tts_flow_flutter/melos_tts_flow_flutter.iml" filepath="$PROJECT_DIR$/packages/tts_flow_flutter/melos_tts_flow_flutter.iml"/>
+<module fileurl="file://$PROJECT_DIR$/apps/tts_flow_flutter_example/melos_tts_flow_flutter_example.iml" filepath="$PROJECT_DIR$/apps/tts_flow_flutter_example/melos_tts_flow_flutter_example.iml"/>
 <module fileurl="file://$PROJECT_DIR$/melos_tts_flow_workspace.iml" filepath="$PROJECT_DIR$/melos_tts_flow_workspace.iml"/>
     </modules>
   </component>

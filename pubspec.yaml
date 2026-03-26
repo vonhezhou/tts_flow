@@ -3,11 +3,13 @@ description: Melos-managed mono repo workspace for tts_flow_dart packages.
 publish_to: none
 
 environment:
-  sdk: ^3.6.0
+  sdk: ^3.11.0
 
 workspace:
   - apps/tts_flow_dart_example
+  - apps/tts_flow_flutter_example
   - packages/tts_flow_dart
+  - packages/tts_flow_flutter
 
 dev_dependencies:
   melos: ^7.0.0
