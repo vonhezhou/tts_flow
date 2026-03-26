@@ -1,3 +1,4 @@
+import 'dart:developer';
 import 'dart:io';
 import 'dart:typed_data';
 
@@ -105,14 +106,38 @@ final class Mp3FileOutput implements TtsOutput {
           requestId: session.requestId,
         );
       }
-      if (currentTargetHeader != null &&
-          !currentTargetHeader.isCompatibleWith(sessionHeader)) {
-        throw TtsError(
-          code: TtsErrorCode.invalidRequest,
-          message:
-              'Session MP3 metadata does not match the existing target file.',
-          requestId: session.requestId,
-        );
+      if (currentTargetHeader != null) {
+        if (currentTargetHeader.version != sessionHeader.version ||
+            currentTargetHeader.layer != sessionHeader.layer) {
+          throw TtsError(
+            code: TtsErrorCode.invalidRequest,
+            message: 'Session MP3 MPEG version/layer does not match the '
+                'existing target file and cannot be safely appended.',
+            requestId: session.requestId,
+          );
+        }
+        if (currentTargetHeader.sampleRateHz != sessionHeader.sampleRateHz) {
+          log(
+            'Mp3FileOutput[$outputId]: sample rate changed from '
+            '${currentTargetHeader.sampleRateHz} Hz to '
+            '${sessionHeader.sampleRateHz} Hz while appending to $filePath '
+            '(requestId: ${session.requestId}). The resulting file may '
+            'play with jumps or glitches.',
+            name: 'tts_flow_dart.Mp3FileOutput',
+            level: 900, // warning
+          );
+        }
+        if (currentTargetHeader.channelCount != sessionHeader.channelCount) {
+          log(
+            'Mp3FileOutput[$outputId]: channel count changed from '
+            '${currentTargetHeader.channelCount} to '
+            '${sessionHeader.channelCount} while appending to $filePath '
+            '(requestId: ${session.requestId}). The resulting file may '
+            'play with jumps or glitches.',
+            name: 'tts_flow_dart.Mp3FileOutput',
+            level: 900, // warning
+          );
+        }
       }
 
       await _stripTrailingId3v1Tag(targetFile);
