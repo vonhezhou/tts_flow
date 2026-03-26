@@ -1,7 +1,7 @@
-import 'dart:developer';
 import 'dart:io';
 import 'dart:typed_data';
 
+import 'package:logging/logging.dart';
 import 'package:tts_flow_dart/src/base/adts_frame_header.dart';
 import 'package:tts_flow_dart/src/core/audio_artifact.dart';
 import 'package:tts_flow_dart/src/core/audio_capability.dart';
@@ -11,6 +11,8 @@ import 'package:tts_flow_dart/src/core/tts_chunk.dart';
 import 'package:tts_flow_dart/src/core/tts_errors.dart';
 import 'package:tts_flow_dart/src/core/tts_output.dart';
 import 'package:tts_flow_dart/src/core/tts_output_session.dart';
+
+final _log = Logger('tts_flow_dart.AacFileOutput');
 
 /// Writes AAC audio as a flat ADTS stream appended to a single file.
 ///
@@ -112,12 +114,10 @@ final class AacFileOutput implements TtsOutput {
       final lockedHeader = _state.lockedHeader;
 
       if (lockedHeader != null && currentTargetHeader != lockedHeader) {
-        log(
+        _log.warning(
           'AacFileOutput[$outputId]: target file metadata changed during '
           'session — the existing ADTS header no longer matches what was '
           'read at session start.',
-          name: 'tts_flow_dart.AacFileOutput',
-          level: 900, // warning
         );
       }
 
@@ -186,26 +186,22 @@ final class AacFileOutput implements TtsOutput {
           existing.sampleRateHz ?? existing.samplingFrequencyIndex;
       final incomingHz =
           incoming.sampleRateHz ?? incoming.samplingFrequencyIndex;
-      log(
+      _log.warning(
         'AacFileOutput[$outputId]: sample rate changed from $existingHz Hz '
         'to $incomingHz Hz while appending to $filePath '
         '(requestId: $requestId). The resulting file may not play correctly '
         'on all decoders.',
-        name: 'tts_flow_dart.AacFileOutput',
-        level: 900, // warning
       );
     }
 
     if (existing.channelConfig != incoming.channelConfig) {
       final existingCh = existing.channelCount ?? existing.channelConfig;
       final incomingCh = incoming.channelCount ?? incoming.channelConfig;
-      log(
+      _log.warning(
         'AacFileOutput[$outputId]: channel count changed from $existingCh '
         'to $incomingCh while appending to $filePath '
         '(requestId: $requestId). The resulting file may not play correctly '
         'on all decoders.',
-        name: 'tts_flow_dart.AacFileOutput',
-        level: 900, // warning
       );
     }
   }

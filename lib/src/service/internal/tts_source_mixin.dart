@@ -1,6 +1,6 @@
 import 'dart:async';
-import 'dart:developer';
 
+import 'package:logging/logging.dart';
 import 'package:meta/meta.dart';
 import 'package:tts_flow_dart/src/core/audio_spec.dart';
 import 'package:tts_flow_dart/src/core/synthesis_control.dart';
@@ -18,6 +18,8 @@ import 'package:tts_flow_dart/src/service/tts_events.dart';
 
 import 'tts_flow_event_mixin.dart';
 import 'tts_flow_state.dart';
+
+final _log = Logger('tts_flow_dart');
 
 final class QueuedRequest {
   const QueuedRequest({required this.request, required this.controller});
@@ -225,11 +227,9 @@ mixin TtsSourceMixin on TtsFlowEventBus {
       final newBytes = state.pauseBufferBytes + chunk.bytes.length;
       if (state.pauseBufferBytes <= config.pauseBufferMaxBytes &&
           newBytes > config.pauseBufferMaxBytes) {
-        log(
+        _log.warning(
           'TTS pause buffer exceeded ${config.pauseBufferMaxBytes} '
           'bytes (current: $newBytes); chunks continue to accumulate.',
-          name: 'tts_flow_dart',
-          level: 900,
         );
       }
       state.pauseBufferBytes = newBytes;

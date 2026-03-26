@@ -1,7 +1,7 @@
-import 'dart:developer';
 import 'dart:io';
 import 'dart:typed_data';
 
+import 'package:logging/logging.dart';
 import 'package:tts_flow_dart/src/base/mp3_frame_header.dart';
 import 'package:tts_flow_dart/src/core/audio_artifact.dart';
 import 'package:tts_flow_dart/src/core/audio_capability.dart';
@@ -11,6 +11,8 @@ import 'package:tts_flow_dart/src/core/tts_chunk.dart';
 import 'package:tts_flow_dart/src/core/tts_errors.dart';
 import 'package:tts_flow_dart/src/core/tts_output.dart';
 import 'package:tts_flow_dart/src/core/tts_output_session.dart';
+
+final _log = Logger('tts_flow_dart.Mp3FileOutput');
 
 final class Mp3FileOutput implements TtsOutput {
   Mp3FileOutput(
@@ -117,25 +119,21 @@ final class Mp3FileOutput implements TtsOutput {
           );
         }
         if (currentTargetHeader.sampleRateHz != sessionHeader.sampleRateHz) {
-          log(
+          _log.warning(
             'Mp3FileOutput[$outputId]: sample rate changed from '
             '${currentTargetHeader.sampleRateHz} Hz to '
             '${sessionHeader.sampleRateHz} Hz while appending to $filePath '
             '(requestId: ${session.requestId}). The resulting file may '
             'play with jumps or glitches.',
-            name: 'tts_flow_dart.Mp3FileOutput',
-            level: 900, // warning
           );
         }
         if (currentTargetHeader.channelCount != sessionHeader.channelCount) {
-          log(
+          _log.warning(
             'Mp3FileOutput[$outputId]: channel count changed from '
             '${currentTargetHeader.channelCount} to '
             '${sessionHeader.channelCount} while appending to $filePath '
             '(requestId: ${session.requestId}). The resulting file may '
             'play with jumps or glitches.',
-            name: 'tts_flow_dart.Mp3FileOutput',
-            level: 900, // warning
           );
         }
       }
