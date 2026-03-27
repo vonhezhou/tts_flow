@@ -15,6 +15,34 @@ enum TtsAudioFormat {
   aac
 }
 
+extension TtsAudioFormatX on TtsAudioFormat {
+  String get name {
+    switch (this) {
+      case TtsAudioFormat.pcm:
+        return 'pcm';
+      case TtsAudioFormat.mp3:
+        return 'mp3';
+      case TtsAudioFormat.opus:
+        return 'opus';
+      case TtsAudioFormat.aac:
+        return 'aac';
+    }
+  }
+
+  String get mimeType {
+    switch (this) {
+      case TtsAudioFormat.pcm:
+        return 'audio/pcm';
+      case TtsAudioFormat.mp3:
+        return 'audio/mpeg';
+      case TtsAudioFormat.opus:
+        return 'audio/opus';
+      case TtsAudioFormat.aac:
+        return 'audio/aac';
+    }
+  }
+}
+
 /// Unified audio format specification carrying both the format type and optional PCM descriptor.
 class TtsAudioSpec {
   const TtsAudioSpec.pcm(PcmDescriptor pcm)
