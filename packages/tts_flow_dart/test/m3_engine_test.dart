@@ -90,8 +90,7 @@ void main() {
         },
         outputCapabilities: {
           PcmCapability(
-            minSampleRateHz: 20000,
-            maxSampleRateHz: 96000,
+            sampleRatesHz: null,
             bitsPerSample: {16},
             channels: {1},
             encodings: {PcmEncoding.signedInt},
@@ -140,8 +139,7 @@ void main() {
         outputCapabilities: {
           PcmCapability(
             sampleRatesHz: {24000},
-            minBitsPerSample: 20,
-            maxBitsPerSample: 40,
+            bitsPerSample: null,
             channels: {1},
             encodings: {PcmEncoding.signedInt},
           ),
@@ -168,8 +166,7 @@ void main() {
           PcmCapability(
             sampleRatesHz: {24000},
             bitsPerSample: {16},
-            minChannels: 2,
-            maxChannels: 2,
+            channels: {2},
             encodings: {PcmEncoding.signedInt},
           ),
         },

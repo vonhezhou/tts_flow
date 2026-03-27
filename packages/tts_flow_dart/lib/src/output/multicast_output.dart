@@ -1,6 +1,7 @@
 import 'package:tts_flow_dart/src/core/audio_artifact.dart';
 import 'package:tts_flow_dart/src/core/audio_capability.dart';
 import 'package:tts_flow_dart/src/core/audio_spec.dart';
+import 'package:tts_flow_dart/src/base/pcm_descriptor.dart';
 import 'package:tts_flow_dart/src/core/synthesis_control.dart';
 import 'package:tts_flow_dart/src/core/tts_chunk.dart';
 import 'package:tts_flow_dart/src/core/tts_errors.dart';
@@ -383,119 +384,91 @@ final class MulticastOutput implements TtsOutput {
     PcmCapability right,
   ) {
     final sampleRate = _intersectIntConstraint(
-      leftDiscrete: left.sampleRatesHz,
-      leftMin: left.minSampleRateHz,
-      leftMax: left.maxSampleRateHz,
-      rightDiscrete: right.sampleRatesHz,
-      rightMin: right.minSampleRateHz,
-      rightMax: right.maxSampleRateHz,
+      leftValues: left.sampleRatesHz,
+      rightValues: right.sampleRatesHz,
     );
-    if (sampleRate == null) {
+    if (sampleRate == null || sampleRate.isEmpty) {
       return null;
     }
 
     final bitDepth = _intersectIntConstraint(
-      leftDiscrete: left.bitsPerSample,
-      leftMin: left.minBitsPerSample,
-      leftMax: left.maxBitsPerSample,
-      rightDiscrete: right.bitsPerSample,
-      rightMin: right.minBitsPerSample,
-      rightMax: right.maxBitsPerSample,
+      leftValues: left.bitsPerSample,
+      rightValues: right.bitsPerSample,
     );
-    if (bitDepth == null) {
+    if (bitDepth == null || bitDepth.isEmpty) {
       return null;
     }
 
     final channels = _intersectIntConstraint(
-      leftDiscrete: left.channels,
-      leftMin: left.minChannels,
-      leftMax: left.maxChannels,
-      rightDiscrete: right.channels,
-      rightMin: right.minChannels,
-      rightMax: right.maxChannels,
+      leftValues: left.channels,
+      rightValues: right.channels,
     );
-    if (channels == null) {
+    if (channels == null || channels.isEmpty) {
       return null;
     }
 
-    final encodings = left.encodings.intersection(right.encodings);
+    final encodings = _intersectEncodings(
+      leftValues: left.encodings,
+      rightValues: right.encodings,
+    );
     if (encodings.isEmpty) {
       return null;
     }
 
     return PcmCapability(
-      sampleRatesHz: sampleRate.discrete,
-      minSampleRateHz: sampleRate.min,
-      maxSampleRateHz: sampleRate.max,
-      bitsPerSample: bitDepth.discrete,
-      minBitsPerSample: bitDepth.min,
-      maxBitsPerSample: bitDepth.max,
-      channels: channels.discrete,
-      minChannels: channels.min,
-      maxChannels: channels.max,
+      sampleRatesHz: sampleRate,
+      bitsPerSample: bitDepth,
+      channels: channels,
       encodings: encodings,
     );
   }
 
-  _IntConstraint? _intersectIntConstraint({
-    required Set<int> leftDiscrete,
-    required int? leftMin,
-    required int? leftMax,
-    required Set<int> rightDiscrete,
-    required int? rightMin,
-    required int? rightMax,
+  Set<int>? _intersectIntConstraint({
+    required Set<int>? leftValues,
+    required Set<int>? rightValues,
   }) {
-    final hasLeftRange = leftMin != null && leftMax != null;
-    final hasRightRange = rightMin != null && rightMax != null;
+    if (leftValues != null && leftValues.isEmpty) {
+      return const <int>{};
+    }
+    if (rightValues != null && rightValues.isEmpty) {
+      return const <int>{};
+    }
 
-    final min = hasLeftRange && hasRightRange
-        ? (leftMin > rightMin ? leftMin : rightMin)
-        : (hasLeftRange ? leftMin : (hasRightRange ? rightMin : null));
-    final max = hasLeftRange && hasRightRange
-        ? (leftMax < rightMax ? leftMax : rightMax)
-        : (hasLeftRange ? leftMax : (hasRightRange ? rightMax : null));
-
-    if (min != null && max != null && min > max) {
+    if (leftValues == null && rightValues == null) {
       return null;
     }
 
-    Set<int> discrete;
-    if (leftDiscrete.isNotEmpty && rightDiscrete.isNotEmpty) {
-      discrete = leftDiscrete.intersection(rightDiscrete);
-    } else if (leftDiscrete.isNotEmpty) {
-      discrete = leftDiscrete.toSet();
-    } else if (rightDiscrete.isNotEmpty) {
-      discrete = rightDiscrete.toSet();
-    } else {
-      discrete = <int>{};
+    if (leftValues == null) {
+      return Set<int>.from(rightValues!);
+    }
+    if (rightValues == null) {
+      return Set<int>.from(leftValues);
     }
 
-    if (discrete.isNotEmpty && min != null && max != null) {
-      discrete = discrete
-          .where((value) => value >= min && value <= max)
-          .toSet();
-    }
-
-    if (discrete.isEmpty && min == null && max == null) {
-      return null;
-    }
-    if (discrete.isEmpty &&
-        (leftDiscrete.isNotEmpty || rightDiscrete.isNotEmpty)) {
-      return null;
-    }
-
-    return _IntConstraint(discrete: discrete, min: min, max: max);
+    return leftValues.intersection(rightValues);
   }
-}
 
-final class _IntConstraint {
-  const _IntConstraint({
-    required this.discrete,
-    required this.min,
-    required this.max,
-  });
+  Set<PcmEncoding> _intersectEncodings({
+    required Set<PcmEncoding>? leftValues,
+    required Set<PcmEncoding>? rightValues,
+  }) {
+    if (leftValues != null && leftValues.isEmpty) {
+      return const <PcmEncoding>{};
+    }
+    if (rightValues != null && rightValues.isEmpty) {
+      return const <PcmEncoding>{};
+    }
 
-  final Set<int> discrete;
-  final int? min;
-  final int? max;
+    if (leftValues == null && rightValues == null) {
+      return Set<PcmEncoding>.from(PcmEncoding.values);
+    }
+    if (leftValues == null) {
+      return Set<PcmEncoding>.from(rightValues!);
+    }
+    if (rightValues == null) {
+      return Set<PcmEncoding>.from(leftValues);
+    }
+
+    return leftValues.intersection(rightValues);
+  }
 }

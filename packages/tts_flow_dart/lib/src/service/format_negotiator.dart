@@ -125,7 +125,7 @@ final class TtsFormatNegotiator {
 
     for (final e in enginePcm) {
       for (final o in outputPcm) {
-        final encodings = e.encodings.intersection(o.encodings);
+        final encodings = _resolveEncodings(engine: e, output: o);
 
         if (encodings.isEmpty) {
           continue;
@@ -175,16 +175,9 @@ final class TtsFormatNegotiator {
   }) {
     return _resolveIntDimension(
       engineDiscrete: engine.sampleRatesHz,
-      engineHasDiscrete: engine.hasDiscreteSampleRates,
-      engineMin: engine.minSampleRateHz,
-      engineMax: engine.maxSampleRateHz,
       engineSupports: engine.supportsSampleRateHz,
       outputDiscrete: output.sampleRatesHz,
-      outputHasDiscrete: output.hasDiscreteSampleRates,
-      outputMin: output.minSampleRateHz,
-      outputMax: output.maxSampleRateHz,
       outputSupports: output.supportsSampleRateHz,
-      domainMin: wavMinSampleRateHz,
       domainMax: wavMaxSampleRateHz,
       preferredValue: preferredSampleRateHz,
     );
@@ -196,16 +189,9 @@ final class TtsFormatNegotiator {
   }) {
     return _resolveIntDimension(
       engineDiscrete: engine.bitsPerSample,
-      engineHasDiscrete: engine.hasDiscreteBitsPerSample,
-      engineMin: engine.minBitsPerSample,
-      engineMax: engine.maxBitsPerSample,
       engineSupports: engine.supportsBitsPerSample,
       outputDiscrete: output.bitsPerSample,
-      outputHasDiscrete: output.hasDiscreteBitsPerSample,
-      outputMin: output.minBitsPerSample,
-      outputMax: output.maxBitsPerSample,
       outputSupports: output.supportsBitsPerSample,
-      domainMin: wavMinBitsPerSample,
       domainMax: wavMaxBitsPerSample,
     );
   }
@@ -216,42 +202,68 @@ final class TtsFormatNegotiator {
   }) {
     return _resolveIntDimension(
       engineDiscrete: engine.channels,
-      engineHasDiscrete: engine.hasDiscreteChannels,
-      engineMin: engine.minChannels,
-      engineMax: engine.maxChannels,
       engineSupports: engine.supportsChannelCount,
       outputDiscrete: output.channels,
-      outputHasDiscrete: output.hasDiscreteChannels,
-      outputMin: output.minChannels,
-      outputMax: output.maxChannels,
       outputSupports: output.supportsChannelCount,
-      domainMin: wavMinChannels,
       domainMax: wavMaxChannels,
     );
   }
 
+  Set<PcmEncoding> _resolveEncodings({
+    required PcmCapability engine,
+    required PcmCapability output,
+  }) {
+    final engineEncodings = engine.encodings;
+    final outputEncodings = output.encodings;
+
+    if (engineEncodings != null && engineEncodings.isEmpty) {
+      return const <PcmEncoding>{};
+    }
+    if (outputEncodings != null && outputEncodings.isEmpty) {
+      return const <PcmEncoding>{};
+    }
+
+    if (engineEncodings != null && outputEncodings != null) {
+      return engineEncodings.intersection(outputEncodings);
+    }
+
+    if (engineEncodings != null) {
+      return Set<PcmEncoding>.from(
+        engineEncodings.where(output.supportsEncoding),
+      );
+    }
+
+    if (outputEncodings != null) {
+      return Set<PcmEncoding>.from(
+        outputEncodings.where(engine.supportsEncoding),
+      );
+    }
+
+    return Set<PcmEncoding>.from(PcmEncoding.values);
+  }
+
   int? _resolveIntDimension({
-    required Set<int> engineDiscrete,
-    required bool engineHasDiscrete,
-    required int? engineMin,
-    required int? engineMax,
+    required Set<int>? engineDiscrete,
     required bool Function(int value) engineSupports,
-    required Set<int> outputDiscrete,
-    required bool outputHasDiscrete,
-    required int? outputMin,
-    required int? outputMax,
+    required Set<int>? outputDiscrete,
     required bool Function(int value) outputSupports,
-    required int domainMin,
     required int domainMax,
     int? preferredValue,
   }) {
+    if (engineDiscrete != null && engineDiscrete.isEmpty) {
+      return null;
+    }
+    if (outputDiscrete != null && outputDiscrete.isEmpty) {
+      return null;
+    }
+
     if (preferredValue != null &&
         engineSupports(preferredValue) &&
         outputSupports(preferredValue)) {
       return preferredValue;
     }
 
-    if (engineHasDiscrete && outputHasDiscrete) {
+    if (engineDiscrete != null && outputDiscrete != null) {
       final shared = engineDiscrete.intersection(outputDiscrete);
       if (shared.isEmpty) {
         return null;
@@ -259,7 +271,7 @@ final class TtsFormatNegotiator {
       return _pickPreferredOrMax(shared, preferredValue: preferredValue);
     }
 
-    if (engineHasDiscrete) {
+    if (engineDiscrete != null) {
       final candidates = engineDiscrete.where(outputSupports).toSet();
       if (candidates.isEmpty) {
         return null;
@@ -267,7 +279,7 @@ final class TtsFormatNegotiator {
       return _pickPreferredOrMax(candidates, preferredValue: preferredValue);
     }
 
-    if (outputHasDiscrete) {
+    if (outputDiscrete != null) {
       final candidates = outputDiscrete.where(engineSupports).toSet();
       if (candidates.isEmpty) {
         return null;
@@ -275,21 +287,7 @@ final class TtsFormatNegotiator {
       return _pickPreferredOrMax(candidates, preferredValue: preferredValue);
     }
 
-    final effectiveEngineMin = engineMin ?? domainMin;
-    final effectiveEngineMax = engineMax ?? domainMax;
-    final effectiveOutputMin = outputMin ?? domainMin;
-    final effectiveOutputMax = outputMax ?? domainMax;
-
-    final minShared = effectiveEngineMin > effectiveOutputMin
-        ? effectiveEngineMin
-        : effectiveOutputMin;
-    final maxShared = effectiveEngineMax < effectiveOutputMax
-        ? effectiveEngineMax
-        : effectiveOutputMax;
-    if (minShared > maxShared) {
-      return null;
-    }
-    return maxShared;
+    return domainMax;
   }
 
   int _pickPreferredOrMax(
