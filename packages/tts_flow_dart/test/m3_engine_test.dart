@@ -8,6 +8,15 @@ import 'package:http/testing.dart';
 import 'package:test/test.dart';
 import 'package:tts_flow_dart/tts_flow_dart.dart';
 
+const _pcmDescriptor = PcmDescriptor(
+  sampleRateHz: 24000,
+  bitsPerSample: 16,
+  channels: 1,
+);
+
+const _pcmSpec = TtsAudioSpec.pcm(_pcmDescriptor);
+const _mp3Spec = TtsAudioSpec.mp3();
+
 void main() {
   group('M3 format negotiator', () {
     const negotiator = TtsFormatNegotiator();
@@ -275,7 +284,7 @@ void main() {
         engineId: 'file-engine',
         provider: RawBytesContentProvider(
           bytes: payload,
-          audioSpec: const TtsAudioSpec(format: TtsAudioFormat.mp3),
+          audioSpec: _mp3Spec,
         ),
         chunkSizeBytes: 5,
       );
@@ -285,7 +294,7 @@ void main() {
           .synthesize(
             const TtsRequest(requestId: 'fx1', text: 'this should be ignored'),
             control,
-            const TtsAudioSpec(format: TtsAudioFormat.mp3),
+            _mp3Spec,
           )
           .toList();
 
@@ -305,7 +314,7 @@ void main() {
         engineId: 'file-engine-throttle',
         provider: RawBytesContentProvider(
           bytes: payload,
-          audioSpec: const TtsAudioSpec(format: TtsAudioFormat.mp3),
+          audioSpec: _mp3Spec,
         ),
         chunkSizeBytes: 100,
         maxBytesPerSecond: 1000,
@@ -317,7 +326,7 @@ void main() {
           .synthesize(
             const TtsRequest(requestId: 'fx2', text: 'ignored too'),
             control,
-            const TtsAudioSpec(format: TtsAudioFormat.mp3),
+            _mp3Spec,
           )
           .toList();
 
@@ -333,7 +342,7 @@ void main() {
         engineId: 'file-engine-format-guard',
         provider: RawBytesContentProvider(
           bytes: Uint8List.fromList([1, 2, 3]),
-          audioSpec: const TtsAudioSpec(format: TtsAudioFormat.mp3),
+          audioSpec: _mp3Spec,
         ),
       );
 
@@ -342,7 +351,7 @@ void main() {
             .synthesize(
               const TtsRequest(requestId: 'fx3', text: 'ignored'),
               SynthesisControl(),
-              const TtsAudioSpec(format: TtsAudioFormat.pcm),
+              _pcmSpec,
             )
             .drain(),
         throwsA(
@@ -362,7 +371,7 @@ void main() {
         engineId: 'file-engine-cancel',
         provider: RawBytesContentProvider(
           bytes: payload,
-          audioSpec: const TtsAudioSpec(format: TtsAudioFormat.mp3),
+          audioSpec: _mp3Spec,
         ),
         chunkSizeBytes: 100,
         maxBytesPerSecond: 1200,
@@ -376,7 +385,7 @@ void main() {
           .synthesize(
         const TtsRequest(requestId: 'fx4', text: 'ignored too'),
         control,
-        const TtsAudioSpec(format: TtsAudioFormat.mp3),
+        _mp3Spec,
       )
           .listen(
         (chunk) {
@@ -740,7 +749,7 @@ void main() {
           .synthesize(
             const TtsRequest(requestId: 'o1', text: 'hello'),
             SynthesisControl(),
-            TtsAudioSpec(format: TtsAudioFormat.mp3),
+            _mp3Spec,
           )
           .toList();
 
@@ -770,7 +779,7 @@ void main() {
             .synthesize(
               const TtsRequest(requestId: 'o2', text: 'hello'),
               SynthesisControl(),
-              TtsAudioSpec(format: TtsAudioFormat.mp3),
+              _mp3Spec,
             )
             .toList(),
         throwsA(
@@ -850,7 +859,7 @@ void main() {
             .synthesize(
               const TtsRequest(requestId: 'o3', text: 'hello'),
               SynthesisControl(),
-              TtsAudioSpec(format: TtsAudioFormat.mp3),
+              _mp3Spec,
             )
             .toList(),
         throwsA(
@@ -877,7 +886,7 @@ void main() {
             .synthesize(
               const TtsRequest(requestId: 'o4', text: 'hello'),
               SynthesisControl(),
-              TtsAudioSpec(format: TtsAudioFormat.mp3),
+              _mp3Spec,
             )
             .toList(),
         throwsA(
@@ -905,7 +914,7 @@ void main() {
           .synthesize(
             const TtsRequest(requestId: 'j1', text: 'hello'),
             SynthesisControl(),
-            TtsAudioSpec(format: TtsAudioFormat.mp3),
+            _mp3Spec,
           )
           .toList();
 

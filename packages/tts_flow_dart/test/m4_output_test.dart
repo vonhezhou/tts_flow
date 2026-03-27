@@ -4,6 +4,15 @@ import 'dart:typed_data';
 import 'package:test/test.dart';
 import 'package:tts_flow_dart/tts_flow_dart.dart';
 
+const _pcmDescriptor = PcmDescriptor(
+  sampleRateHz: 24000,
+  bitsPerSample: 16,
+  channels: 1,
+);
+
+const _pcmSpec = TtsAudioSpec.pcm(_pcmDescriptor);
+const _mp3Spec = TtsAudioSpec.mp3();
+
 void main() {
   group('M4 mp3 frame header', () {
     test('parses frame metadata and skips ID3v2 tag', () {
@@ -30,7 +39,7 @@ void main() {
       final output = MemoryOutput();
       const session = TtsOutputSession(
         requestId: 'mem-1',
-        audioSpec: TtsAudioSpec(format: TtsAudioFormat.pcm),
+        audioSpec: _pcmSpec,
         voice: null,
         options: null,
       );
@@ -56,7 +65,7 @@ void main() {
       await output.initSession(
         const TtsOutputSession(
           requestId: 'a',
-          audioSpec: TtsAudioSpec(format: TtsAudioFormat.mp3),
+          audioSpec: _mp3Spec,
           voice: null,
           options: null,
         ),
@@ -69,7 +78,7 @@ void main() {
       await output.initSession(
         const TtsOutputSession(
           requestId: 'b',
-          audioSpec: TtsAudioSpec(format: TtsAudioFormat.pcm),
+          audioSpec: _pcmSpec,
           voice: null,
           options: null,
         ),
@@ -89,7 +98,7 @@ void main() {
       final output = NullOutput();
       const session = TtsOutputSession(
         requestId: 'null-1',
-        audioSpec: TtsAudioSpec(format: TtsAudioFormat.pcm),
+        audioSpec: _pcmSpec,
         voice: null,
         options: null,
       );
@@ -113,7 +122,7 @@ void main() {
       final output = NullOutput();
       const session = TtsOutputSession(
         requestId: 'null-2',
-        audioSpec: TtsAudioSpec(format: TtsAudioFormat.mp3),
+        audioSpec: _mp3Spec,
         voice: null,
         options: null,
       );
@@ -144,7 +153,7 @@ void main() {
         );
         const session = TtsOutputSession(
           requestId: 'wav-1',
-          audioSpec: TtsAudioSpec(format: TtsAudioFormat.pcm, pcm: descriptor),
+          audioSpec: TtsAudioSpec.pcm(descriptor),
           voice: null,
           options: TtsOptions(sampleRateHz: 16000),
         );
@@ -188,7 +197,7 @@ void main() {
 
         const session = TtsOutputSession(
           requestId: 'mp3-1',
-          audioSpec: TtsAudioSpec(format: TtsAudioFormat.mp3),
+          audioSpec: _mp3Spec,
           voice: null,
           options: null,
         );
@@ -233,7 +242,7 @@ void main() {
         await output.initSession(
           const TtsOutputSession(
             requestId: 'mp3-append-1',
-            audioSpec: TtsAudioSpec(format: TtsAudioFormat.mp3),
+            audioSpec: _mp3Spec,
             voice: null,
             options: null,
           ),
@@ -246,7 +255,7 @@ void main() {
         await output.initSession(
           const TtsOutputSession(
             requestId: 'mp3-append-2',
-            audioSpec: TtsAudioSpec(format: TtsAudioFormat.mp3),
+            audioSpec: _mp3Spec,
             voice: null,
             options: null,
           ),
@@ -291,7 +300,7 @@ void main() {
         await output.initSession(
           const TtsOutputSession(
             requestId: 'mp3-append-id3v1-1',
-            audioSpec: TtsAudioSpec(format: TtsAudioFormat.mp3),
+            audioSpec: _mp3Spec,
             voice: null,
             options: null,
           ),
@@ -304,7 +313,7 @@ void main() {
         await output.initSession(
           const TtsOutputSession(
             requestId: 'mp3-append-id3v1-2',
-            audioSpec: TtsAudioSpec(format: TtsAudioFormat.mp3),
+            audioSpec: _mp3Spec,
             voice: null,
             options: null,
           ),
@@ -345,19 +354,24 @@ void main() {
           final output = Mp3FileOutput(outputPath);
           final baselineBytes = _mp3Bytes(
             frames: 1,
+            version: Mp3MpegVersion.mpeg25,
+            layer: Mp3Layer.layer3,
             sampleRateHz: 8000,
             channelMode: Mp3ChannelMode.mono,
           );
           final mismatchedBytes = _mp3Bytes(
             frames: 1,
-            sampleRateHz: 11025,
+            version: Mp3MpegVersion.mpeg1,
+            layer: Mp3Layer.layer3,
+            bitrateKbps: 32,
+            sampleRateHz: 44100,
             channelMode: Mp3ChannelMode.mono,
           );
 
           await output.initSession(
             const TtsOutputSession(
               requestId: 'mp3-mismatch-1',
-              audioSpec: TtsAudioSpec(format: TtsAudioFormat.mp3),
+              audioSpec: _mp3Spec,
               voice: null,
               options: null,
             ),
@@ -376,7 +390,7 @@ void main() {
           await output.initSession(
             const TtsOutputSession(
               requestId: 'mp3-mismatch-2',
-              audioSpec: TtsAudioSpec(format: TtsAudioFormat.mp3),
+              audioSpec: _mp3Spec,
               voice: null,
               options: null,
             ),
@@ -408,7 +422,7 @@ void main() {
           await output.initSession(
             const TtsOutputSession(
               requestId: 'mp3-mismatch-3',
-              audioSpec: TtsAudioSpec(format: TtsAudioFormat.mp3),
+              audioSpec: _mp3Spec,
               voice: null,
               options: null,
             ),
@@ -431,23 +445,51 @@ void main() {
     );
 
     test(
-      'WavFileOutput clears temp and state after finalize failure',
+      'WavFileOutput clears temp and state after initSession failure',
       () async {
         final tempDir = await Directory.systemTemp.createTemp(
           'uni_tts_wav_finalize_fail_',
         );
+        final outputPath =
+            '${tempDir.path}${Platform.pathSeparator}finalize-fail.wav';
+        final output = WavFileOutput(outputPath);
         try {
-          final outputPath =
-              '${tempDir.path}${Platform.pathSeparator}finalize-fail.wav';
-          final output = WavFileOutput(outputPath);
+          const baselineDescriptor = PcmDescriptor(
+            sampleRateHz: 24000,
+            bitsPerSample: 16,
+            channels: 1,
+          );
+          await output.initSession(
+            const TtsOutputSession(
+              requestId: 'wav-finalize-fail-0',
+              audioSpec: TtsAudioSpec.pcm(baselineDescriptor),
+              voice: null,
+              options: null,
+            ),
+          );
+          await output.consumeChunk(
+            _pcmChunk(
+              'wav-finalize-fail-0',
+              0,
+              [7, 8],
+              baselineDescriptor,
+              isLast: true,
+            ),
+          );
+          await output.finalizeSession();
 
+          const mismatchedDescriptor = PcmDescriptor(
+            sampleRateHz: 16000,
+            bitsPerSample: 16,
+            channels: 1,
+          );
           await expectLater(
             output.initSession(
               const TtsOutputSession(
                 requestId: 'wav-finalize-fail-1',
-                audioSpec: TtsAudioSpec(format: TtsAudioFormat.pcm),
+                audioSpec: TtsAudioSpec.pcm(mismatchedDescriptor),
                 voice: null,
-                options: TtsOptions(sampleRateHz: -1),
+                options: null,
               ),
             ),
             throwsA(
@@ -461,18 +503,10 @@ void main() {
 
           expect(await File('$outputPath.tmp').exists(), isFalse);
 
-          const descriptor = PcmDescriptor(
-            sampleRateHz: 24000,
-            bitsPerSample: 16,
-            channels: 1,
-          );
           await output.initSession(
             const TtsOutputSession(
               requestId: 'wav-finalize-fail-2',
-              audioSpec: TtsAudioSpec(
-                format: TtsAudioFormat.pcm,
-                pcm: descriptor,
-              ),
+              audioSpec: TtsAudioSpec.pcm(baselineDescriptor),
               voice: null,
               options: null,
             ),
@@ -482,13 +516,14 @@ void main() {
               'wav-finalize-fail-2',
               0,
               [1, 2, 3],
-              descriptor,
+              baselineDescriptor,
               isLast: true,
             ),
           );
           final artifact = await output.finalizeSession() as FileAudioArtifact;
           expect(artifact.filePath, outputPath);
         } finally {
+          await output.dispose();
           await tempDir.delete(recursive: true);
         }
       },
@@ -509,7 +544,7 @@ void main() {
         );
         const session = TtsOutputSession(
           requestId: 'wav-2',
-          audioSpec: TtsAudioSpec(format: TtsAudioFormat.pcm, pcm: descriptor),
+          audioSpec: TtsAudioSpec.pcm(descriptor),
           voice: null,
           options: null,
         );
@@ -544,7 +579,7 @@ void main() {
 
         const session = TtsOutputSession(
           requestId: 'pcm-1',
-          audioSpec: TtsAudioSpec(format: TtsAudioFormat.pcm, pcm: descriptor),
+          audioSpec: TtsAudioSpec.pcm(descriptor),
           voice: null,
           options: null,
         );
@@ -591,10 +626,7 @@ void main() {
           await output.initSession(
             const TtsOutputSession(
               requestId: 'append-1',
-              audioSpec: TtsAudioSpec(
-                format: TtsAudioFormat.pcm,
-                pcm: descriptor,
-              ),
+              audioSpec: TtsAudioSpec.pcm(descriptor),
               voice: null,
               options: null,
             ),
@@ -607,10 +639,7 @@ void main() {
           await output.initSession(
             const TtsOutputSession(
               requestId: 'append-2',
-              audioSpec: TtsAudioSpec(
-                format: TtsAudioFormat.pcm,
-                pcm: descriptor,
-              ),
+              audioSpec: TtsAudioSpec.pcm(descriptor),
               voice: null,
               options: null,
             ),
@@ -660,10 +689,7 @@ void main() {
           await output.initSession(
             const TtsOutputSession(
               requestId: 'mismatch-1',
-              audioSpec: TtsAudioSpec(
-                format: TtsAudioFormat.pcm,
-                pcm: lockedDescriptor,
-              ),
+              audioSpec: TtsAudioSpec.pcm(lockedDescriptor),
               voice: null,
               options: null,
             ),
@@ -679,10 +705,7 @@ void main() {
             output.initSession(
               const TtsOutputSession(
                 requestId: 'mismatch-2',
-                audioSpec: TtsAudioSpec(
-                  format: TtsAudioFormat.pcm,
-                  pcm: mismatchedDescriptor,
-                ),
+                audioSpec: TtsAudioSpec.pcm(mismatchedDescriptor),
                 voice: null,
                 options: null,
               ),
@@ -722,10 +745,7 @@ void main() {
           await output.initSession(
             const TtsOutputSession(
               requestId: 'preserve-1',
-              audioSpec: TtsAudioSpec(
-                format: TtsAudioFormat.pcm,
-                pcm: descriptor,
-              ),
+              audioSpec: TtsAudioSpec.pcm(descriptor),
               voice: null,
               options: null,
             ),
@@ -740,10 +760,7 @@ void main() {
           await output.initSession(
             const TtsOutputSession(
               requestId: 'preserve-2',
-              audioSpec: TtsAudioSpec(
-                format: TtsAudioFormat.pcm,
-                pcm: descriptor,
-              ),
+              audioSpec: TtsAudioSpec.pcm(descriptor),
               voice: null,
               options: null,
             ),
@@ -783,7 +800,7 @@ void main() {
           await output.initSession(
             const TtsOutputSession(
               requestId: 'mp3-preserve-1',
-              audioSpec: TtsAudioSpec(format: TtsAudioFormat.mp3),
+              audioSpec: _mp3Spec,
               voice: null,
               options: null,
             ),
@@ -798,7 +815,7 @@ void main() {
           await output.initSession(
             const TtsOutputSession(
               requestId: 'mp3-preserve-2',
-              audioSpec: TtsAudioSpec(format: TtsAudioFormat.mp3),
+              audioSpec: _mp3Spec,
               voice: null,
               options: null,
             ),
@@ -849,7 +866,7 @@ void main() {
 
         const session = TtsOutputSession(
           requestId: 'Multicast-1',
-          audioSpec: TtsAudioSpec(format: TtsAudioFormat.pcm),
+          audioSpec: _pcmSpec,
           voice: null,
           options: null,
         );
@@ -879,7 +896,7 @@ void main() {
 
       const session = TtsOutputSession(
         requestId: 'Multicast-2',
-        audioSpec: TtsAudioSpec(format: TtsAudioFormat.pcm),
+        audioSpec: _pcmSpec,
         voice: null,
         options: null,
       );
@@ -917,7 +934,7 @@ void main() {
 
         const session = TtsOutputSession(
           requestId: 'Multicast-init-rollback',
-          audioSpec: TtsAudioSpec(format: TtsAudioFormat.pcm),
+          audioSpec: _pcmSpec,
           voice: null,
           options: null,
         );
@@ -953,7 +970,7 @@ void main() {
 
       const session = TtsOutputSession(
         requestId: 'Multicast-finalize-rollback',
-        audioSpec: TtsAudioSpec(format: TtsAudioFormat.pcm),
+        audioSpec: _pcmSpec,
         voice: null,
         options: null,
       );
@@ -1113,10 +1130,23 @@ TtsChunk _chunk(
     requestId: requestId,
     sequenceNumber: seq,
     bytes: Uint8List.fromList(bytes),
-    audioSpec: TtsAudioSpec(format: format),
+    audioSpec: _audioSpecForFormat(format),
     isLastChunk: isLast,
     timestamp: DateTime.now().toUtc(),
   );
+}
+
+TtsAudioSpec _audioSpecForFormat(TtsAudioFormat format) {
+  switch (format) {
+    case TtsAudioFormat.pcm:
+      return _pcmSpec;
+    case TtsAudioFormat.mp3:
+      return _mp3Spec;
+    case TtsAudioFormat.opus:
+      return const TtsAudioSpec.opus();
+    case TtsAudioFormat.aac:
+      return const TtsAudioSpec.aac();
+  }
 }
 
 TtsChunk _pcmChunk(
@@ -1130,7 +1160,7 @@ TtsChunk _pcmChunk(
     requestId: requestId,
     sequenceNumber: seq,
     bytes: Uint8List.fromList(bytes),
-    audioSpec: TtsAudioSpec(format: TtsAudioFormat.pcm, pcm: descriptor),
+    audioSpec: TtsAudioSpec.pcm(descriptor),
     isLastChunk: isLast,
     timestamp: DateTime.now().toUtc(),
   );

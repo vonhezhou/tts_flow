@@ -3,6 +3,15 @@ import 'dart:typed_data';
 import 'package:test/test.dart';
 import 'package:tts_flow_dart/tts_flow_dart.dart';
 
+const _pcmDescriptor = PcmDescriptor(
+  sampleRateHz: 24000,
+  bitsPerSample: 16,
+  channels: 1,
+);
+
+const _pcmSpec = TtsAudioSpec.pcm(_pcmDescriptor);
+const _mp3Spec = TtsAudioSpec.mp3();
+
 void main() {
   group('M1 contracts', () {
     test('synthesis control keeps first cancellation reason', () {
@@ -27,14 +36,24 @@ void main() {
       final control = SynthesisControl();
 
       final chunks = await engine
-          .synthesize(
-              request, control, TtsAudioSpec(format: TtsAudioFormat.pcm))
+          .synthesize(request, control, _pcmSpec)
           .toList();
 
       expect(chunks, hasLength(1));
       expect(chunks.first.sequenceNumber, 0);
       expect(chunks.first.isLastChunk, isTrue);
       expect(chunks.first.audioSpec.format, TtsAudioFormat.pcm);
+    });
+
+    test('audio spec named constructors preserve descriptor semantics', () {
+      const mp3Spec = TtsAudioSpec.mp3();
+
+      expect(_pcmSpec.format, TtsAudioFormat.pcm);
+      expect(_pcmSpec.pcm, _pcmDescriptor);
+      expect(_pcmSpec.requirePcm, _pcmDescriptor);
+      expect(mp3Spec.format, TtsAudioFormat.mp3);
+      expect(mp3Spec.pcm, isNull);
+      expect(() => mp3Spec.requirePcm, throwsStateError);
     });
 
     test('fake engine emits multiple ordered chunks', () async {
@@ -48,8 +67,7 @@ void main() {
       final control = SynthesisControl();
 
       final chunks = await engine
-          .synthesize(
-              request, control, TtsAudioSpec(format: TtsAudioFormat.mp3))
+          .synthesize(request, control, _mp3Spec)
           .toList();
 
       expect(chunks.length, greaterThanOrEqualTo(2));
@@ -65,7 +83,7 @@ void main() {
       final output = NullOutput();
       const session = TtsOutputSession(
         requestId: 'r3',
-        audioSpec: TtsAudioSpec(format: TtsAudioFormat.pcm),
+        audioSpec: _pcmSpec,
         voice: null,
         options: null,
       );
@@ -76,7 +94,7 @@ void main() {
           requestId: 'r3',
           sequenceNumber: 0,
           bytes: Uint8List.fromList([1, 2, 3]),
-          audioSpec: TtsAudioSpec(format: TtsAudioFormat.pcm),
+          audioSpec: _pcmSpec,
           isLastChunk: true,
           timestamp: DateTime.now().toUtc(),
         ),

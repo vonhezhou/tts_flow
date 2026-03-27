@@ -3,6 +3,15 @@ import 'dart:typed_data';
 import 'package:test/test.dart';
 import 'package:tts_flow_dart/tts_flow_dart.dart';
 
+const _pcmDescriptor = PcmDescriptor(
+  sampleRateHz: 24000,
+  bitsPerSample: 16,
+  channels: 1,
+);
+
+const _pcmSpec = TtsAudioSpec.pcm(_pcmDescriptor);
+const _mp3Spec = TtsAudioSpec.mp3();
+
 void main() {
   group('M5 speaker output', () {
     test('finalize returns playback artifact with metadata', () async {
@@ -12,7 +21,7 @@ void main() {
       await output.initSession(
         const TtsOutputSession(
           requestId: 'spk-1',
-          audioSpec: TtsAudioSpec(format: TtsAudioFormat.mp3),
+          audioSpec: _mp3Spec,
           voice: null,
           options: null,
         ),
@@ -42,7 +51,7 @@ void main() {
       await output.initSession(
         const TtsOutputSession(
           requestId: 'spk-2',
-          audioSpec: TtsAudioSpec(format: TtsAudioFormat.pcm),
+          audioSpec: _pcmSpec,
           voice: null,
           options: null,
         ),
@@ -63,7 +72,7 @@ void main() {
       await output.initSession(
         const TtsOutputSession(
           requestId: 'spk-a',
-          audioSpec: TtsAudioSpec(format: TtsAudioFormat.mp3),
+          audioSpec: _mp3Spec,
           voice: null,
           options: null,
         ),
@@ -74,7 +83,7 @@ void main() {
       await output.initSession(
         const TtsOutputSession(
           requestId: 'spk-b',
-          audioSpec: TtsAudioSpec(format: TtsAudioFormat.pcm),
+          audioSpec: _pcmSpec,
           voice: null,
           options: null,
         ),
@@ -93,10 +102,23 @@ TtsChunk _chunk(String requestId, List<int> bytes, TtsAudioFormat format) {
     requestId: requestId,
     sequenceNumber: 0,
     bytes: Uint8List.fromList(bytes),
-    audioSpec: TtsAudioSpec(format: format),
+    audioSpec: _audioSpecForFormat(format),
     isLastChunk: false,
     timestamp: DateTime.now().toUtc(),
   );
+}
+
+TtsAudioSpec _audioSpecForFormat(TtsAudioFormat format) {
+  switch (format) {
+    case TtsAudioFormat.pcm:
+      return _pcmSpec;
+    case TtsAudioFormat.mp3:
+      return _mp3Spec;
+    case TtsAudioFormat.opus:
+      return const TtsAudioSpec.opus();
+    case TtsAudioFormat.aac:
+      return const TtsAudioSpec.aac();
+  }
 }
 
 final class _FakeSpeakerBackend implements SpeakerBackend {

@@ -16,9 +16,12 @@ final class NullOutput implements TtsOutput {
   final String outputId;
 
   @override
-  Set<AudioCapability> get acceptedCapabilities => TtsAudioFormat.values
-      .map((format) => SimpleFormatCapability(format: format))
-      .toSet();
+  Set<AudioCapability> get acceptedCapabilities => {
+        PcmCapability.wav(),
+        const SimpleFormatCapability(format: TtsAudioFormat.mp3),
+        const SimpleFormatCapability(format: TtsAudioFormat.opus),
+        const SimpleFormatCapability(format: TtsAudioFormat.aac),
+      };
 
   TtsOutputSession? _session;
 

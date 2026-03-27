@@ -16,7 +16,7 @@ final class Mp3FileContentProvider implements FileContentProvider {
   final String filePath;
 
   @override
-  TtsAudioSpec get audioSpec => const TtsAudioSpec(format: TtsAudioFormat.mp3);
+  TtsAudioSpec get audioSpec => const TtsAudioSpec.mp3();
 
   @override
   Set<AudioCapability> get supportedCapabilities => const {

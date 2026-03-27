@@ -124,7 +124,7 @@ Future<void> playFixedBytes() async {
     engineId: 'fixed-bytes',
     provider: RawBytesContentProvider(
       bytes: payload,
-      audioSpec: const TtsAudioSpec(format: TtsAudioFormat.mp3),
+      audioSpec: const TtsAudioSpec.mp3(),
     ),
     chunkSizeBytes: 3,
     maxBytesPerSecond: 8000,
@@ -134,7 +134,7 @@ Future<void> playFixedBytes() async {
       .synthesize(
         const TtsRequest(requestId: 'raw-1', text: 'ignored input text'),
         SynthesisControl(),
-        const TtsAudioSpec(format: TtsAudioFormat.mp3),
+        const TtsAudioSpec.mp3(),
       )
       .toList();
 
@@ -161,7 +161,7 @@ Future<void> playMp3File() async {
   final stream = engine.synthesize(
     const TtsRequest(requestId: 'mp3-1', text: 'ignored input text'),
     SynthesisControl(),
-    const TtsAudioSpec(format: TtsAudioFormat.mp3),
+    const TtsAudioSpec.mp3(),
   );
 
   await stream.drain();
@@ -177,6 +177,12 @@ Each emitted chunk is wrapped as a self-contained WAV blob
 import 'package:tts_flow_dart/tts_flow_dart.dart';
 
 Future<void> playWavOrPcm() async {
+  const wavDescriptor = PcmDescriptor(
+    sampleRateHz: 16000,
+    bitsPerSample: 16,
+    channels: 1,
+  );
+
   final wavEngine = FileTtsEngine(
     engineId: 'file-wav',
     provider: WavFileContentProvider.fromWav('assets/voice.wav'),
@@ -200,7 +206,7 @@ Future<void> playWavOrPcm() async {
       .synthesize(
         const TtsRequest(requestId: 'wav-1', text: 'ignored'),
         SynthesisControl(),
-        const TtsAudioSpec(format: TtsAudioFormat.wav),
+        const TtsAudioSpec.pcm(wavDescriptor),
       )
       .drain();
 
@@ -208,7 +214,7 @@ Future<void> playWavOrPcm() async {
       .synthesize(
         const TtsRequest(requestId: 'pcm-1', text: 'ignored'),
         SynthesisControl(),
-        const TtsAudioSpec(format: TtsAudioFormat.wav),
+        const TtsAudioSpec.pcm(wavDescriptor),
       )
       .drain();
 }

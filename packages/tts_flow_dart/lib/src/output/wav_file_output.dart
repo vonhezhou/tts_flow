@@ -194,7 +194,7 @@ final class WavFileOutput implements TtsOutput {
 
       return FileAudioArtifact(
         requestId: session.requestId,
-        audioSpec: TtsAudioSpec(format: TtsAudioFormat.pcm, pcm: descriptor),
+        audioSpec: TtsAudioSpec.pcm(descriptor),
         filePath: targetFile.path,
         fileSizeBytes: fileSize,
       );

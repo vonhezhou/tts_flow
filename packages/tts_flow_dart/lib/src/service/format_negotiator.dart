@@ -39,8 +39,14 @@ final class TtsFormatNegotiator {
       requestId: requestId,
     );
 
-    if (selectedFormat != TtsAudioFormat.pcm) {
-      return TtsAudioSpec(format: selectedFormat);
+    if (selectedFormat == TtsAudioFormat.mp3) {
+      return const TtsAudioSpec.mp3();
+    }
+    if (selectedFormat == TtsAudioFormat.opus) {
+      return const TtsAudioSpec.opus();
+    }
+    if (selectedFormat == TtsAudioFormat.aac) {
+      return const TtsAudioSpec.aac();
     }
 
     final pcmDescriptor = _resolvePcmDescriptor(
@@ -49,10 +55,7 @@ final class TtsFormatNegotiator {
       requestId: requestId,
       preferredSampleRateHz: preferredSampleRateHz,
     );
-    return TtsAudioSpec(
-      format: TtsAudioFormat.pcm,
-      pcm: pcmDescriptor,
-    );
+    return TtsAudioSpec.pcm(pcmDescriptor);
   }
 
   TtsAudioFormat negotiate({
