@@ -128,8 +128,8 @@ final class _FakeSpeakerBackend implements SpeakerBackend {
 
   @override
   Set<AudioCapability> get supportedCapabilities => {
-        const SimpleFormatCapability(format: TtsAudioFormat.mp3),
-        const SimpleFormatCapability(format: TtsAudioFormat.pcm),
+        const Mp3Capability(),
+        PcmCapability.wav(),
       };
 
   final Map<String, TtsAudioSpec> startedSpecs = <String, TtsAudioSpec>{};

@@ -121,7 +121,7 @@ final class _FailingEngine implements TtsEngine {
 
   @override
   Set<AudioCapability> get supportedCapabilities => {
-    const SimpleFormatCapability(format: TtsAudioFormat.mp3),
+    const Mp3Capability(),
   };
 
   @override

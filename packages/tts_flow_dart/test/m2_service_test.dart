@@ -589,7 +589,7 @@ final class _CaptureCancelOutput implements TtsOutput {
   @override
   Set<AudioCapability> get acceptedCapabilities => {
     PcmCapability.wav(),
-    const SimpleFormatCapability(format: TtsAudioFormat.mp3),
+    const Mp3Capability(),
   };
 
   @override
@@ -704,7 +704,7 @@ final class _TrackingOutput implements TtsOutput {
   @override
   Set<AudioCapability> get acceptedCapabilities => {
     PcmCapability.wav(),
-    const SimpleFormatCapability(format: TtsAudioFormat.mp3),
+    const Mp3Capability(),
   };
 
   @override

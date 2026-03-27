@@ -354,7 +354,7 @@ final class MulticastOutput implements TtsOutput {
       }
 
       if (leftCapability.format != TtsAudioFormat.pcm) {
-        result.add(SimpleFormatCapability(format: leftCapability.format));
+        result.add(_formatToCapability(leftCapability.format));
         continue;
       }
 
@@ -470,5 +470,14 @@ final class MulticastOutput implements TtsOutput {
     }
 
     return leftValues.intersection(rightValues);
+  }
+
+  AudioCapability _formatToCapability(TtsAudioFormat format) {
+    return switch (format) {
+      TtsAudioFormat.pcm => PcmCapability(),
+      TtsAudioFormat.mp3 => const Mp3Capability(),
+      TtsAudioFormat.opus => const OpusCapability(),
+      TtsAudioFormat.aac => const AacCapability(),
+    };
   }
 }

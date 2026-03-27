@@ -2,7 +2,6 @@ import 'dart:typed_data';
 
 import 'package:tts_flow_dart/src/core/audio_artifact.dart';
 import 'package:tts_flow_dart/src/core/audio_capability.dart';
-import 'package:tts_flow_dart/src/core/audio_spec.dart';
 import 'package:tts_flow_dart/src/core/synthesis_control.dart';
 import 'package:tts_flow_dart/src/core/tts_chunk.dart';
 import 'package:tts_flow_dart/src/core/tts_output.dart';
@@ -18,9 +17,9 @@ final class NullOutput implements TtsOutput {
   @override
   Set<AudioCapability> get acceptedCapabilities => {
         PcmCapability.wav(),
-        const SimpleFormatCapability(format: TtsAudioFormat.mp3),
-        const SimpleFormatCapability(format: TtsAudioFormat.opus),
-        const SimpleFormatCapability(format: TtsAudioFormat.aac),
+        const Mp3Capability(),
+        const OpusCapability(),
+        const AacCapability(),
       };
 
   TtsOutputSession? _session;

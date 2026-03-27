@@ -20,7 +20,7 @@ final class Mp3FileContentProvider implements FileContentProvider {
 
   @override
   Set<AudioCapability> get supportedCapabilities => const {
-        SimpleFormatCapability(format: TtsAudioFormat.mp3),
+        Mp3Capability(),
       };
 
   @override

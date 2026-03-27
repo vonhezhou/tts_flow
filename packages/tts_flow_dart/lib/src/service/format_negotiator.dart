@@ -67,16 +67,25 @@ final class TtsFormatNegotiator {
   }) {
     final resolved = negotiateSpec(
       engineCapabilities: engineFormats
-          .map((format) => SimpleFormatCapability(format: format))
+          .map(_formatToCapability)
           .toSet(),
       outputCapabilities: outputFormats
-          .map((format) => SimpleFormatCapability(format: format))
+          .map(_formatToCapability)
           .toSet(),
       preferredOrder: preferredOrder,
       requestId: requestId,
       preferredFormat: preferredFormat,
     );
     return resolved.format;
+  }
+
+  AudioCapability _formatToCapability(TtsAudioFormat format) {
+    return switch (format) {
+      TtsAudioFormat.pcm => PcmCapability(),
+      TtsAudioFormat.mp3 => const Mp3Capability(),
+      TtsAudioFormat.opus => const OpusCapability(),
+      TtsAudioFormat.aac => const AacCapability(),
+    };
   }
 
   Set<TtsAudioFormat> _intersectFormats(

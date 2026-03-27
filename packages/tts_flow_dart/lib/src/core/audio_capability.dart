@@ -15,9 +15,22 @@ sealed class AudioCapability {
   }
 }
 
-/// Capability for non-PCM formats where only the format value is needed.
-final class SimpleFormatCapability extends AudioCapability {
-  const SimpleFormatCapability({required super.format});
+/// Capability for MP3 format.
+/// This ensures the correct format is encoded at compile time, preventing misuse.
+final class Mp3Capability extends AudioCapability {
+  const Mp3Capability() : super(format: TtsAudioFormat.mp3);
+}
+
+/// Capability for Opus format.
+/// This ensures the correct format is encoded at compile time, preventing misuse.
+final class OpusCapability extends AudioCapability {
+  const OpusCapability() : super(format: TtsAudioFormat.opus);
+}
+
+/// Capability for AAC format.
+/// This ensures the correct format is encoded at compile time, preventing misuse.
+final class AacCapability extends AudioCapability {
+  const AacCapability() : super(format: TtsAudioFormat.aac);
 }
 
 /// Capability for PCM format that constrains descriptor fields.

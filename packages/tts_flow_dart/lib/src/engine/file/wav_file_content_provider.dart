@@ -29,8 +29,8 @@ final class WavFileContentProvider implements FileContentProvider {
   TtsAudioSpec get audioSpec => TtsAudioSpec.pcm(_pcmDescriptor);
 
   @override
-  Set<AudioCapability> get supportedCapabilities => const {
-        SimpleFormatCapability(format: TtsAudioFormat.pcm),
+  Set<AudioCapability> get supportedCapabilities => {
+        PcmCapability(),
       };
 
   @override

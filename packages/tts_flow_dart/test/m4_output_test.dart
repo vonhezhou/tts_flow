@@ -1020,7 +1020,7 @@ final class _FailingTestOutput implements TtsOutput {
 
   @override
   Set<AudioCapability> get acceptedCapabilities => {
-    const SimpleFormatCapability(format: TtsAudioFormat.pcm),
+    PcmCapability.wav(),
   };
 
   @override

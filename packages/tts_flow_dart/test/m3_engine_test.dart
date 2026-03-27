@@ -223,10 +223,10 @@ void main() {
       try {
         negotiator.negotiateSpec(
           engineCapabilities: {
-            const SimpleFormatCapability(format: TtsAudioFormat.mp3),
+            const Mp3Capability(),
           },
           outputCapabilities: {
-            const SimpleFormatCapability(format: TtsAudioFormat.pcm),
+            PcmCapability(),
           },
           preferredOrder: const [TtsAudioFormat.pcm],
           requestId: 'n4',

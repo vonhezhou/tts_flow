@@ -26,7 +26,7 @@ final class Mp3FileOutput implements TtsOutput {
 
   @override
   Set<AudioCapability> get acceptedCapabilities => {
-    const SimpleFormatCapability(format: TtsAudioFormat.mp3),
+    const Mp3Capability(),
   };
 
   @override

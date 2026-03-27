@@ -3,6 +3,16 @@ import 'dart:typed_data';
 import 'package:tts_flow_dart/src/core/audio_capability.dart';
 import 'package:tts_flow_dart/src/core/audio_spec.dart';
 
+/// Converts a TtsAudioFormat to the appropriate AudioCapability subclass.
+AudioCapability _formatToCapability(TtsAudioFormat format) {
+  return switch (format) {
+    TtsAudioFormat.pcm => PcmCapability(),
+    TtsAudioFormat.mp3 => const Mp3Capability(),
+    TtsAudioFormat.opus => const OpusCapability(),
+    TtsAudioFormat.aac => const AacCapability(),
+  };
+}
+
 /// Supplies deterministic audio bytes for [FileTtsEngine].
 ///
 /// Providers are responsible for parsing/normalizing file content and yielding
@@ -28,7 +38,7 @@ final class RawBytesContentProvider implements FileContentProvider {
         _supportedCapabilities = Set.unmodifiable(
           supportedCapabilities ??
               <AudioCapability>{
-                SimpleFormatCapability(format: audioSpec.format),
+                _formatToCapability(audioSpec.format),
               },
         );
 

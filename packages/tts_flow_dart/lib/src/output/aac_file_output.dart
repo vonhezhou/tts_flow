@@ -38,7 +38,7 @@ final class AacFileOutput implements TtsOutput {
 
   @override
   Set<AudioCapability> get acceptedCapabilities => {
-    const SimpleFormatCapability(format: TtsAudioFormat.aac),
+    const AacCapability(),
   };
 
   @override
