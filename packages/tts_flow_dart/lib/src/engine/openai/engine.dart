@@ -119,6 +119,7 @@ class OpenAiTtsEngine implements TtsEngine {
   Set<AudioCapability> get supportedCapabilities => {
     const SimpleFormatCapability(format: TtsAudioFormat.mp3),
     const SimpleFormatCapability(format: TtsAudioFormat.aac),
+    const SimpleFormatCapability(format: TtsAudioFormat.opus),
     PcmCapability(
       sampleRatesHz: {_openAiPcmSampleRateHz},
       bitsPerSample: {_openAiPcmBitsPerSample},
