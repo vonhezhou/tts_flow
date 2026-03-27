@@ -3,10 +3,7 @@ import 'dart:typed_data';
 import 'package:tts_flow_dart/tts_flow_dart.dart';
 
 sealed class AudioArtifact {
-  const AudioArtifact({
-    required this.requestId,
-    required this.audioSpec,
-  });
+  const AudioArtifact({required this.requestId, required this.audioSpec});
 
   final String requestId;
   final TtsAudioSpec audioSpec;
@@ -41,11 +38,16 @@ final class PlaybackAudioArtifact extends AudioArtifact {
     required super.requestId,
     required super.audioSpec,
     required this.playbackId,
-    required this.playbackDuration,
+    required this.bufferedAudioDuration,
   });
 
   final String playbackId;
-  final Duration playbackDuration;
+
+  /// Duration of audio accepted by the speaker backend when ingestion closed.
+  ///
+  /// This is not guaranteed to be the wall-clock time when device playback
+  /// physically finished.
+  final Duration bufferedAudioDuration;
 }
 
 final class MulticastAudioArtifact extends AudioArtifact {
@@ -54,8 +56,8 @@ final class MulticastAudioArtifact extends AudioArtifact {
     required super.audioSpec,
     required Map<String, AudioArtifact> artifacts,
     required Map<String, TtsError> outputErrors,
-  })  : artifacts = Map.unmodifiable(artifacts),
-        outputErrors = Map.unmodifiable(outputErrors);
+  }) : artifacts = Map.unmodifiable(artifacts),
+       outputErrors = Map.unmodifiable(outputErrors);
 
   final Map<String, AudioArtifact> artifacts;
   final Map<String, TtsError> outputErrors;

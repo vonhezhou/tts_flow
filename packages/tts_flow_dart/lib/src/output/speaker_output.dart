@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:tts_flow_dart/src/core/audio_artifact.dart';
 import 'package:tts_flow_dart/src/core/audio_capability.dart';
 import 'package:tts_flow_dart/src/core/audio_spec.dart';
@@ -15,7 +17,7 @@ import 'package:tts_flow_dart/src/core/tts_policy.dart';
 ///    backend-owned playback identifier.
 /// 2. [appendAudio] is called zero or more times with ordered audio chunks for
 ///    that playback.
-/// 3. The session ends with either [completePlayback] (normal finish) or
+/// 3. The session ends with either [finalizeIngestion] (normal finish) or
 ///    [stopPlayback] (cancellation/interruption).
 ///
 /// Playback control methods [pausePlayback] and [resumePlayback] are optional
@@ -24,9 +26,16 @@ import 'package:tts_flow_dart/src/core/tts_policy.dart';
 /// Contract expectations for implementers:
 /// - Treat [playbackId] as the stable key for all per-session state.
 /// - Keep audio ordering exactly as received by [appendAudio].
-/// - Reject writes after [completePlayback] or [stopPlayback] closes a session.
+/// - Reject writes after [finalizeIngestion] or [stopPlayback] closes a
+///   session.
 /// - Make [dispose] release resources even when sessions are still active.
 abstract interface class SpeakerBackend {
+  /// Emits events when a playback stream physically finishes on the speaker.
+  ///
+  /// This stream is independent from ingestion completion and can emit after
+  /// [finalizeIngestion] has returned.
+  Stream<SpeakerPlaybackCompletedEvent> get playbackCompletedEvents;
+
   /// Audio capabilities accepted by this backend.
   ///
   /// [SpeakerOutput] uses this value as its accepted capabilities and forwards
@@ -36,7 +45,7 @@ abstract interface class SpeakerBackend {
   /// Starts a new playback session for [requestId] using [audioSpec].
   ///
   /// Returns a backend-generated playback identifier that must be passed to
-  /// subsequent calls such as [appendAudio], [completePlayback], and
+  /// subsequent calls such as [appendAudio], [finalizeIngestion], and
   /// [stopPlayback].
   Future<String> startPlayback({
     required String requestId,
@@ -52,11 +61,14 @@ abstract interface class SpeakerBackend {
     required List<int> bytes,
   });
 
-  /// Completes [playbackId] and returns the final playback duration.
+  /// Closes ingestion for [playbackId] and returns the buffered media duration.
   ///
-  /// After completion, the playback session is considered closed and should no
-  /// longer accept new audio data.
-  Future<Duration> completePlayback({required String playbackId});
+  /// This call must not be interpreted as physical speaker completion. Backends
+  /// can continue rendering buffered audio after this method returns.
+  ///
+  /// After ingestion finalization, the playback session should no longer accept
+  /// new audio data.
+  Future<Duration> finalizeIngestion({required String playbackId});
 
   /// Stops [playbackId] before normal completion.
   ///
@@ -73,13 +85,46 @@ abstract interface class SpeakerBackend {
   Future<void> dispose();
 }
 
-final class SpeakerOutput implements TtsOutput {
+final class SpeakerPlaybackCompletedEvent {
+  const SpeakerPlaybackCompletedEvent({
+    required this.requestId,
+    required this.playbackId,
+    this.playedDuration,
+  });
+
+  final String requestId;
+  final String playbackId;
+
+  /// Optional elapsed playback time as reported by the speaker backend.
+  final Duration? playedDuration;
+}
+
+final class SpeakerOutput implements TtsOutput, PlaybackAwareOutput {
   SpeakerOutput({
     required SpeakerBackend backend,
     this.outputId = 'speaker-output',
-  }) : _backend = backend;
+  }) : _backend = backend,
+       _playbackCompletedController =
+           StreamController<TtsOutputPlaybackCompletedEvent>.broadcast() {
+    _playbackCompletedSubscription = _backend.playbackCompletedEvents.listen((
+      event,
+    ) {
+      _playbackCompletedController.add(
+        TtsOutputPlaybackCompletedEvent(
+          requestId: event.requestId,
+          outputId: outputId,
+          playbackId: event.playbackId,
+          playedDuration: event.playedDuration,
+        ),
+      );
+    });
+  }
 
   final SpeakerBackend _backend;
+  final StreamController<TtsOutputPlaybackCompletedEvent>
+  _playbackCompletedController;
+  late final StreamSubscription<SpeakerPlaybackCompletedEvent>
+  _playbackCompletedSubscription;
 
   @override
   final String outputId;
@@ -87,6 +132,10 @@ final class SpeakerOutput implements TtsOutput {
   @override
   Set<AudioCapability> get acceptedCapabilities =>
       _backend.supportedCapabilities;
+
+  @override
+  Stream<TtsOutputPlaybackCompletedEvent> get playbackCompletedEvents =>
+      _playbackCompletedController.stream;
 
   TtsOutputSession? _session;
   String? _playbackId;
@@ -125,7 +174,7 @@ final class SpeakerOutput implements TtsOutput {
       throw StateError('SpeakerOutput session is not initialized.');
     }
 
-    final duration = await _backend.completePlayback(playbackId: playbackId);
+    final duration = await _backend.finalizeIngestion(playbackId: playbackId);
     _session = null;
     _playbackId = null;
 
@@ -133,7 +182,7 @@ final class SpeakerOutput implements TtsOutput {
       requestId: session.requestId,
       audioSpec: session.audioSpec,
       playbackId: playbackId,
-      playbackDuration: duration,
+      bufferedAudioDuration: duration,
     );
   }
 
@@ -152,6 +201,8 @@ final class SpeakerOutput implements TtsOutput {
   Future<void> dispose() async {
     final control = SynthesisControl()..cancel(CancelReason.serviceDispose);
     await onCancelSession(control);
+    await _playbackCompletedSubscription.cancel();
+    await _playbackCompletedController.close();
     await _backend.dispose();
   }
 }

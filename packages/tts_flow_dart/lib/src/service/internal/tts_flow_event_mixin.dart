@@ -33,6 +33,8 @@ mixin TtsFlowEventBus {
     TtsError? error,
     String? outputId,
     TtsError? outputError,
+    String? playbackId,
+    Duration? playedDuration,
   }) {
     eventBus.add(
       TtsRequestEvent(
@@ -44,6 +46,8 @@ mixin TtsFlowEventBus {
         error: error,
         outputId: outputId,
         outputError: outputError,
+        playbackId: playbackId,
+        playedDuration: playedDuration,
       ),
     );
   }

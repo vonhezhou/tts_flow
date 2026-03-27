@@ -181,6 +181,7 @@ final class TtsFlow with TtsOptionsMixin, TtsFlowEventBus, TtsSourceMixin {
     state.activeControl?.cancel(CancelReason.serviceDispose);
     await clearQueue();
     await _awaitActiveRequestShutdown();
+    await disposePlaybackCompletionListeners();
     await _engine.dispose();
     await _defaultOutput?.dispose();
     state.markDisposed();

@@ -64,6 +64,31 @@ abstract interface class TtsOutput {
   Future<void> dispose();
 }
 
+/// Optional output capability that emits physical playback completion events.
+///
+/// Implement this on outputs that can distinguish ingestion completion from
+/// device playback completion.
+abstract interface class PlaybackAwareOutput {
+  Stream<TtsOutputPlaybackCompletedEvent> get playbackCompletedEvents;
+}
+
+final class TtsOutputPlaybackCompletedEvent {
+  const TtsOutputPlaybackCompletedEvent({
+    required this.requestId,
+    required this.outputId,
+    required this.playbackId,
+    this.playedDuration,
+  });
+
+  final String requestId;
+  final String outputId;
+  final String playbackId;
+
+  /// Optional speaker-reported elapsed playback duration at physical
+  /// completion time.
+  final Duration? playedDuration;
+}
+
 extension TtsOutputCapabilities on TtsOutput {
   /// Returns true when any accepted capability can consume [spec].
   bool acceptsSpec(TtsAudioSpec spec) {

@@ -36,7 +36,7 @@ void main() {
       expect(speaker.requestId, 'spk-1');
       expect(speaker.audioSpec.format, TtsAudioFormat.mp3);
       expect(speaker.playbackId, 'playback-spk-1');
-      expect(speaker.playbackDuration, const Duration(milliseconds: 3));
+      expect(speaker.bufferedAudioDuration, const Duration(milliseconds: 3));
       expect(backend.writtenBytes['playback-spk-1'], [1, 2, 3]);
       expect(
         backend.startedSpecs['playback-spk-1']?.format,
@@ -127,10 +127,14 @@ final class _FakeSpeakerBackend implements SpeakerBackend {
   final Map<String, String?> stopReasons = <String, String?>{};
 
   @override
+  Stream<SpeakerPlaybackCompletedEvent> get playbackCompletedEvents =>
+      const Stream<SpeakerPlaybackCompletedEvent>.empty();
+
+  @override
   Set<AudioCapability> get supportedCapabilities => {
-        const Mp3Capability(),
-        PcmCapability.wav(),
-      };
+    const Mp3Capability(),
+    PcmCapability.wav(),
+  };
 
   final Map<String, TtsAudioSpec> startedSpecs = <String, TtsAudioSpec>{};
 
@@ -154,14 +158,16 @@ final class _FakeSpeakerBackend implements SpeakerBackend {
   }
 
   @override
-  Future<Duration> completePlayback({required String playbackId}) async {
+  Future<Duration> finalizeIngestion({required String playbackId}) async {
     final length = writtenBytes[playbackId]?.length ?? 0;
     return Duration(milliseconds: length);
   }
 
   @override
-  Future<void> stopPlayback(
-      {required String playbackId, String? reason}) async {
+  Future<void> stopPlayback({
+    required String playbackId,
+    String? reason,
+  }) async {
     stoppedPlaybackIds.add(playbackId);
     stopReasons[playbackId] = reason;
   }

@@ -14,6 +14,7 @@ enum TtsRequestEventType {
   requestStarted,
   requestChunkReceived,
   requestCompleted,
+  requestPlaybackCompleted,
   requestFailed,
   requestStopped,
   requestCanceled,
@@ -45,6 +46,8 @@ final class TtsRequestEvent implements TtsFlowEvent {
     this.error,
     this.outputId,
     this.outputError,
+    this.playbackId,
+    this.playedDuration,
   });
 
   final TtsRequestEventType type;
@@ -55,4 +58,6 @@ final class TtsRequestEvent implements TtsFlowEvent {
   final TtsError? error;
   final String? outputId;
   final TtsError? outputError;
+  final String? playbackId;
+  final Duration? playedDuration;
 }

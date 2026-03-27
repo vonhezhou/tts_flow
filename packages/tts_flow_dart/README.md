@@ -302,24 +302,40 @@ Lifecycle per request:
    stable `playbackId`.
 2. `appendAudio(playbackId, bytes)` appends ordered bytes for that session.
 3. End with either:
-   - `completePlayback(playbackId)` for normal completion.
+   - `finalizeIngestion(playbackId)` when all synthesized bytes have been
+     handed to the backend.
    - `stopPlayback(playbackId, reason)` for cancellation/interruption.
+4. If the backend can distinguish real device playback completion, emit
+   `playbackCompletedEvents` after the speaker actually finishes.
 4. `dispose()` must release resources even if a session is still active.
+
+Semantics:
+
+- `requestCompleted` means synthesis/output ingestion is finished.
+- `requestPlaybackCompleted` means the speaker backend reported physical
+  playback completion.
+- `PlaybackAudioArtifact.bufferedAudioDuration` is the buffered media duration
+  observed at ingestion close, not guaranteed wall-clock playback completion.
 
 Implementation checklist:
 
 - Store per-session state by `playbackId`.
 - Preserve write order in `appendAudio`.
 - Reject unknown `playbackId` and writes after completion/stop.
-- Make `completePlayback` idempotent or clearly fail on second call.
+- Make `finalizeIngestion` idempotent or clearly fail on second call.
 - Ensure `stopPlayback` is safe to call after partial writes.
 - Return capabilities from `supportedCapabilities` that match the real device.
+- Emit `playbackCompletedEvents` only for true physical completion.
 
 Reference skeleton:
 
 ```dart
 final class MySpeakerBackend implements SpeakerBackend {
   final _sessions = <String, List<int>>{};
+
+  @override
+  Stream<SpeakerPlaybackCompletedEvent> get playbackCompletedEvents =>
+      const Stream<SpeakerPlaybackCompletedEvent>.empty();
 
   @override
   Set<AudioCapability> get supportedCapabilities => {const Mp3Capability()};
@@ -347,12 +363,12 @@ final class MySpeakerBackend implements SpeakerBackend {
   }
 
   @override
-  Future<Duration> completePlayback({required String playbackId}) async {
+  Future<Duration> finalizeIngestion({required String playbackId}) async {
     final buffer = _sessions.remove(playbackId);
     if (buffer == null) {
       throw StateError('Unknown playbackId: $playbackId');
     }
-    // Replace with actual player flush/end call.
+    // Replace with the backend's ingestion-close behavior.
     return Duration(milliseconds: buffer.length);
   }
 

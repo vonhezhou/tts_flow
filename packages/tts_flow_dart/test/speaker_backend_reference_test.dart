@@ -8,6 +8,10 @@ final class _ReferenceSpeakerBackend implements SpeakerBackend {
   final Set<String> _closed = <String>{};
 
   @override
+  Stream<SpeakerPlaybackCompletedEvent> get playbackCompletedEvents =>
+      const Stream<SpeakerPlaybackCompletedEvent>.empty();
+
+  @override
   Set<AudioCapability> get supportedCapabilities => {const Mp3Capability()};
 
   @override
@@ -37,7 +41,7 @@ final class _ReferenceSpeakerBackend implements SpeakerBackend {
   }
 
   @override
-  Future<Duration> completePlayback({required String playbackId}) async {
+  Future<Duration> finalizeIngestion({required String playbackId}) async {
     final buffer = _buffers.remove(playbackId);
     if (buffer == null) {
       throw StateError('Unknown playbackId: $playbackId');
@@ -81,7 +85,7 @@ void main() {
       await backend.appendAudio(playbackId: playbackId, bytes: [1, 2]);
       await backend.appendAudio(playbackId: playbackId, bytes: [3]);
 
-      final duration = await backend.completePlayback(playbackId: playbackId);
+      final duration = await backend.finalizeIngestion(playbackId: playbackId);
       expect(duration, const Duration(milliseconds: 3));
       await expectLater(
         () => backend.appendAudio(playbackId: playbackId, bytes: [4]),

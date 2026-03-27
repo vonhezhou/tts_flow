@@ -388,6 +388,57 @@ void main() {
     });
 
     test(
+      'requestCompleted is ingestion-based and playback completion is separate',
+      () async {
+        final output = _PlaybackAwareTestOutput(
+          outputId: 'playback-aware',
+          playbackCompletionDelay: const Duration(milliseconds: 30),
+        );
+        final service = TtsFlow(
+          engine: SineTtsEngine(
+            engineId: 'fake-engine',
+            supportsStreaming: true,
+            chunkCount: 2,
+            chunkDelay: const Duration(milliseconds: 2),
+          ),
+          defaultOutput: output,
+        );
+
+        final events = <TtsRequestEvent>[];
+        final sub = service.requestEvents.listen(events.add);
+
+        await service.init();
+        await service.speak('playback-split', 'hello').toList();
+
+        await Future<void>.delayed(const Duration(milliseconds: 60));
+
+        final completedIndex = events.indexWhere(
+          (event) =>
+              event.requestId == 'playback-split' &&
+              event.type == TtsRequestEventType.requestCompleted,
+        );
+        final playbackCompletedIndex = events.indexWhere(
+          (event) =>
+              event.requestId == 'playback-split' &&
+              event.type == TtsRequestEventType.requestPlaybackCompleted,
+        );
+
+        expect(completedIndex, isNonNegative);
+        expect(playbackCompletedIndex, greaterThan(completedIndex));
+
+        final playbackEvent =
+            events[playbackCompletedIndex.clamp(0, events.length - 1)];
+        expect(playbackEvent.outputId, 'playback-aware');
+        expect(playbackEvent.playbackId, 'playback-playback-split');
+        expect(playbackEvent.playedDuration, isNotNull);
+        expect(playbackEvent.playedDuration!, greaterThan(Duration.zero));
+
+        await sub.cancel();
+        await service.dispose();
+      },
+    );
+
+    test(
       'speak with output override routes audio only to override output',
       () async {
         final defaultOutput = _TrackingOutput(outputId: 'default');
@@ -483,9 +534,7 @@ final class _AlwaysFailOutput implements TtsOutput {
   final String outputId;
 
   @override
-  Set<AudioCapability> get acceptedCapabilities => {
-    PcmCapability.wav(),
-  };
+  Set<AudioCapability> get acceptedCapabilities => {PcmCapability.wav()};
 
   @override
   Future<void> init() async {}
@@ -529,9 +578,7 @@ final class _FailByRequestIdOutput implements TtsOutput {
   TtsOutputSession? _session;
 
   @override
-  Set<AudioCapability> get acceptedCapabilities => {
-    PcmCapability.wav(),
-  };
+  Set<AudioCapability> get acceptedCapabilities => {PcmCapability.wav()};
 
   @override
   Future<void> init() async {}
@@ -741,5 +788,94 @@ final class _TrackingOutput implements TtsOutput {
   @override
   Future<void> dispose() async {
     _session = null;
+  }
+}
+
+final class _PlaybackAwareTestOutput implements TtsOutput, PlaybackAwareOutput {
+  _PlaybackAwareTestOutput({
+    required this.outputId,
+    required this.playbackCompletionDelay,
+  });
+
+  @override
+  final String outputId;
+
+  final Duration playbackCompletionDelay;
+  final StreamController<TtsOutputPlaybackCompletedEvent>
+  _playbackCompletedController =
+      StreamController<TtsOutputPlaybackCompletedEvent>.broadcast();
+
+  TtsOutputSession? _session;
+  String? _playbackId;
+  int _bytesCount = 0;
+
+  @override
+  Set<AudioCapability> get acceptedCapabilities => {
+    PcmCapability.wav(),
+    const Mp3Capability(),
+  };
+
+  @override
+  Stream<TtsOutputPlaybackCompletedEvent> get playbackCompletedEvents =>
+      _playbackCompletedController.stream;
+
+  @override
+  Future<void> init() async {}
+
+  @override
+  Future<void> initSession(TtsOutputSession session) async {
+    _session = session;
+    _playbackId = 'playback-${session.requestId}';
+    _bytesCount = 0;
+  }
+
+  @override
+  Future<void> consumeChunk(TtsChunk chunk) async {
+    _bytesCount += chunk.bytes.length;
+  }
+
+  @override
+  Future<AudioArtifact> finalizeSession() async {
+    final session = _session;
+    final playbackId = _playbackId;
+    if (session == null || playbackId == null) {
+      throw StateError('No active session.');
+    }
+
+    Future<void>.delayed(playbackCompletionDelay, () {
+      if (_playbackCompletedController.isClosed) {
+        return;
+      }
+      _playbackCompletedController.add(
+        TtsOutputPlaybackCompletedEvent(
+          requestId: session.requestId,
+          outputId: outputId,
+          playbackId: playbackId,
+          playedDuration: Duration(milliseconds: _bytesCount),
+        ),
+      );
+    });
+
+    _session = null;
+    _playbackId = null;
+    return PlaybackAudioArtifact(
+      requestId: session.requestId,
+      audioSpec: session.audioSpec,
+      playbackId: playbackId,
+      bufferedAudioDuration: Duration(milliseconds: _bytesCount),
+    );
+  }
+
+  @override
+  Future<void> onCancelSession(SynthesisControl control) async {
+    _session = null;
+    _playbackId = null;
+  }
+
+  @override
+  Future<void> dispose() async {
+    _session = null;
+    _playbackId = null;
+    await _playbackCompletedController.close();
   }
 }

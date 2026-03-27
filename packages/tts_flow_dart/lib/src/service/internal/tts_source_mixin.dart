@@ -42,6 +42,10 @@ mixin TtsSourceMixin on TtsFlowEventBus {
   @protected
   final state = TtsFlowState();
 
+  final Map<String, StreamSubscription<TtsOutputPlaybackCompletedEvent>>
+  _playbackCompletionSubscriptions =
+      <String, StreamSubscription<TtsOutputPlaybackCompletedEvent>>{};
+
   @protected
   Future<void> processQueue() async {
     if (!state.tryEnterProcessing()) {
@@ -98,6 +102,11 @@ mixin TtsSourceMixin on TtsFlowEventBus {
   ) async {
     final request = item.request;
     final effectiveOutput = request.output ?? defaultOutput!;
+
+    _registerPlaybackCompletionListener(
+      requestId: request.requestId,
+      output: effectiveOutput,
+    );
 
     final control = SynthesisControl();
     state.activeControl = control;
@@ -161,6 +170,7 @@ mixin TtsSourceMixin on TtsFlowEventBus {
 
       if (control.isCanceled) {
         await effectiveOutput.onCancelSession(control);
+        await _cancelPlaybackCompletionListenerForRequest(request.requestId);
         emitRequestEvent(
           TtsRequestEventType.requestStopped,
           requestId: request.requestId,
@@ -179,6 +189,7 @@ mixin TtsSourceMixin on TtsFlowEventBus {
       return false;
     } catch (error) {
       final failure = _mapRequestFailure(error, request);
+      await _cancelPlaybackCompletionListenerForRequest(request.requestId);
       emitRequestEvent(
         TtsRequestEventType.requestFailed,
         requestId: request.requestId,
@@ -269,6 +280,55 @@ mixin TtsSourceMixin on TtsFlowEventBus {
       preferredFormat: request.preferredFormat,
       preferredSampleRateHz: request.options?.sampleRateHz,
     );
+  }
+
+  @protected
+  Future<void> disposePlaybackCompletionListeners() async {
+    final subscriptions = _playbackCompletionSubscriptions.values.toList();
+    _playbackCompletionSubscriptions.clear();
+    for (final subscription in subscriptions) {
+      await subscription.cancel();
+    }
+  }
+
+  void _registerPlaybackCompletionListener({
+    required String requestId,
+    required TtsOutput output,
+  }) {
+    if (output is! PlaybackAwareOutput) {
+      return;
+    }
+    final playbackAwareOutput = output as PlaybackAwareOutput;
+
+    unawaited(_cancelPlaybackCompletionListenerForRequest(requestId));
+
+    final subscription = playbackAwareOutput.playbackCompletedEvents
+        .where((event) => event.requestId == requestId)
+        .take(1)
+        .listen(
+          (event) {
+            emitRequestEvent(
+              TtsRequestEventType.requestPlaybackCompleted,
+              requestId: event.requestId,
+              state: TtsRequestState.completed,
+              outputId: event.outputId,
+              playbackId: event.playbackId,
+              playedDuration: event.playedDuration,
+            );
+          },
+          onDone: () {
+            _playbackCompletionSubscriptions.remove(requestId);
+          },
+        );
+
+    _playbackCompletionSubscriptions[requestId] = subscription;
+  }
+
+  Future<void> _cancelPlaybackCompletionListenerForRequest(
+    String requestId,
+  ) async {
+    final subscription = _playbackCompletionSubscriptions.remove(requestId);
+    await subscription?.cancel();
   }
 }
 
