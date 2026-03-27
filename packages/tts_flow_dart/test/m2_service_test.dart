@@ -484,7 +484,7 @@ final class _AlwaysFailOutput implements TtsOutput {
 
   @override
   Set<AudioCapability> get acceptedCapabilities => {
-    const SimpleFormatCapability(format: TtsAudioFormat.pcm),
+    PcmCapability.wav(),
   };
 
   @override
@@ -530,7 +530,7 @@ final class _FailByRequestIdOutput implements TtsOutput {
 
   @override
   Set<AudioCapability> get acceptedCapabilities => {
-    const SimpleFormatCapability(format: TtsAudioFormat.pcm),
+    PcmCapability.wav(),
   };
 
   @override
@@ -588,7 +588,7 @@ final class _CaptureCancelOutput implements TtsOutput {
 
   @override
   Set<AudioCapability> get acceptedCapabilities => {
-    const SimpleFormatCapability(format: TtsAudioFormat.pcm),
+    PcmCapability.wav(),
     const SimpleFormatCapability(format: TtsAudioFormat.mp3),
   };
 
@@ -703,7 +703,7 @@ final class _TrackingOutput implements TtsOutput {
 
   @override
   Set<AudioCapability> get acceptedCapabilities => {
-    const SimpleFormatCapability(format: TtsAudioFormat.pcm),
+    PcmCapability.wav(),
     const SimpleFormatCapability(format: TtsAudioFormat.mp3),
   };
 

@@ -33,7 +33,6 @@ final class SineTtsEngine implements TtsEngine {
       channels: {1, 2},
       encodings: {PcmEncoding.signedInt},
     ),
-    const SimpleFormatCapability(format: TtsAudioFormat.mp3),
   };
 
   final int chunkCount;
