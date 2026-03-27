@@ -1,0 +1,10 @@
+{
+  "folders": [
+    { "path": "apps/tts_flow_dart_example" },
+    { "path": "apps/tts_flow_flutter_example" },
+    { "path": "packages/tts_flow_dart" },
+    { "path": "packages/tts_flow_flutter" },
+    { "name": "Root (Melos)", "path": "." },
+  ],
+  "settings": {},
+}

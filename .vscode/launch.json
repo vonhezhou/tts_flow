@@ -1,0 +1,13 @@
+{
+  "version": "0.2.0",
+  "configurations": [
+    {
+      "name": "Run Pure Dart Tests",
+      "type": "dart",
+      "request": "launch",
+      "cwd": "packages/tts_flow_dart",
+      "program": "test/",
+      "args": ["--reporter", "expanded"]
+    }
+  ]
+}

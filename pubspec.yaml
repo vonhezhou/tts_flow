@@ -13,3 +13,33 @@ workspace:
 
 dev_dependencies:
   melos: ^7.0.0
+
+melos:
+  scripts:
+    analyze:
+      run: melos exec -- dart analyze .
+      description: Analyze all packages.
+
+    format:
+      run: melos exec -- dart format .
+      description: Format all packages.
+
+    test:
+      run: melos run test:dart && melos run test:flutter
+      description: Run all tests.
+
+    test:dart:
+      exec: dart test
+      packageFilters:
+        dirExists: test
+        flutter: false
+    
+    test:flutter:
+      exec: flutter test
+      packageFilters:
+        flutter: true
+        dirExists: test
+
+    check:
+      run: melos run analyze && melos run test
+      description: Analyze and test all packages.
