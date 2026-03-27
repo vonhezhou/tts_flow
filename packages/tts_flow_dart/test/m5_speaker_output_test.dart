@@ -44,7 +44,7 @@ void main() {
       );
     });
 
-    test('onCancel stops active playback', () async {
+    test('onCancelSession stops active playback', () async {
       final backend = _FakeSpeakerBackend();
       final output = SpeakerOutput(backend: backend);
 
@@ -59,7 +59,7 @@ void main() {
       await output.consumeChunk(_chunk('spk-2', [9], TtsAudioFormat.pcm));
       final control = SynthesisControl()
         ..cancel(CancelReason.stopCurrent, message: 'manual-stop');
-      await output.onCancel(control);
+      await output.onCancelSession(control);
 
       expect(backend.stoppedPlaybackIds, contains('playback-spk-2'));
       expect(backend.stopReasons['playback-spk-2'], 'manual-stop');

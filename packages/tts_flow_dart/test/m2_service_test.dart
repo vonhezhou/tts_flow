@@ -510,7 +510,7 @@ final class _AlwaysFailOutput implements TtsOutput {
   }
 
   @override
-  Future<void> onCancel(SynthesisControl control) async {}
+  Future<void> onCancelSession(SynthesisControl control) async {}
 
   @override
   Future<void> dispose() async {}
@@ -570,7 +570,7 @@ final class _FailByRequestIdOutput implements TtsOutput {
   }
 
   @override
-  Future<void> onCancel(SynthesisControl control) async {}
+  Future<void> onCancelSession(SynthesisControl control) async {}
 
   @override
   Future<void> dispose() async {
@@ -623,7 +623,7 @@ final class _CaptureCancelOutput implements TtsOutput {
   }
 
   @override
-  Future<void> onCancel(SynthesisControl control) async {
+  Future<void> onCancelSession(SynthesisControl control) async {
     lastCancelReason = control.cancelReason;
     _session = null;
     _buffer.clear();
@@ -682,7 +682,7 @@ final class _PcmOnlyOutput implements TtsOutput {
   }
 
   @override
-  Future<void> onCancel(SynthesisControl control) async {
+  Future<void> onCancelSession(SynthesisControl control) async {
     _session = null;
   }
 
@@ -734,7 +734,7 @@ final class _TrackingOutput implements TtsOutput {
   }
 
   @override
-  Future<void> onCancel(SynthesisControl control) async {
+  Future<void> onCancelSession(SynthesisControl control) async {
     _session = null;
   }
 

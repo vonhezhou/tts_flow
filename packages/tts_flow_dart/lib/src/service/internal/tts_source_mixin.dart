@@ -160,7 +160,7 @@ mixin TtsSourceMixin on TtsFlowEventBus {
       }
 
       if (control.isCanceled) {
-        await effectiveOutput.onCancel(control);
+        await effectiveOutput.onCancelSession(control);
         emitRequestEvent(
           TtsRequestEventType.requestStopped,
           requestId: request.requestId,

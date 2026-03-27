@@ -184,7 +184,7 @@ final class Mp3FileOutput implements TtsOutput {
   }
 
   @override
-  Future<void> onCancel(SynthesisControl control) async {
+  Future<void> onCancelSession(SynthesisControl control) async {
     await _state.safeCleanupTemp();
     _state.clear();
   }

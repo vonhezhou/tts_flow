@@ -166,7 +166,7 @@ final class AacFileOutput implements TtsOutput {
   }
 
   @override
-  Future<void> onCancel(SynthesisControl control) async {
+  Future<void> onCancelSession(SynthesisControl control) async {
     await _state.safeCleanupTemp();
     _state.clear();
   }

@@ -71,7 +71,7 @@ final class MemoryOutput implements TtsOutput {
   }
 
   @override
-  Future<void> onCancel(SynthesisControl control) async {
+  Future<void> onCancelSession(SynthesisControl control) async {
     _session = null;
     _buffer = null;
   }

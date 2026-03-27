@@ -292,6 +292,90 @@ Policy options:
 Tip: use `failFast` when all outputs are required for correctness. Use
 `bestEffort` for resilient production fanout where partial output is acceptable.
 
+## SpeakerBackend Implementation Checklist
+
+Use this when implementing a custom backend for `SpeakerOutput`.
+
+Lifecycle per request:
+
+1. `startPlayback(requestId, audioSpec)` creates session state and returns a
+   stable `playbackId`.
+2. `appendAudio(playbackId, bytes)` appends ordered bytes for that session.
+3. End with either:
+   - `completePlayback(playbackId)` for normal completion.
+   - `stopPlayback(playbackId, reason)` for cancellation/interruption.
+4. `dispose()` must release resources even if a session is still active.
+
+Implementation checklist:
+
+- Store per-session state by `playbackId`.
+- Preserve write order in `appendAudio`.
+- Reject unknown `playbackId` and writes after completion/stop.
+- Make `completePlayback` idempotent or clearly fail on second call.
+- Ensure `stopPlayback` is safe to call after partial writes.
+- Return capabilities from `supportedCapabilities` that match the real device.
+
+Reference skeleton:
+
+```dart
+final class MySpeakerBackend implements SpeakerBackend {
+  final _sessions = <String, List<int>>{};
+
+  @override
+  Set<AudioCapability> get supportedCapabilities => {const Mp3Capability()};
+
+  @override
+  Future<String> startPlayback({
+    required String requestId,
+    required TtsAudioSpec audioSpec,
+  }) async {
+    final playbackId = 'pb-$requestId';
+    _sessions[playbackId] = <int>[];
+    return playbackId;
+  }
+
+  @override
+  Future<void> appendAudio({
+    required String playbackId,
+    required List<int> bytes,
+  }) async {
+    final buffer = _sessions[playbackId];
+    if (buffer == null) {
+      throw StateError('Unknown playbackId: $playbackId');
+    }
+    buffer.addAll(bytes);
+  }
+
+  @override
+  Future<Duration> completePlayback({required String playbackId}) async {
+    final buffer = _sessions.remove(playbackId);
+    if (buffer == null) {
+      throw StateError('Unknown playbackId: $playbackId');
+    }
+    // Replace with actual player flush/end call.
+    return Duration(milliseconds: buffer.length);
+  }
+
+  @override
+  Future<void> stopPlayback({required String playbackId, String? reason}) async {
+    _sessions.remove(playbackId);
+  }
+
+  @override
+  Future<void> pausePlayback({required String playbackId}) async {}
+
+  @override
+  Future<void> resumePlayback({required String playbackId}) async {}
+
+  @override
+  Future<void> dispose() async {
+    _sessions.clear();
+  }
+}
+```
+
+For a runnable reference, see `test/speaker_backend_reference_test.dart`.
+
 ## Development Commands
 
 ```bash

@@ -216,17 +216,17 @@ final class MulticastOutput implements TtsOutput {
   }
 
   @override
-  Future<void> onCancel(SynthesisControl control) async {
+  Future<void> onCancelSession(SynthesisControl control) async {
     final activeEntries = _activeOutputs.entries.toList();
     for (final entry in activeEntries) {
       try {
-        await entry.value.onCancel(control);
+        await entry.value.onCancelSession(control);
       } catch (error) {
         final requestId = _session?.requestId;
         final converted = _toOutputError(
           error,
           requestId: requestId,
-          stage: 'onCancel',
+          stage: 'onCancelSession',
           outputId: entry.key,
         );
         _outputErrors[entry.key] = converted;
@@ -320,12 +320,12 @@ final class MulticastOutput implements TtsOutput {
 
     for (final entry in entries) {
       try {
-        await entry.value.onCancel(rollbackControl);
+        await entry.value.onCancelSession(rollbackControl);
       } catch (error) {
         final converted = _toOutputError(
           error,
           requestId: requestId,
-          stage: '$stage.rollback.onCancel',
+          stage: '$stage.rollback.onCancelSession',
           outputId: entry.key,
         );
         _outputErrors[entry.key] = converted;

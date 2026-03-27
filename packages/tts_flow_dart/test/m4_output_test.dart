@@ -529,7 +529,7 @@ void main() {
       },
     );
 
-    test('WavFileOutput onCancel removes temp file', () async {
+    test('WavFileOutput onCancelSession removes temp file', () async {
       final tempDir = await Directory.systemTemp.createTemp(
         'uni_tts_wav_cancel_',
       );
@@ -554,7 +554,7 @@ void main() {
 
         final control = SynthesisControl()
           ..cancel(CancelReason.stopCurrent, message: 'test-cancel');
-        await output.onCancel(control);
+        await output.onCancelSession(control);
 
         expect(await File('$outputPath.tmp').exists(), isFalse);
         expect(await File(outputPath).exists(), isFalse);
@@ -774,7 +774,7 @@ void main() {
               CancelReason.stopCurrent,
               message: 'cancel-second-session',
             );
-          await output.onCancel(control);
+          await output.onCancelSession(control);
 
           expect(await File('$outputPath.tmp').exists(), isFalse);
           expect(await File(outputPath).readAsBytes(), baselineBytes);
@@ -829,7 +829,7 @@ void main() {
               CancelReason.stopCurrent,
               message: 'cancel-second-session',
             );
-          await output.onCancel(control);
+          await output.onCancelSession(control);
 
           expect(await File('$outputPath.tmp').exists(), isFalse);
           expect(await File(outputPath).readAsBytes(), baselineFileBytes);
@@ -1071,7 +1071,7 @@ final class _FailingTestOutput implements TtsOutput {
   }
 
   @override
-  Future<void> onCancel(SynthesisControl control) async {
+  Future<void> onCancelSession(SynthesisControl control) async {
     cancelCalls += 1;
     _session = null;
   }
@@ -1116,7 +1116,7 @@ final class _PcmConstraintOutput implements TtsOutput {
   Future<void> initSession(TtsOutputSession session) async {}
 
   @override
-  Future<void> onCancel(SynthesisControl control) async {}
+  Future<void> onCancelSession(SynthesisControl control) async {}
 }
 
 TtsChunk _chunk(
