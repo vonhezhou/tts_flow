@@ -67,6 +67,32 @@ final class MulticastOutput implements TtsOutput {
   }
 
   @override
+  Future<void> init() async {
+    TtsOutputFailure? firstFailure;
+    for (final output in _outputs) {
+      try {
+        await output.init();
+      } catch (error) {
+        final converted = _toOutputError(
+          error,
+          requestId: null,
+          stage: 'init',
+          outputId: output.outputId,
+        );
+        _outputErrors[output.outputId] = converted;
+        firstFailure ??= TtsOutputFailure(
+          outputId: output.outputId,
+          error: converted,
+        );
+      }
+    }
+    if (firstFailure != null &&
+        errorPolicy == MulticastOutputErrorPolicy.failFast) {
+      throw firstFailure;
+    }
+  }
+
+  @override
   Future<void> initSession(TtsOutputSession session) async {
     _session = session;
     _activeOutputs.clear();
@@ -226,8 +252,10 @@ final class MulticastOutput implements TtsOutput {
           outputId: output.outputId,
         );
         _outputErrors[output.outputId] = converted;
-        firstFailure ??=
-            TtsOutputFailure(outputId: output.outputId, error: converted);
+        firstFailure ??= TtsOutputFailure(
+          outputId: output.outputId,
+          error: converted,
+        );
       }
     }
     _clearSession();
@@ -443,8 +471,9 @@ final class MulticastOutput implements TtsOutput {
     }
 
     if (discrete.isNotEmpty && min != null && max != null) {
-      discrete =
-          discrete.where((value) => value >= min && value <= max).toSet();
+      discrete = discrete
+          .where((value) => value >= min && value <= max)
+          .toSet();
     }
 
     if (discrete.isEmpty && min == null && max == null) {

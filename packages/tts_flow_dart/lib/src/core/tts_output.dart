@@ -9,6 +9,8 @@ abstract interface class TtsOutput {
   String get outputId;
   Set<AudioCapability> get acceptedCapabilities;
 
+  Future<void> init();
+
   Future<void> initSession(TtsOutputSession session);
   Future<void> consumeChunk(TtsChunk chunk);
   Future<AudioArtifact> finalizeSession();

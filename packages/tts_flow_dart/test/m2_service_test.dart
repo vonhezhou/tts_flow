@@ -64,52 +64,56 @@ void main() {
       await service.dispose();
     });
 
-    test('stopCurrent stops active request and next request proceeds',
-        () async {
-      final service = TtsFlow(
-        engine: SineTtsEngine(
-          engineId: 'fake-engine',
-          supportsStreaming: true,
-          chunkCount: 8,
-          chunkDelay: const Duration(milliseconds: 5),
-        ),
-        defaultOutput: NullOutput(),
-      );
+    test(
+      'stopCurrent stops active request and next request proceeds',
+      () async {
+        final service = TtsFlow(
+          engine: SineTtsEngine(
+            engineId: 'fake-engine',
+            supportsStreaming: true,
+            chunkCount: 8,
+            chunkDelay: const Duration(milliseconds: 5),
+          ),
+          defaultOutput: NullOutput(),
+        );
 
-      final events = <TtsRequestEvent>[];
-      final sub = service.requestEvents.listen(events.add);
+        final events = <TtsRequestEvent>[];
+        final sub = service.requestEvents.listen(events.add);
 
-      await service.init();
+        await service.init();
 
-      final longStream =
-          service.speak('long', 'this is a long request payload');
-      final nextStream = service.speak('next', 'next request');
+        final longStream = service.speak(
+          'long',
+          'this is a long request payload',
+        );
+        final nextStream = service.speak('next', 'next request');
 
-      await Future<void>.delayed(const Duration(milliseconds: 12));
-      await service.stopCurrent();
+        await Future<void>.delayed(const Duration(milliseconds: 12));
+        await service.stopCurrent();
 
-      await longStream.toList();
-      await nextStream.toList();
+        await longStream.toList();
+        await nextStream.toList();
 
-      expect(
-        events.any(
+        expect(
+          events.any(
+            (event) =>
+                event.requestId == 'long' &&
+                event.type == TtsRequestEventType.requestStopped,
+          ),
+          isTrue,
+        );
+
+        final nextStartedIndex = events.indexWhere(
           (event) =>
-              event.requestId == 'long' &&
-              event.type == TtsRequestEventType.requestStopped,
-        ),
-        isTrue,
-      );
+              event.requestId == 'next' &&
+              event.type == TtsRequestEventType.requestStarted,
+        );
+        expect(nextStartedIndex, isNonNegative);
 
-      final nextStartedIndex = events.indexWhere(
-        (event) =>
-            event.requestId == 'next' &&
-            event.type == TtsRequestEventType.requestStarted,
-      );
-      expect(nextStartedIndex, isNonNegative);
-
-      await sub.cancel();
-      await service.dispose();
-    });
+        await sub.cancel();
+        await service.dispose();
+      },
+    );
 
     test('requestFailed event includes output failure details', () async {
       final service = TtsFlow(
@@ -151,41 +155,43 @@ void main() {
       await service.dispose();
     });
 
-    test('fails during negotiation when multicast children have disjoint PCM',
-        () async {
-      final service = TtsFlow(
-        engine: SineTtsEngine(
-          engineId: 'fake-engine',
-          supportsStreaming: true,
-          chunkCount: 2,
-          chunkDelay: const Duration(milliseconds: 2),
-        ),
-        defaultOutput: MulticastOutput(
-          outputs: [
-            _PcmOnlyOutput(outputId: 'pcm-16k', sampleRatesHz: {16000}),
-            _PcmOnlyOutput(outputId: 'pcm-24k', sampleRatesHz: {24000}),
-          ],
-          errorPolicy: MulticastOutputErrorPolicy.failFast,
-        ),
-      );
-
-      await service.init();
-
-      final stream = service.speak('pcm-disjoint', 'disjoint constraints');
-
-      await expectLater(
-        stream.toList(),
-        throwsA(
-          isA<TtsError>().having(
-            (error) => error.code,
-            'code',
-            TtsErrorCode.formatNegotiationFailed,
+    test(
+      'fails during negotiation when multicast children have disjoint PCM',
+      () async {
+        final service = TtsFlow(
+          engine: SineTtsEngine(
+            engineId: 'fake-engine',
+            supportsStreaming: true,
+            chunkCount: 2,
+            chunkDelay: const Duration(milliseconds: 2),
           ),
-        ),
-      );
+          defaultOutput: MulticastOutput(
+            outputs: [
+              _PcmOnlyOutput(outputId: 'pcm-16k', sampleRatesHz: {16000}),
+              _PcmOnlyOutput(outputId: 'pcm-24k', sampleRatesHz: {24000}),
+            ],
+            errorPolicy: MulticastOutputErrorPolicy.failFast,
+          ),
+        );
 
-      await service.dispose();
-    });
+        await service.init();
+
+        final stream = service.speak('pcm-disjoint', 'disjoint constraints');
+
+        await expectLater(
+          stream.toList(),
+          throwsA(
+            isA<TtsError>().having(
+              (error) => error.code,
+              'code',
+              TtsErrorCode.formatNegotiationFailed,
+            ),
+          ),
+        );
+
+        await service.dispose();
+      },
+    );
 
     test('continueOnError keeps pending queue after active failure', () async {
       final service = TtsFlow(
@@ -294,42 +300,41 @@ void main() {
       await service.dispose();
     });
 
-    test('dispose during paused active request forwards serviceDispose reason',
-        () async {
-      final output = _CaptureCancelOutput();
-      final service = TtsFlow(
-        engine: SineTtsEngine(
-          engineId: 'fake-engine',
-          supportsStreaming: true,
-          chunkCount: 20,
-          chunkDelay: const Duration(milliseconds: 5),
-        ),
-        defaultOutput: output,
-      );
+    test(
+      'dispose during paused active request forwards serviceDispose reason',
+      () async {
+        final output = _CaptureCancelOutput();
+        final service = TtsFlow(
+          engine: SineTtsEngine(
+            engineId: 'fake-engine',
+            supportsStreaming: true,
+            chunkCount: 20,
+            chunkDelay: const Duration(milliseconds: 5),
+          ),
+          defaultOutput: output,
+        );
 
-      await service.init();
+        await service.init();
 
-      final stream = service.speak(
-        'dispose-paused',
-        'this request should be canceled by service dispose while paused',
-      );
+        final stream = service.speak(
+          'dispose-paused',
+          'this request should be canceled by service dispose while paused',
+        );
 
-      await Future<void>.delayed(const Duration(milliseconds: 12));
-      await service.pause();
-      await Future<void>.delayed(const Duration(milliseconds: 12));
-      await service.dispose();
+        await Future<void>.delayed(const Duration(milliseconds: 12));
+        await service.pause();
+        await Future<void>.delayed(const Duration(milliseconds: 12));
+        await service.dispose();
 
-      final chunks = await stream.toList();
-      expect(chunks, isNotNull);
-      expect(output.lastCancelReason, CancelReason.serviceDispose);
-    });
+        final chunks = await stream.toList();
+        expect(chunks, isNotNull);
+        expect(output.lastCancelReason, CancelReason.serviceDispose);
+      },
+    );
 
     test('service exposes engine available voices and defaults', () async {
       final service = TtsFlow(
-        engine: SineTtsEngine(
-          engineId: 'fake-engine',
-          supportsStreaming: true,
-        ),
+        engine: SineTtsEngine(engineId: 'fake-engine', supportsStreaming: true),
         defaultOutput: NullOutput(),
       );
 
@@ -356,11 +361,13 @@ void main() {
       expect(service.sampleRateHz, 24000);
       expect(service.timeout, const Duration(seconds: 10));
 
-      final streamedChunks = await service.speak(
-        'defaults-applied',
-        'request uses service defaults',
-        params: const {'style': 'news', 'emotion': 'calm'},
-      ).toList();
+      final streamedChunks = await service
+          .speak(
+            'defaults-applied',
+            'request uses service defaults',
+            params: const {'style': 'news', 'emotion': 'calm'},
+          )
+          .toList();
       expect(streamedChunks, isNotEmpty);
 
       await service.dispose();
@@ -368,10 +375,7 @@ void main() {
 
     test('speak requires init before usage', () async {
       final service = TtsFlow(
-        engine: SineTtsEngine(
-          engineId: 'fake-engine',
-          supportsStreaming: true,
-        ),
+        engine: SineTtsEngine(engineId: 'fake-engine', supportsStreaming: true),
         defaultOutput: NullOutput(),
       );
 
@@ -383,32 +387,34 @@ void main() {
       await service.dispose();
     });
 
-    test('speak with output override routes audio only to override output',
-        () async {
-      final defaultOutput = _TrackingOutput(outputId: 'default');
-      final overrideOutput = _TrackingOutput(outputId: 'override');
-      final service = TtsFlow(
-        engine: SineTtsEngine(
-          engineId: 'fake-engine',
-          supportsStreaming: true,
-          chunkCount: 3,
-          chunkDelay: const Duration(milliseconds: 2),
-        ),
-        defaultOutput: defaultOutput,
-      );
+    test(
+      'speak with output override routes audio only to override output',
+      () async {
+        final defaultOutput = _TrackingOutput(outputId: 'default');
+        final overrideOutput = _TrackingOutput(outputId: 'override');
+        final service = TtsFlow(
+          engine: SineTtsEngine(
+            engineId: 'fake-engine',
+            supportsStreaming: true,
+            chunkCount: 3,
+            chunkDelay: const Duration(milliseconds: 2),
+          ),
+          defaultOutput: defaultOutput,
+        );
 
-      await service.init();
+        await service.init();
 
-      final chunks = await service
-          .speak('override-1', 'override output test', output: overrideOutput)
-          .toList();
+        final chunks = await service
+            .speak('override-1', 'override output test', output: overrideOutput)
+            .toList();
 
-      expect(chunks, isNotEmpty);
-      expect(overrideOutput.consumedChunks, isNotEmpty);
-      expect(defaultOutput.consumedChunks, isEmpty);
+        expect(chunks, isNotEmpty);
+        expect(overrideOutput.consumedChunks, isNotEmpty);
+        expect(defaultOutput.consumedChunks, isEmpty);
 
-      await service.dispose();
-    });
+        await service.dispose();
+      },
+    );
 
     test('no default output and no override fails request', () async {
       final service = TtsFlow(
@@ -427,7 +433,10 @@ void main() {
         throwsA(
           isA<TtsError>()
               .having(
-                  (error) => error.code, 'code', TtsErrorCode.invalidRequest)
+                (error) => error.code,
+                'code',
+                TtsErrorCode.invalidRequest,
+              )
               .having((error) => error.requestId, 'requestId', 'no-output'),
         ),
       );
@@ -435,30 +444,35 @@ void main() {
       await service.dispose();
     });
 
-    test('no default output with per-request override works normally',
-        () async {
-      final overrideOutput = _TrackingOutput(outputId: 'override');
-      final service = TtsFlow(
-        engine: SineTtsEngine(
-          engineId: 'fake-engine',
-          supportsStreaming: true,
-          chunkCount: 3,
-          chunkDelay: const Duration(milliseconds: 2),
-        ),
-      );
+    test(
+      'no default output with per-request override works normally',
+      () async {
+        final overrideOutput = _TrackingOutput(outputId: 'override');
+        final service = TtsFlow(
+          engine: SineTtsEngine(
+            engineId: 'fake-engine',
+            supportsStreaming: true,
+            chunkCount: 3,
+            chunkDelay: const Duration(milliseconds: 2),
+          ),
+        );
 
-      await service.init();
+        await service.init();
 
-      final chunks = await service
-          .speak('no-default-override', 'no default, use override',
-              output: overrideOutput)
-          .toList();
+        final chunks = await service
+            .speak(
+              'no-default-override',
+              'no default, use override',
+              output: overrideOutput,
+            )
+            .toList();
 
-      expect(chunks, isNotEmpty);
-      expect(overrideOutput.consumedChunks, isNotEmpty);
+        expect(chunks, isNotEmpty);
+        expect(overrideOutput.consumedChunks, isNotEmpty);
 
-      await service.dispose();
-    });
+        await service.dispose();
+      },
+    );
   });
 }
 
@@ -470,8 +484,11 @@ final class _AlwaysFailOutput implements TtsOutput {
 
   @override
   Set<AudioCapability> get acceptedCapabilities => {
-        const SimpleFormatCapability(format: TtsAudioFormat.pcm),
-      };
+    const SimpleFormatCapability(format: TtsAudioFormat.pcm),
+  };
+
+  @override
+  Future<void> init() async {}
 
   @override
   Future<void> initSession(TtsOutputSession session) async {}
@@ -513,8 +530,11 @@ final class _FailByRequestIdOutput implements TtsOutput {
 
   @override
   Set<AudioCapability> get acceptedCapabilities => {
-        const SimpleFormatCapability(format: TtsAudioFormat.pcm),
-      };
+    const SimpleFormatCapability(format: TtsAudioFormat.pcm),
+  };
+
+  @override
+  Future<void> init() async {}
 
   @override
   Future<void> initSession(TtsOutputSession session) async {
@@ -568,9 +588,12 @@ final class _CaptureCancelOutput implements TtsOutput {
 
   @override
   Set<AudioCapability> get acceptedCapabilities => {
-        const SimpleFormatCapability(format: TtsAudioFormat.pcm),
-        const SimpleFormatCapability(format: TtsAudioFormat.mp3),
-      };
+    const SimpleFormatCapability(format: TtsAudioFormat.pcm),
+    const SimpleFormatCapability(format: TtsAudioFormat.mp3),
+  };
+
+  @override
+  Future<void> init() async {}
 
   @override
   Future<void> initSession(TtsOutputSession session) async {
@@ -614,10 +637,8 @@ final class _CaptureCancelOutput implements TtsOutput {
 }
 
 final class _PcmOnlyOutput implements TtsOutput {
-  _PcmOnlyOutput({
-    required this.outputId,
-    required Set<int> sampleRatesHz,
-  }) : _sampleRatesHz = Set<int>.from(sampleRatesHz);
+  _PcmOnlyOutput({required this.outputId, required Set<int> sampleRatesHz})
+    : _sampleRatesHz = Set<int>.from(sampleRatesHz);
 
   @override
   final String outputId;
@@ -627,13 +648,16 @@ final class _PcmOnlyOutput implements TtsOutput {
 
   @override
   Set<AudioCapability> get acceptedCapabilities => {
-        PcmCapability(
-          sampleRatesHz: _sampleRatesHz,
-          bitsPerSample: const {16},
-          channels: const {1},
-          encodings: const {PcmEncoding.signedInt},
-        ),
-      };
+    PcmCapability(
+      sampleRatesHz: _sampleRatesHz,
+      bitsPerSample: const {16},
+      channels: const {1},
+      encodings: const {PcmEncoding.signedInt},
+    ),
+  };
+
+  @override
+  Future<void> init() async {}
 
   @override
   Future<void> initSession(TtsOutputSession session) async {
@@ -679,9 +703,12 @@ final class _TrackingOutput implements TtsOutput {
 
   @override
   Set<AudioCapability> get acceptedCapabilities => {
-        const SimpleFormatCapability(format: TtsAudioFormat.pcm),
-        const SimpleFormatCapability(format: TtsAudioFormat.mp3),
-      };
+    const SimpleFormatCapability(format: TtsAudioFormat.pcm),
+    const SimpleFormatCapability(format: TtsAudioFormat.mp3),
+  };
+
+  @override
+  Future<void> init() async {}
 
   @override
   Future<void> initSession(TtsOutputSession session) async {

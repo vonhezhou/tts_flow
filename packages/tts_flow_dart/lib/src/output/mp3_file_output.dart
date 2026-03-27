@@ -15,10 +15,8 @@ import 'package:tts_flow_dart/src/core/tts_output_session.dart';
 final _log = Logger('tts_flow_dart.Mp3FileOutput');
 
 final class Mp3FileOutput implements TtsOutput {
-  Mp3FileOutput(
-    this.filePath, {
-    this.outputId = 'mp3-file-output',
-  }) : _state = _Mp3FileOutputSessionState();
+  Mp3FileOutput(this.filePath, {this.outputId = 'mp3-file-output'})
+    : _state = _Mp3FileOutputSessionState();
 
   final String filePath;
   final _Mp3FileOutputSessionState _state;
@@ -28,8 +26,11 @@ final class Mp3FileOutput implements TtsOutput {
 
   @override
   Set<AudioCapability> get acceptedCapabilities => {
-        const SimpleFormatCapability(format: TtsAudioFormat.mp3),
-      };
+    const SimpleFormatCapability(format: TtsAudioFormat.mp3),
+  };
+
+  @override
+  Future<void> init() async {}
 
   @override
   Future<void> initSession(TtsOutputSession session) async {
@@ -44,8 +45,10 @@ final class Mp3FileOutput implements TtsOutput {
     final target = File(filePath);
     await target.parent.create(recursive: true);
 
-    final lockedHeader =
-        await _readTargetHeader(target, requestId: session.requestId);
+    final lockedHeader = await _readTargetHeader(
+      target,
+      requestId: session.requestId,
+    );
 
     final tempFile = File('$filePath.tmp');
     if (await tempFile.exists()) {
@@ -94,10 +97,14 @@ final class Mp3FileOutput implements TtsOutput {
     final targetFile = File(filePath);
     try {
       await _state.flushAndCloseSink();
-      final sessionHeader =
-          await _readSessionHeader(tempFile, requestId: session.requestId);
-      final currentTargetHeader =
-          await _readTargetHeader(targetFile, requestId: session.requestId);
+      final sessionHeader = await _readSessionHeader(
+        tempFile,
+        requestId: session.requestId,
+      );
+      final currentTargetHeader = await _readTargetHeader(
+        targetFile,
+        requestId: session.requestId,
+      );
       final lockedHeader = _state.lockedHeader;
 
       if (lockedHeader != null && currentTargetHeader != lockedHeader) {
@@ -113,7 +120,8 @@ final class Mp3FileOutput implements TtsOutput {
             currentTargetHeader.layer != sessionHeader.layer) {
           throw TtsError(
             code: TtsErrorCode.invalidRequest,
-            message: 'Session MP3 MPEG version/layer does not match the '
+            message:
+                'Session MP3 MPEG version/layer does not match the '
                 'existing target file and cannot be safely appended.',
             requestId: session.requestId,
           );
@@ -246,7 +254,8 @@ final class Mp3FileOutput implements TtsOutput {
       }
 
       final flags = prefix[5];
-      final tagSize = ((prefix[6] & 0x7F) << 21) |
+      final tagSize =
+          ((prefix[6] & 0x7F) << 21) |
           ((prefix[7] & 0x7F) << 14) |
           ((prefix[8] & 0x7F) << 7) |
           (prefix[9] & 0x7F);
@@ -282,7 +291,8 @@ final class Mp3FileOutput implements TtsOutput {
         return;
       }
 
-      final hasId3v1Tag = trailingBlock[0] == 0x54 &&
+      final hasId3v1Tag =
+          trailingBlock[0] == 0x54 &&
           trailingBlock[1] == 0x41 &&
           trailingBlock[2] == 0x47;
       if (!hasId3v1Tag) {

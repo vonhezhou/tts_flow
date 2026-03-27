@@ -21,19 +21,19 @@ final class FileTtsEngine implements TtsEngine {
     this.maxBytesPerSecond,
     this.supportsStreaming = true,
     List<TtsVoice>? voices,
-  })  : assert(chunkSizeBytes > 0),
-        _voices = List.unmodifiable(
-          (voices == null || voices.isEmpty)
-              ? const [
-                  TtsVoice(
-                    voiceId: 'file-engine-default',
-                    locale: 'und',
-                    displayName: 'File Engine Default',
-                    isDefault: true,
-                  ),
-                ]
-              : voices,
-        ) {
+  }) : assert(chunkSizeBytes > 0),
+       _voices = List.unmodifiable(
+         (voices == null || voices.isEmpty)
+             ? const [
+                 TtsVoice(
+                   voiceId: 'file-engine-default',
+                   locale: 'und',
+                   displayName: 'File Engine Default',
+                   isDefault: true,
+                 ),
+               ]
+             : voices,
+       ) {
     final bytesPerSecond = maxBytesPerSecond;
     if (bytesPerSecond != null && bytesPerSecond <= 0) {
       throw ArgumentError.value(
@@ -69,15 +69,19 @@ final class FileTtsEngine implements TtsEngine {
       return _voices;
     }
     final normalized = _normalizeLocale(locale);
-    return _voices.where((voice) {
-      return _localeMatches(voice.locale, normalized);
-    }).toList(growable: false);
+    return _voices
+        .where((voice) {
+          return _localeMatches(voice.locale, normalized);
+        })
+        .toList(growable: false);
   }
 
   @override
   Future<TtsVoice> getDefaultVoice() async {
-    return _voices.firstWhere((voice) => voice.isDefault,
-        orElse: () => _voices.first);
+    return _voices.firstWhere(
+      (voice) => voice.isDefault,
+      orElse: () => _voices.first,
+    );
   }
 
   @override
@@ -85,8 +89,10 @@ final class FileTtsEngine implements TtsEngine {
     final normalized = _normalizeLocale(locale);
     final scoped = await getAvailableVoices(locale: normalized);
     if (scoped.isNotEmpty) {
-      return scoped.firstWhere((voice) => voice.isDefault,
-          orElse: () => scoped.first);
+      return scoped.firstWhere(
+        (voice) => voice.isDefault,
+        orElse: () => scoped.first,
+      );
     }
     return getDefaultVoice();
   }
@@ -100,7 +106,8 @@ final class FileTtsEngine implements TtsEngine {
     if (!supportsSpec(resolvedFormat)) {
       throw TtsError(
         code: TtsErrorCode.unsupportedFormat,
-        message: 'Resolved audio spec is not supported by this provider: '
+        message:
+            'Resolved audio spec is not supported by this provider: '
             '$resolvedFormat',
         requestId: request.requestId,
       );
@@ -157,6 +164,9 @@ final class FileTtsEngine implements TtsEngine {
       );
     }
   }
+
+  @override
+  Future<void> init() async {}
 
   @override
   Future<void> dispose() async {}

@@ -21,11 +21,11 @@ final class TtsFlow with TtsOptionsMixin, TtsFlowEventBus, TtsSourceMixin {
     required TtsEngine engine,
     TtsOutput? defaultOutput,
     TtsFlowConfig config = const TtsFlowConfig(),
-  })  : _engine = engine,
-        _defaultOutput = defaultOutput,
-        _config = config,
-        options = const TtsOptions(),
-        preferredFormat = config.preferredFormatOrder.first;
+  }) : _engine = engine,
+       _defaultOutput = defaultOutput,
+       _config = config,
+       options = const TtsOptions(),
+       preferredFormat = config.preferredFormatOrder.first;
 
   final TtsEngine _engine;
   final TtsOutput? _defaultOutput;
@@ -70,6 +70,8 @@ final class TtsFlow with TtsOptionsMixin, TtsFlowEventBus, TtsSourceMixin {
       return;
     }
 
+    await _engine.init();
+    await _defaultOutput?.init();
     voice = await _engine.getDefaultVoice();
 
     state.markInitialized();
@@ -163,8 +165,10 @@ final class TtsFlow with TtsOptionsMixin, TtsFlowEventBus, TtsSourceMixin {
     }
 
     if (pending.isNotEmpty) {
-      emitQueueEvent(TtsQueueEventType.queueCleared,
-          queueLength: scheduler.length);
+      emitQueueEvent(
+        TtsQueueEventType.queueCleared,
+        queueLength: scheduler.length,
+      );
     }
     return pending.length;
   }

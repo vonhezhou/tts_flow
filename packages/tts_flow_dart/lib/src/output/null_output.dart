@@ -23,6 +23,9 @@ final class NullOutput implements TtsOutput {
   TtsOutputSession? _session;
 
   @override
+  Future<void> init() async {}
+
+  @override
   Future<void> initSession(TtsOutputSession session) async {
     _session = session;
   }

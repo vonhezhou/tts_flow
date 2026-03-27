@@ -27,14 +27,14 @@ final class SineTtsEngine implements TtsEngine {
 
   @override
   Set<AudioCapability> get supportedCapabilities => {
-        PcmCapability(
-          sampleRatesHz: {16000, 22050, 24000, 44100, 48000},
-          bitsPerSample: {16},
-          channels: {1, 2},
-          encodings: {PcmEncoding.signedInt},
-        ),
-        const SimpleFormatCapability(format: TtsAudioFormat.mp3),
-      };
+    PcmCapability(
+      sampleRatesHz: {16000, 22050, 24000, 44100, 48000},
+      bitsPerSample: {16},
+      channels: {1, 2},
+      encodings: {PcmEncoding.signedInt},
+    ),
+    const SimpleFormatCapability(format: TtsAudioFormat.mp3),
+  };
 
   final int chunkCount;
   final Duration chunkDelay;
@@ -64,15 +64,19 @@ final class SineTtsEngine implements TtsEngine {
       return _voices;
     }
     final normalized = _normalizeLocale(locale);
-    return _voices.where((voice) {
-      return _localeMatches(voice.locale, normalized);
-    }).toList(growable: false);
+    return _voices
+        .where((voice) {
+          return _localeMatches(voice.locale, normalized);
+        })
+        .toList(growable: false);
   }
 
   @override
   Future<TtsVoice> getDefaultVoice() async {
-    return _voices.firstWhere((voice) => voice.isDefault,
-        orElse: () => _voices.first);
+    return _voices.firstWhere(
+      (voice) => voice.isDefault,
+      orElse: () => _voices.first,
+    );
   }
 
   @override
@@ -80,8 +84,10 @@ final class SineTtsEngine implements TtsEngine {
     final normalized = _normalizeLocale(locale);
     final scoped = (await getAvailableVoices(locale: normalized));
     if (scoped.isNotEmpty) {
-      return scoped.firstWhere((voice) => voice.isDefault,
-          orElse: () => scoped.first);
+      return scoped.firstWhere(
+        (voice) => voice.isDefault,
+        orElse: () => scoped.first,
+      );
     }
     return getDefaultVoice();
   }
@@ -95,7 +101,10 @@ final class SineTtsEngine implements TtsEngine {
     final pcm = resolvedFormat.format == TtsAudioFormat.pcm
         ? resolvedFormat.requirePcm
         : const PcmDescriptor(
-            sampleRateHz: 24000, bitsPerSample: 16, channels: 1);
+            sampleRateHz: 24000,
+            bitsPerSample: 16,
+            channels: 1,
+          );
 
     const frequency = 440.0; // A4 tone
     const amplitude = 16384; // 50% of 16-bit signed max
@@ -142,6 +151,9 @@ final class SineTtsEngine implements TtsEngine {
       );
     }
   }
+
+  @override
+  Future<void> init() async {}
 
   @override
   Future<void> dispose() async {}

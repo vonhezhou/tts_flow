@@ -27,10 +27,8 @@ final _log = Logger('tts_flow_dart.AacFileOutput');
 /// the append proceeds—ADTS is a self-framing format and each frame carries
 /// its own header.
 final class AacFileOutput implements TtsOutput {
-  AacFileOutput(
-    this.filePath, {
-    this.outputId = 'aac-file-output',
-  }) : _state = _AacFileOutputSessionState();
+  AacFileOutput(this.filePath, {this.outputId = 'aac-file-output'})
+    : _state = _AacFileOutputSessionState();
 
   final String filePath;
   final _AacFileOutputSessionState _state;
@@ -40,8 +38,11 @@ final class AacFileOutput implements TtsOutput {
 
   @override
   Set<AudioCapability> get acceptedCapabilities => {
-        const SimpleFormatCapability(format: TtsAudioFormat.aac),
-      };
+    const SimpleFormatCapability(format: TtsAudioFormat.aac),
+  };
+
+  @override
+  Future<void> init() async {}
 
   @override
   Future<void> initSession(TtsOutputSession session) async {

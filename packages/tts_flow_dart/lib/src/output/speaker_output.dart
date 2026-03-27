@@ -20,14 +20,9 @@ abstract interface class SpeakerBackend {
     required List<int> bytes,
   });
 
-  Future<Duration> completePlayback({
-    required String playbackId,
-  });
+  Future<Duration> completePlayback({required String playbackId});
 
-  Future<void> stopPlayback({
-    required String playbackId,
-    String? reason,
-  });
+  Future<void> stopPlayback({required String playbackId, String? reason});
 
   Future<void> pausePlayback({required String playbackId});
 
@@ -53,6 +48,9 @@ final class SpeakerOutput implements TtsOutput {
 
   TtsOutputSession? _session;
   String? _playbackId;
+
+  @override
+  Future<void> init() async {}
 
   @override
   Future<void> initSession(TtsOutputSession session) async {
@@ -102,10 +100,7 @@ final class SpeakerOutput implements TtsOutput {
     final playbackId = _playbackId;
     if (playbackId != null) {
       final reason = control.cancelMessage ?? control.cancelReason?.name;
-      await _backend.stopPlayback(
-        playbackId: playbackId,
-        reason: reason,
-      );
+      await _backend.stopPlayback(playbackId: playbackId, reason: reason);
     }
     _session = null;
     _playbackId = null;

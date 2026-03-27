@@ -117,15 +117,15 @@ class OpenAiTtsEngine implements TtsEngine {
 
   @override
   Set<AudioCapability> get supportedCapabilities => {
-        const SimpleFormatCapability(format: TtsAudioFormat.mp3),
-        const SimpleFormatCapability(format: TtsAudioFormat.aac),
-        PcmCapability(
-          sampleRatesHz: {_openAiPcmSampleRateHz},
-          bitsPerSample: {_openAiPcmBitsPerSample},
-          channels: {_openAiPcmChannels},
-          encodings: {PcmEncoding.signedInt},
-        ),
-      };
+    const SimpleFormatCapability(format: TtsAudioFormat.mp3),
+    const SimpleFormatCapability(format: TtsAudioFormat.aac),
+    PcmCapability(
+      sampleRatesHz: {_openAiPcmSampleRateHz},
+      bitsPerSample: {_openAiPcmBitsPerSample},
+      channels: {_openAiPcmChannels},
+      encodings: {PcmEncoding.signedInt},
+    ),
+  };
 
   static const int _openAiPcmSampleRateHz = 24000;
   static const int _openAiPcmBitsPerSample = 16;
@@ -139,9 +139,11 @@ class OpenAiTtsEngine implements TtsEngine {
     }
 
     final normalizedLocale = _normalizeLocale(locale);
-    final scoped = voices.where((voice) {
-      return _localeMatches(voice.locale, normalizedLocale);
-    }).toList(growable: false);
+    final scoped = voices
+        .where((voice) {
+          return _localeMatches(voice.locale, normalizedLocale);
+        })
+        .toList(growable: false);
 
     // If provider metadata does not include locales, do not hide voices.
     if (scoped.isEmpty && voices.every((voice) => voice.locale == null)) {
@@ -290,9 +292,7 @@ class OpenAiTtsEngine implements TtsEngine {
     TtsRequest request,
     TtsAudioSpec resolvedFormat,
   ) {
-    final headers = <String, String>{
-      'Content-Type': 'application/json',
-    };
+    final headers = <String, String>{'Content-Type': 'application/json'};
     if (apiKey.isNotEmpty) {
       headers['Authorization'] = 'Bearer $apiKey';
     }
@@ -384,26 +384,30 @@ class OpenAiTtsEngine implements TtsEngine {
       return discovered;
     }
 
-    return discovered.map((voice) {
-      if (voice.voiceId != defaultVoiceId) {
-        return voice;
-      }
-      return TtsVoice(
-        voiceId: voice.voiceId,
-        locale: voice.locale,
-        displayName: voice.displayName,
-        isDefault: true,
-      );
-    }).toList(growable: false);
+    return discovered
+        .map((voice) {
+          if (voice.voiceId != defaultVoiceId) {
+            return voice;
+          }
+          return TtsVoice(
+            voiceId: voice.voiceId,
+            locale: voice.locale,
+            displayName: voice.displayName,
+            isDefault: true,
+          );
+        })
+        .toList(growable: false);
   }
 
   List<TtsVoice> _fallbackVoices() {
-    return _fallbackVoiceIds.map((voiceId) {
-      return TtsVoice(
-        voiceId: voiceId,
-        isDefault: voiceId == defaultVoiceId,
-      );
-    }).toList(growable: false);
+    return _fallbackVoiceIds
+        .map((voiceId) {
+          return TtsVoice(
+            voiceId: voiceId,
+            isDefault: voiceId == defaultVoiceId,
+          );
+        })
+        .toList(growable: false);
   }
 
   String _normalizeLocale(String locale) {
@@ -422,6 +426,9 @@ class OpenAiTtsEngine implements TtsEngine {
     return normalizedVoiceLocale == language ||
         normalizedVoiceLocale.startsWith('$language-');
   }
+
+  @override
+  Future<void> init() async {}
 
   @override
   Future<void> dispose() async {}

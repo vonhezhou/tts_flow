@@ -27,6 +27,8 @@ abstract interface class TtsEngine {
   /// exact locale -> language match -> global default voice.
   Future<TtsVoice> getDefaultVoiceForLocale(String locale);
 
+  Future<void> init();
+
   Stream<TtsChunk> synthesize(
     TtsRequest request,
     SynthesisControl control,

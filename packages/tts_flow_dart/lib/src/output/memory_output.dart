@@ -32,6 +32,9 @@ final class MemoryOutput implements TtsOutput {
   BytesBuilder? _buffer;
 
   @override
+  Future<void> init() async {}
+
+  @override
   Future<void> initSession(TtsOutputSession session) async {
     _session = session;
     _buffer = BytesBuilder(copy: false);

@@ -38,7 +38,8 @@ void main() {
       await output.initSession(session);
       await output.consumeChunk(_chunk('mem-1', 0, [1, 2], TtsAudioFormat.pcm));
       await output.consumeChunk(
-          _chunk('mem-1', 1, [3], TtsAudioFormat.pcm, isLast: true));
+        _chunk('mem-1', 1, [3], TtsAudioFormat.pcm, isLast: true),
+      );
       final artifact = await output.finalizeSession();
 
       expect(artifact, isA<InMemoryAudioArtifact>());
@@ -54,24 +55,28 @@ void main() {
 
       await output.initSession(
         const TtsOutputSession(
-            requestId: 'a',
-            audioSpec: TtsAudioSpec(format: TtsAudioFormat.mp3),
-            voice: null,
-            options: null),
+          requestId: 'a',
+          audioSpec: TtsAudioSpec(format: TtsAudioFormat.mp3),
+          voice: null,
+          options: null,
+        ),
       );
       await output.consumeChunk(
-          _chunk('a', 0, [8, 8], TtsAudioFormat.mp3, isLast: true));
+        _chunk('a', 0, [8, 8], TtsAudioFormat.mp3, isLast: true),
+      );
       final first = await output.finalizeSession() as InMemoryAudioArtifact;
 
       await output.initSession(
         const TtsOutputSession(
-            requestId: 'b',
-            audioSpec: TtsAudioSpec(format: TtsAudioFormat.pcm),
-            voice: null,
-            options: null),
+          requestId: 'b',
+          audioSpec: TtsAudioSpec(format: TtsAudioFormat.pcm),
+          voice: null,
+          options: null,
+        ),
       );
-      await output
-          .consumeChunk(_chunk('b', 0, [7], TtsAudioFormat.pcm, isLast: true));
+      await output.consumeChunk(
+        _chunk('b', 0, [7], TtsAudioFormat.pcm, isLast: true),
+      );
       final second = await output.finalizeSession() as InMemoryAudioArtifact;
 
       expect(first.audioBytes, Uint8List.fromList([8, 8]));
@@ -90,8 +95,9 @@ void main() {
       );
 
       await output.initSession(session);
-      await output
-          .consumeChunk(_chunk('null-1', 0, [1, 2], TtsAudioFormat.pcm));
+      await output.consumeChunk(
+        _chunk('null-1', 0, [1, 2], TtsAudioFormat.pcm),
+      );
       await output.consumeChunk(
         _chunk('null-1', 1, [3], TtsAudioFormat.pcm, isLast: true),
       );
@@ -123,8 +129,9 @@ void main() {
 
   group('M4 wav/mp3 file outputs', () {
     test('WavFileOutput writes to explicit file path and finalizes', () async {
-      final tempDir =
-          await Directory.systemTemp.createTemp('uni_tts_wav_file_output_');
+      final tempDir = await Directory.systemTemp.createTemp(
+        'uni_tts_wav_file_output_',
+      );
       try {
         final outputPath =
             '${tempDir.path}${Platform.pathSeparator}fixed-output.wav';
@@ -137,18 +144,13 @@ void main() {
         );
         const session = TtsOutputSession(
           requestId: 'wav-1',
-          audioSpec: TtsAudioSpec(
-            format: TtsAudioFormat.pcm,
-            pcm: descriptor,
-          ),
+          audioSpec: TtsAudioSpec(format: TtsAudioFormat.pcm, pcm: descriptor),
           voice: null,
           options: TtsOptions(sampleRateHz: 16000),
         );
 
         await output.initSession(session);
-        await output.consumeChunk(
-          _pcmChunk('wav-1', 0, [1, 2, 3], descriptor),
-        );
+        await output.consumeChunk(_pcmChunk('wav-1', 0, [1, 2, 3], descriptor));
         await output.consumeChunk(
           _pcmChunk('wav-1', 1, [4], descriptor, isLast: true),
         );
@@ -175,8 +177,9 @@ void main() {
     });
 
     test('Mp3FileOutput writes to explicit file path and finalizes', () async {
-      final tempDir =
-          await Directory.systemTemp.createTemp('uni_tts_mp3_file_output_');
+      final tempDir = await Directory.systemTemp.createTemp(
+        'uni_tts_mp3_file_output_',
+      );
       try {
         final outputPath =
             '${tempDir.path}${Platform.pathSeparator}fixed-output.mp3';
@@ -195,8 +198,13 @@ void main() {
           _chunk('mp3-1', 0, bytes.sublist(0, 20), TtsAudioFormat.mp3),
         );
         await output.consumeChunk(
-          _chunk('mp3-1', 1, bytes.sublist(20), TtsAudioFormat.mp3,
-              isLast: true),
+          _chunk(
+            'mp3-1',
+            1,
+            bytes.sublist(20),
+            TtsAudioFormat.mp3,
+            isLast: true,
+          ),
         );
 
         final artifact = await output.finalizeSession();
@@ -213,8 +221,9 @@ void main() {
     });
 
     test('Mp3FileOutput appends across sessions', () async {
-      final tempDir =
-          await Directory.systemTemp.createTemp('uni_tts_mp3_append_');
+      final tempDir = await Directory.systemTemp.createTemp(
+        'uni_tts_mp3_append_',
+      );
       try {
         final outputPath = '${tempDir.path}${Platform.pathSeparator}append.mp3';
         final output = Mp3FileOutput(outputPath);
@@ -243,8 +252,13 @@ void main() {
           ),
         );
         await output.consumeChunk(
-          _chunk('mp3-append-2', 0, secondBytes, TtsAudioFormat.mp3,
-              isLast: true),
+          _chunk(
+            'mp3-append-2',
+            0,
+            secondBytes,
+            TtsAudioFormat.mp3,
+            isLast: true,
+          ),
         );
 
         final artifact = await output.finalizeSession() as FileAudioArtifact;
@@ -260,8 +274,9 @@ void main() {
     });
 
     test('Mp3FileOutput strips trailing ID3v1 TAG before appending', () async {
-      final tempDir =
-          await Directory.systemTemp.createTemp('uni_tts_mp3_append_id3v1_');
+      final tempDir = await Directory.systemTemp.createTemp(
+        'uni_tts_mp3_append_id3v1_',
+      );
       try {
         final outputPath =
             '${tempDir.path}${Platform.pathSeparator}append-id3v1.mp3';
@@ -295,8 +310,13 @@ void main() {
           ),
         );
         await output.consumeChunk(
-          _chunk('mp3-append-id3v1-2', 0, secondBytes, TtsAudioFormat.mp3,
-              isLast: true),
+          _chunk(
+            'mp3-append-id3v1-2',
+            0,
+            secondBytes,
+            TtsAudioFormat.mp3,
+            isLast: true,
+          ),
         );
 
         final artifact = await output.finalizeSession() as FileAudioArtifact;
@@ -313,144 +333,171 @@ void main() {
       }
     });
 
-    test('Mp3FileOutput rejects later sessions with mismatched metadata',
-        () async {
-      final tempDir =
-          await Directory.systemTemp.createTemp('uni_tts_mp3_mismatch_');
-      try {
-        final outputPath =
-            '${tempDir.path}${Platform.pathSeparator}mismatch.mp3';
-        final output = Mp3FileOutput(outputPath);
-        final baselineBytes = _mp3Bytes(
-          frames: 1,
-          sampleRateHz: 8000,
-          channelMode: Mp3ChannelMode.mono,
+    test(
+      'Mp3FileOutput rejects later sessions with mismatched metadata',
+      () async {
+        final tempDir = await Directory.systemTemp.createTemp(
+          'uni_tts_mp3_mismatch_',
         );
-        final mismatchedBytes = _mp3Bytes(
-          frames: 1,
-          sampleRateHz: 11025,
-          channelMode: Mp3ChannelMode.mono,
-        );
+        try {
+          final outputPath =
+              '${tempDir.path}${Platform.pathSeparator}mismatch.mp3';
+          final output = Mp3FileOutput(outputPath);
+          final baselineBytes = _mp3Bytes(
+            frames: 1,
+            sampleRateHz: 8000,
+            channelMode: Mp3ChannelMode.mono,
+          );
+          final mismatchedBytes = _mp3Bytes(
+            frames: 1,
+            sampleRateHz: 11025,
+            channelMode: Mp3ChannelMode.mono,
+          );
 
-        await output.initSession(
-          const TtsOutputSession(
-            requestId: 'mp3-mismatch-1',
-            audioSpec: TtsAudioSpec(format: TtsAudioFormat.mp3),
-            voice: null,
-            options: null,
-          ),
-        );
-        await output.consumeChunk(
-          _chunk('mp3-mismatch-1', 0, baselineBytes, TtsAudioFormat.mp3,
-              isLast: true),
-        );
-        await output.finalizeSession();
-
-        await output.initSession(
-          const TtsOutputSession(
-            requestId: 'mp3-mismatch-2',
-            audioSpec: TtsAudioSpec(format: TtsAudioFormat.mp3),
-            voice: null,
-            options: null,
-          ),
-        );
-        await output.consumeChunk(
-          _chunk('mp3-mismatch-2', 0, mismatchedBytes, TtsAudioFormat.mp3,
-              isLast: true),
-        );
-
-        await expectLater(
-          output.finalizeSession(),
-          throwsA(
-            isA<TtsError>().having(
-              (error) => error.code,
-              'code',
-              TtsErrorCode.invalidRequest,
-            ),
-          ),
-        );
-
-        expect(await File('$outputPath.tmp').exists(), isFalse);
-        expect(await File(outputPath).readAsBytes(), baselineBytes);
-
-        await output.initSession(
-          const TtsOutputSession(
-            requestId: 'mp3-mismatch-3',
-            audioSpec: TtsAudioSpec(format: TtsAudioFormat.mp3),
-            voice: null,
-            options: null,
-          ),
-        );
-        await output.consumeChunk(
-          _chunk('mp3-mismatch-3', 0, baselineBytes, TtsAudioFormat.mp3,
-              isLast: true),
-        );
-        final artifact = await output.finalizeSession() as FileAudioArtifact;
-        expect(artifact.filePath, outputPath);
-      } finally {
-        await tempDir.delete(recursive: true);
-      }
-    });
-
-    test('WavFileOutput clears temp and state after finalize failure',
-        () async {
-      final tempDir =
-          await Directory.systemTemp.createTemp('uni_tts_wav_finalize_fail_');
-      try {
-        final outputPath =
-            '${tempDir.path}${Platform.pathSeparator}finalize-fail.wav';
-        final output = WavFileOutput(outputPath);
-
-        await expectLater(
-          output.initSession(
+          await output.initSession(
             const TtsOutputSession(
-              requestId: 'wav-finalize-fail-1',
-              audioSpec: TtsAudioSpec(format: TtsAudioFormat.pcm),
+              requestId: 'mp3-mismatch-1',
+              audioSpec: TtsAudioSpec(format: TtsAudioFormat.mp3),
               voice: null,
-              options: TtsOptions(sampleRateHz: -1),
+              options: null,
             ),
-          ),
-          throwsA(
-            isA<TtsError>().having(
-              (error) => error.code,
-              'code',
-              TtsErrorCode.invalidRequest,
+          );
+          await output.consumeChunk(
+            _chunk(
+              'mp3-mismatch-1',
+              0,
+              baselineBytes,
+              TtsAudioFormat.mp3,
+              isLast: true,
             ),
-          ),
-        );
+          );
+          await output.finalizeSession();
 
-        expect(await File('$outputPath.tmp').exists(), isFalse);
-
-        const descriptor = PcmDescriptor(
-          sampleRateHz: 24000,
-          bitsPerSample: 16,
-          channels: 1,
-        );
-        await output.initSession(
-          const TtsOutputSession(
-            requestId: 'wav-finalize-fail-2',
-            audioSpec: TtsAudioSpec(
-              format: TtsAudioFormat.pcm,
-              pcm: descriptor,
+          await output.initSession(
+            const TtsOutputSession(
+              requestId: 'mp3-mismatch-2',
+              audioSpec: TtsAudioSpec(format: TtsAudioFormat.mp3),
+              voice: null,
+              options: null,
             ),
-            voice: null,
-            options: null,
-          ),
+          );
+          await output.consumeChunk(
+            _chunk(
+              'mp3-mismatch-2',
+              0,
+              mismatchedBytes,
+              TtsAudioFormat.mp3,
+              isLast: true,
+            ),
+          );
+
+          await expectLater(
+            output.finalizeSession(),
+            throwsA(
+              isA<TtsError>().having(
+                (error) => error.code,
+                'code',
+                TtsErrorCode.invalidRequest,
+              ),
+            ),
+          );
+
+          expect(await File('$outputPath.tmp').exists(), isFalse);
+          expect(await File(outputPath).readAsBytes(), baselineBytes);
+
+          await output.initSession(
+            const TtsOutputSession(
+              requestId: 'mp3-mismatch-3',
+              audioSpec: TtsAudioSpec(format: TtsAudioFormat.mp3),
+              voice: null,
+              options: null,
+            ),
+          );
+          await output.consumeChunk(
+            _chunk(
+              'mp3-mismatch-3',
+              0,
+              baselineBytes,
+              TtsAudioFormat.mp3,
+              isLast: true,
+            ),
+          );
+          final artifact = await output.finalizeSession() as FileAudioArtifact;
+          expect(artifact.filePath, outputPath);
+        } finally {
+          await tempDir.delete(recursive: true);
+        }
+      },
+    );
+
+    test(
+      'WavFileOutput clears temp and state after finalize failure',
+      () async {
+        final tempDir = await Directory.systemTemp.createTemp(
+          'uni_tts_wav_finalize_fail_',
         );
-        await output.consumeChunk(
-          _pcmChunk('wav-finalize-fail-2', 0, [1, 2, 3], descriptor,
-              isLast: true),
-        );
-        final artifact = await output.finalizeSession() as FileAudioArtifact;
-        expect(artifact.filePath, outputPath);
-      } finally {
-        await tempDir.delete(recursive: true);
-      }
-    });
+        try {
+          final outputPath =
+              '${tempDir.path}${Platform.pathSeparator}finalize-fail.wav';
+          final output = WavFileOutput(outputPath);
+
+          await expectLater(
+            output.initSession(
+              const TtsOutputSession(
+                requestId: 'wav-finalize-fail-1',
+                audioSpec: TtsAudioSpec(format: TtsAudioFormat.pcm),
+                voice: null,
+                options: TtsOptions(sampleRateHz: -1),
+              ),
+            ),
+            throwsA(
+              isA<TtsError>().having(
+                (error) => error.code,
+                'code',
+                TtsErrorCode.invalidRequest,
+              ),
+            ),
+          );
+
+          expect(await File('$outputPath.tmp').exists(), isFalse);
+
+          const descriptor = PcmDescriptor(
+            sampleRateHz: 24000,
+            bitsPerSample: 16,
+            channels: 1,
+          );
+          await output.initSession(
+            const TtsOutputSession(
+              requestId: 'wav-finalize-fail-2',
+              audioSpec: TtsAudioSpec(
+                format: TtsAudioFormat.pcm,
+                pcm: descriptor,
+              ),
+              voice: null,
+              options: null,
+            ),
+          );
+          await output.consumeChunk(
+            _pcmChunk(
+              'wav-finalize-fail-2',
+              0,
+              [1, 2, 3],
+              descriptor,
+              isLast: true,
+            ),
+          );
+          final artifact = await output.finalizeSession() as FileAudioArtifact;
+          expect(artifact.filePath, outputPath);
+        } finally {
+          await tempDir.delete(recursive: true);
+        }
+      },
+    );
 
     test('WavFileOutput onCancel removes temp file', () async {
-      final tempDir =
-          await Directory.systemTemp.createTemp('uni_tts_wav_cancel_');
+      final tempDir = await Directory.systemTemp.createTemp(
+        'uni_tts_wav_cancel_',
+      );
       try {
         final outputPath = '${tempDir.path}${Platform.pathSeparator}cancel.wav';
         final output = WavFileOutput(outputPath);
@@ -462,10 +509,7 @@ void main() {
         );
         const session = TtsOutputSession(
           requestId: 'wav-2',
-          audioSpec: TtsAudioSpec(
-            format: TtsAudioFormat.pcm,
-            pcm: descriptor,
-          ),
+          audioSpec: TtsAudioSpec(format: TtsAudioFormat.pcm, pcm: descriptor),
           voice: null,
           options: null,
         );
@@ -485,8 +529,9 @@ void main() {
     });
 
     test('WavFileOutput accepts PCM chunks and produces WAV file', () async {
-      final tempDir =
-          await Directory.systemTemp.createTemp('uni_tts_wav_from_pcm_');
+      final tempDir = await Directory.systemTemp.createTemp(
+        'uni_tts_wav_from_pcm_',
+      );
       try {
         final outputPath =
             '${tempDir.path}${Platform.pathSeparator}from-pcm.wav';
@@ -499,10 +544,7 @@ void main() {
 
         const session = TtsOutputSession(
           requestId: 'pcm-1',
-          audioSpec: TtsAudioSpec(
-            format: TtsAudioFormat.pcm,
-            pcm: descriptor,
-          ),
+          audioSpec: TtsAudioSpec(format: TtsAudioFormat.pcm, pcm: descriptor),
           voice: null,
           options: null,
         );
@@ -530,246 +572,263 @@ void main() {
       }
     });
 
-    test('WavFileOutput appends across sessions with locked descriptor',
-        () async {
-      final tempDir =
-          await Directory.systemTemp.createTemp('uni_tts_wav_append_');
-      try {
-        final outputPath = '${tempDir.path}${Platform.pathSeparator}append.wav';
-        final output = WavFileOutput(outputPath);
-        const descriptor = PcmDescriptor(
-          sampleRateHz: 16000,
-          bitsPerSample: 16,
-          channels: 1,
+    test(
+      'WavFileOutput appends across sessions with locked descriptor',
+      () async {
+        final tempDir = await Directory.systemTemp.createTemp(
+          'uni_tts_wav_append_',
         );
+        try {
+          final outputPath =
+              '${tempDir.path}${Platform.pathSeparator}append.wav';
+          final output = WavFileOutput(outputPath);
+          const descriptor = PcmDescriptor(
+            sampleRateHz: 16000,
+            bitsPerSample: 16,
+            channels: 1,
+          );
 
-        await output.initSession(
-          const TtsOutputSession(
-            requestId: 'append-1',
-            audioSpec: TtsAudioSpec(
-              format: TtsAudioFormat.pcm,
-              pcm: descriptor,
-            ),
-            voice: null,
-            options: null,
-          ),
-        );
-        await output.consumeChunk(_pcmChunk('append-1', 0, [1, 2], descriptor));
-        await output.finalizeSession();
-
-        await output.initSession(
-          const TtsOutputSession(
-            requestId: 'append-2',
-            audioSpec: TtsAudioSpec(
-              format: TtsAudioFormat.pcm,
-              pcm: descriptor,
-            ),
-            voice: null,
-            options: null,
-          ),
-        );
-        await output.consumeChunk(
-          _pcmChunk('append-2', 0, [3, 4, 5], descriptor, isLast: true),
-        );
-
-        final artifact = await output.finalizeSession() as FileAudioArtifact;
-        expect(artifact.audioSpec.format, TtsAudioFormat.pcm);
-        expect(artifact.fileSizeBytes, 49);
-
-        final fileBytes = await File(outputPath).readAsBytes();
-        final header = WavHeader.parse(fileBytes);
-        expect(header.sampleRateHz, 16000);
-        expect(header.bitsPerSample, 16);
-        expect(header.channels, 1);
-        expect(header.dataLengthBytes, 5);
-        expect(fileBytes.sublist(44), [1, 2, 3, 4, 5]);
-      } finally {
-        await tempDir.delete(recursive: true);
-      }
-    });
-
-    test('WavFileOutput rejects later sessions with mismatched descriptor',
-        () async {
-      final tempDir =
-          await Directory.systemTemp.createTemp('uni_tts_wav_mismatch_');
-      try {
-        final outputPath =
-            '${tempDir.path}${Platform.pathSeparator}mismatch.wav';
-        final output = WavFileOutput(outputPath);
-        const lockedDescriptor = PcmDescriptor(
-          sampleRateHz: 16000,
-          bitsPerSample: 16,
-          channels: 1,
-        );
-        const mismatchedDescriptor = PcmDescriptor(
-          sampleRateHz: 22050,
-          bitsPerSample: 16,
-          channels: 1,
-        );
-
-        await output.initSession(
-          const TtsOutputSession(
-            requestId: 'mismatch-1',
-            audioSpec: TtsAudioSpec(
-              format: TtsAudioFormat.pcm,
-              pcm: lockedDescriptor,
-            ),
-            voice: null,
-            options: null,
-          ),
-        );
-        await output.consumeChunk(
-          _pcmChunk('mismatch-1', 0, [7, 8], lockedDescriptor, isLast: true),
-        );
-        await output.finalizeSession();
-
-        final baselineBytes = await File(outputPath).readAsBytes();
-
-        await expectLater(
-          output.initSession(
+          await output.initSession(
             const TtsOutputSession(
-              requestId: 'mismatch-2',
+              requestId: 'append-1',
               audioSpec: TtsAudioSpec(
                 format: TtsAudioFormat.pcm,
-                pcm: mismatchedDescriptor,
+                pcm: descriptor,
               ),
               voice: null,
               options: null,
             ),
-          ),
-          throwsA(
-            isA<TtsError>().having(
-              (error) => error.code,
-              'code',
-              TtsErrorCode.invalidRequest,
+          );
+          await output.consumeChunk(
+            _pcmChunk('append-1', 0, [1, 2], descriptor),
+          );
+          await output.finalizeSession();
+
+          await output.initSession(
+            const TtsOutputSession(
+              requestId: 'append-2',
+              audioSpec: TtsAudioSpec(
+                format: TtsAudioFormat.pcm,
+                pcm: descriptor,
+              ),
+              voice: null,
+              options: null,
             ),
-          ),
+          );
+          await output.consumeChunk(
+            _pcmChunk('append-2', 0, [3, 4, 5], descriptor, isLast: true),
+          );
+
+          final artifact = await output.finalizeSession() as FileAudioArtifact;
+          expect(artifact.audioSpec.format, TtsAudioFormat.pcm);
+          expect(artifact.fileSizeBytes, 49);
+
+          final fileBytes = await File(outputPath).readAsBytes();
+          final header = WavHeader.parse(fileBytes);
+          expect(header.sampleRateHz, 16000);
+          expect(header.bitsPerSample, 16);
+          expect(header.channels, 1);
+          expect(header.dataLengthBytes, 5);
+          expect(fileBytes.sublist(44), [1, 2, 3, 4, 5]);
+        } finally {
+          await tempDir.delete(recursive: true);
+        }
+      },
+    );
+
+    test(
+      'WavFileOutput rejects later sessions with mismatched descriptor',
+      () async {
+        final tempDir = await Directory.systemTemp.createTemp(
+          'uni_tts_wav_mismatch_',
         );
+        try {
+          final outputPath =
+              '${tempDir.path}${Platform.pathSeparator}mismatch.wav';
+          final output = WavFileOutput(outputPath);
+          const lockedDescriptor = PcmDescriptor(
+            sampleRateHz: 16000,
+            bitsPerSample: 16,
+            channels: 1,
+          );
+          const mismatchedDescriptor = PcmDescriptor(
+            sampleRateHz: 22050,
+            bitsPerSample: 16,
+            channels: 1,
+          );
 
-        expect(await File(outputPath).readAsBytes(), baselineBytes);
-      } finally {
-        await tempDir.delete(recursive: true);
-      }
-    });
-
-    test('WavFileOutput cancel preserves previously accumulated file',
-        () async {
-      final tempDir =
-          await Directory.systemTemp.createTemp('uni_tts_wav_preserve_');
-      try {
-        final outputPath =
-            '${tempDir.path}${Platform.pathSeparator}preserve.wav';
-        final output = WavFileOutput(outputPath);
-        const descriptor = PcmDescriptor(
-          sampleRateHz: 24000,
-          bitsPerSample: 16,
-          channels: 1,
-        );
-
-        await output.initSession(
-          const TtsOutputSession(
-            requestId: 'preserve-1',
-            audioSpec: TtsAudioSpec(
-              format: TtsAudioFormat.pcm,
-              pcm: descriptor,
+          await output.initSession(
+            const TtsOutputSession(
+              requestId: 'mismatch-1',
+              audioSpec: TtsAudioSpec(
+                format: TtsAudioFormat.pcm,
+                pcm: lockedDescriptor,
+              ),
+              voice: null,
+              options: null,
             ),
-            voice: null,
-            options: null,
-          ),
-        );
-        await output.consumeChunk(
-          _pcmChunk('preserve-1', 0, [9, 10], descriptor, isLast: true),
-        );
-        await output.finalizeSession();
+          );
+          await output.consumeChunk(
+            _pcmChunk('mismatch-1', 0, [7, 8], lockedDescriptor, isLast: true),
+          );
+          await output.finalizeSession();
 
-        final baselineBytes = await File(outputPath).readAsBytes();
+          final baselineBytes = await File(outputPath).readAsBytes();
 
-        await output.initSession(
-          const TtsOutputSession(
-            requestId: 'preserve-2',
-            audioSpec: TtsAudioSpec(
-              format: TtsAudioFormat.pcm,
-              pcm: descriptor,
+          await expectLater(
+            output.initSession(
+              const TtsOutputSession(
+                requestId: 'mismatch-2',
+                audioSpec: TtsAudioSpec(
+                  format: TtsAudioFormat.pcm,
+                  pcm: mismatchedDescriptor,
+                ),
+                voice: null,
+                options: null,
+              ),
             ),
-            voice: null,
-            options: null,
-          ),
+            throwsA(
+              isA<TtsError>().having(
+                (error) => error.code,
+                'code',
+                TtsErrorCode.invalidRequest,
+              ),
+            ),
+          );
+
+          expect(await File(outputPath).readAsBytes(), baselineBytes);
+        } finally {
+          await tempDir.delete(recursive: true);
+        }
+      },
+    );
+
+    test(
+      'WavFileOutput cancel preserves previously accumulated file',
+      () async {
+        final tempDir = await Directory.systemTemp.createTemp(
+          'uni_tts_wav_preserve_',
         );
-        await output.consumeChunk(_pcmChunk('preserve-2', 0, [11], descriptor));
+        try {
+          final outputPath =
+              '${tempDir.path}${Platform.pathSeparator}preserve.wav';
+          final output = WavFileOutput(outputPath);
+          const descriptor = PcmDescriptor(
+            sampleRateHz: 24000,
+            bitsPerSample: 16,
+            channels: 1,
+          );
 
-        final control = SynthesisControl()
-          ..cancel(CancelReason.stopCurrent, message: 'cancel-second-session');
-        await output.onCancel(control);
+          await output.initSession(
+            const TtsOutputSession(
+              requestId: 'preserve-1',
+              audioSpec: TtsAudioSpec(
+                format: TtsAudioFormat.pcm,
+                pcm: descriptor,
+              ),
+              voice: null,
+              options: null,
+            ),
+          );
+          await output.consumeChunk(
+            _pcmChunk('preserve-1', 0, [9, 10], descriptor, isLast: true),
+          );
+          await output.finalizeSession();
 
-        expect(await File('$outputPath.tmp').exists(), isFalse);
-        expect(await File(outputPath).readAsBytes(), baselineBytes);
-      } finally {
-        await tempDir.delete(recursive: true);
-      }
-    });
+          final baselineBytes = await File(outputPath).readAsBytes();
 
-    test('Mp3FileOutput cancel preserves previously accumulated file',
-        () async {
-      final tempDir =
-          await Directory.systemTemp.createTemp('uni_tts_mp3_preserve_');
-      try {
-        final outputPath =
-            '${tempDir.path}${Platform.pathSeparator}preserve.mp3';
-        final output = Mp3FileOutput(outputPath);
-        final baselineBytes = _mp3Bytes(frames: 1);
-        final secondBytes = _mp3Bytes(frames: 1, bitrateKbps: 16);
+          await output.initSession(
+            const TtsOutputSession(
+              requestId: 'preserve-2',
+              audioSpec: TtsAudioSpec(
+                format: TtsAudioFormat.pcm,
+                pcm: descriptor,
+              ),
+              voice: null,
+              options: null,
+            ),
+          );
+          await output.consumeChunk(
+            _pcmChunk('preserve-2', 0, [11], descriptor),
+          );
 
-        await output.initSession(
-          const TtsOutputSession(
-            requestId: 'mp3-preserve-1',
-            audioSpec: TtsAudioSpec(format: TtsAudioFormat.mp3),
-            voice: null,
-            options: null,
-          ),
+          final control = SynthesisControl()
+            ..cancel(
+              CancelReason.stopCurrent,
+              message: 'cancel-second-session',
+            );
+          await output.onCancel(control);
+
+          expect(await File('$outputPath.tmp').exists(), isFalse);
+          expect(await File(outputPath).readAsBytes(), baselineBytes);
+        } finally {
+          await tempDir.delete(recursive: true);
+        }
+      },
+    );
+
+    test(
+      'Mp3FileOutput cancel preserves previously accumulated file',
+      () async {
+        final tempDir = await Directory.systemTemp.createTemp(
+          'uni_tts_mp3_preserve_',
         );
-        await output.consumeChunk(
-          _chunk('mp3-preserve-1', 0, baselineBytes, TtsAudioFormat.mp3),
-        );
-        await output.finalizeSession();
+        try {
+          final outputPath =
+              '${tempDir.path}${Platform.pathSeparator}preserve.mp3';
+          final output = Mp3FileOutput(outputPath);
+          final baselineBytes = _mp3Bytes(frames: 1);
+          final secondBytes = _mp3Bytes(frames: 1, bitrateKbps: 16);
 
-        final baselineFileBytes = await File(outputPath).readAsBytes();
+          await output.initSession(
+            const TtsOutputSession(
+              requestId: 'mp3-preserve-1',
+              audioSpec: TtsAudioSpec(format: TtsAudioFormat.mp3),
+              voice: null,
+              options: null,
+            ),
+          );
+          await output.consumeChunk(
+            _chunk('mp3-preserve-1', 0, baselineBytes, TtsAudioFormat.mp3),
+          );
+          await output.finalizeSession();
 
-        await output.initSession(
-          const TtsOutputSession(
-            requestId: 'mp3-preserve-2',
-            audioSpec: TtsAudioSpec(format: TtsAudioFormat.mp3),
-            voice: null,
-            options: null,
-          ),
-        );
-        await output.consumeChunk(
-          _chunk('mp3-preserve-2', 0, secondBytes, TtsAudioFormat.mp3),
-        );
+          final baselineFileBytes = await File(outputPath).readAsBytes();
 
-        final control = SynthesisControl()
-          ..cancel(CancelReason.stopCurrent, message: 'cancel-second-session');
-        await output.onCancel(control);
+          await output.initSession(
+            const TtsOutputSession(
+              requestId: 'mp3-preserve-2',
+              audioSpec: TtsAudioSpec(format: TtsAudioFormat.mp3),
+              voice: null,
+              options: null,
+            ),
+          );
+          await output.consumeChunk(
+            _chunk('mp3-preserve-2', 0, secondBytes, TtsAudioFormat.mp3),
+          );
 
-        expect(await File('$outputPath.tmp').exists(), isFalse);
-        expect(await File(outputPath).readAsBytes(), baselineFileBytes);
-      } finally {
-        await tempDir.delete(recursive: true);
-      }
-    });
+          final control = SynthesisControl()
+            ..cancel(
+              CancelReason.stopCurrent,
+              message: 'cancel-second-session',
+            );
+          await output.onCancel(control);
+
+          expect(await File('$outputPath.tmp').exists(), isFalse);
+          expect(await File(outputPath).readAsBytes(), baselineFileBytes);
+        } finally {
+          await tempDir.delete(recursive: true);
+        }
+      },
+    );
   });
 
   group('M4 Multicast output', () {
     test('acceptedCapabilities intersects PCM constraints across children', () {
       final output = MulticastOutput(
         outputs: [
-          _PcmConstraintOutput(
-            outputId: 'pcm-16k',
-            sampleRatesHz: {16000},
-          ),
-          _PcmConstraintOutput(
-            outputId: 'pcm-24k',
-            sampleRatesHz: {24000},
-          ),
+          _PcmConstraintOutput(outputId: 'pcm-16k', sampleRatesHz: {16000}),
+          _PcmConstraintOutput(outputId: 'pcm-24k', sampleRatesHz: {24000}),
         ],
       );
 
@@ -777,35 +836,37 @@ void main() {
       expect(capabilities, isEmpty);
     });
 
-    test('bestEffort finalizes successful outputs and records failures',
-        () async {
-      final output = MulticastOutput(
-        outputs: [
-          MemoryOutput(outputId: 'memory'),
-          _FailingTestOutput(outputId: 'failing', failOnConsume: true),
-        ],
-        errorPolicy: MulticastOutputErrorPolicy.bestEffort,
-      );
+    test(
+      'bestEffort finalizes successful outputs and records failures',
+      () async {
+        final output = MulticastOutput(
+          outputs: [
+            MemoryOutput(outputId: 'memory'),
+            _FailingTestOutput(outputId: 'failing', failOnConsume: true),
+          ],
+          errorPolicy: MulticastOutputErrorPolicy.bestEffort,
+        );
 
-      const session = TtsOutputSession(
-        requestId: 'Multicast-1',
-        audioSpec: TtsAudioSpec(format: TtsAudioFormat.pcm),
-        voice: null,
-        options: null,
-      );
+        const session = TtsOutputSession(
+          requestId: 'Multicast-1',
+          audioSpec: TtsAudioSpec(format: TtsAudioFormat.pcm),
+          voice: null,
+          options: null,
+        );
 
-      await output.initSession(session);
-      await output.consumeChunk(
-        _chunk('Multicast-1', 0, [1, 2, 3], TtsAudioFormat.pcm, isLast: true),
-      );
-      final artifact = await output.finalizeSession();
+        await output.initSession(session);
+        await output.consumeChunk(
+          _chunk('Multicast-1', 0, [1, 2, 3], TtsAudioFormat.pcm, isLast: true),
+        );
+        final artifact = await output.finalizeSession();
 
-      expect(artifact, isA<MulticastAudioArtifact>());
-      final multicast = artifact as MulticastAudioArtifact;
-      expect(multicast.artifacts.keys, contains('memory'));
-      expect(multicast.artifacts.keys, isNot(contains('failing')));
-      expect(multicast.outputErrors.keys, contains('failing'));
-    });
+        expect(artifact, isA<MulticastAudioArtifact>());
+        final multicast = artifact as MulticastAudioArtifact;
+        expect(multicast.artifacts.keys, contains('memory'));
+        expect(multicast.artifacts.keys, isNot(contains('failing')));
+        expect(multicast.outputErrors.keys, contains('failing'));
+      },
+    );
 
     test('failFast throws TtsOutputFailure with output id', () async {
       final output = MulticastOutput(
@@ -838,44 +899,48 @@ void main() {
       );
     });
 
-    test('failFast initSession rolls back already initialized outputs',
-        () async {
-      final initializedThenRolledBack =
-          _FailingTestOutput(outputId: 'initialized');
-      final failingInit = _FailingTestOutput(
-        outputId: 'failing-init',
-        failOnInit: true,
-      );
+    test(
+      'failFast initSession rolls back already initialized outputs',
+      () async {
+        final initializedThenRolledBack = _FailingTestOutput(
+          outputId: 'initialized',
+        );
+        final failingInit = _FailingTestOutput(
+          outputId: 'failing-init',
+          failOnInit: true,
+        );
 
-      final output = MulticastOutput(
-        outputs: [initializedThenRolledBack, failingInit],
-        errorPolicy: MulticastOutputErrorPolicy.failFast,
-      );
+        final output = MulticastOutput(
+          outputs: [initializedThenRolledBack, failingInit],
+          errorPolicy: MulticastOutputErrorPolicy.failFast,
+        );
 
-      const session = TtsOutputSession(
-        requestId: 'Multicast-init-rollback',
-        audioSpec: TtsAudioSpec(format: TtsAudioFormat.pcm),
-        voice: null,
-        options: null,
-      );
+        const session = TtsOutputSession(
+          requestId: 'Multicast-init-rollback',
+          audioSpec: TtsAudioSpec(format: TtsAudioFormat.pcm),
+          voice: null,
+          options: null,
+        );
 
-      await expectLater(
-        output.initSession(session),
-        throwsA(
-          isA<TtsOutputFailure>().having(
-            (failure) => failure.outputId,
-            'outputId',
-            'failing-init',
+        await expectLater(
+          output.initSession(session),
+          throwsA(
+            isA<TtsOutputFailure>().having(
+              (failure) => failure.outputId,
+              'outputId',
+              'failing-init',
+            ),
           ),
-        ),
-      );
+        );
 
-      expect(initializedThenRolledBack.cancelCalls, 1);
-    });
+        expect(initializedThenRolledBack.cancelCalls, 1);
+      },
+    );
 
     test('failFast finalize rolls back remaining outputs', () async {
-      final successfulThenRolledBack =
-          _FailingTestOutput(outputId: 'successful');
+      final successfulThenRolledBack = _FailingTestOutput(
+        outputId: 'successful',
+      );
       final failingFinalize = _FailingTestOutput(
         outputId: 'failing-finalize',
         failOnFinalize: true,
@@ -895,8 +960,13 @@ void main() {
 
       await output.initSession(session);
       await output.consumeChunk(
-        _chunk('Multicast-finalize-rollback', 0, [1], TtsAudioFormat.pcm,
-            isLast: true),
+        _chunk(
+          'Multicast-finalize-rollback',
+          0,
+          [1],
+          TtsAudioFormat.pcm,
+          isLast: true,
+        ),
       );
 
       await expectLater(
@@ -933,8 +1003,8 @@ final class _FailingTestOutput implements TtsOutput {
 
   @override
   Set<AudioCapability> get acceptedCapabilities => {
-        const SimpleFormatCapability(format: TtsAudioFormat.pcm),
-      };
+    const SimpleFormatCapability(format: TtsAudioFormat.pcm),
+  };
 
   @override
   Future<void> consumeChunk(TtsChunk chunk) async {
@@ -970,6 +1040,9 @@ final class _FailingTestOutput implements TtsOutput {
   }
 
   @override
+  Future<void> init() async {}
+
+  @override
   Future<void> initSession(TtsOutputSession session) async {
     if (failOnInit) {
       throw const TtsError(
@@ -1000,13 +1073,13 @@ final class _PcmConstraintOutput implements TtsOutput {
 
   @override
   Set<AudioCapability> get acceptedCapabilities => {
-        PcmCapability(
-          sampleRatesHz: _sampleRatesHz,
-          bitsPerSample: const {16},
-          channels: const {1},
-          encodings: const {PcmEncoding.signedInt},
-        ),
-      };
+    PcmCapability(
+      sampleRatesHz: _sampleRatesHz,
+      bitsPerSample: const {16},
+      channels: const {1},
+      encodings: const {PcmEncoding.signedInt},
+    ),
+  };
 
   @override
   Future<void> consumeChunk(TtsChunk chunk) async {}
@@ -1018,6 +1091,9 @@ final class _PcmConstraintOutput implements TtsOutput {
   Future<AudioArtifact> finalizeSession() async {
     throw UnimplementedError();
   }
+
+  @override
+  Future<void> init() async {}
 
   @override
   Future<void> initSession(TtsOutputSession session) async {}
@@ -1054,10 +1130,7 @@ TtsChunk _pcmChunk(
     requestId: requestId,
     sequenceNumber: seq,
     bytes: Uint8List.fromList(bytes),
-    audioSpec: TtsAudioSpec(
-      format: TtsAudioFormat.pcm,
-      pcm: descriptor,
-    ),
+    audioSpec: TtsAudioSpec(format: TtsAudioFormat.pcm, pcm: descriptor),
     isLastChunk: isLast,
     timestamp: DateTime.now().toUtc(),
   );
@@ -1169,69 +1242,69 @@ int _bitrateIndexFor({
 }) {
   final values = switch ((version, layer)) {
     (Mp3MpegVersion.mpeg1, Mp3Layer.layer1) => const [
-        32,
-        64,
-        96,
-        128,
-        160,
-        192,
-        224,
-        256,
-        288,
-        320,
-        352,
-        384,
-        416,
-        448,
-      ],
+      32,
+      64,
+      96,
+      128,
+      160,
+      192,
+      224,
+      256,
+      288,
+      320,
+      352,
+      384,
+      416,
+      448,
+    ],
     (Mp3MpegVersion.mpeg1, Mp3Layer.layer2) => const [
-        32,
-        48,
-        56,
-        64,
-        80,
-        96,
-        112,
-        128,
-        160,
-        192,
-        224,
-        256,
-        320,
-        384,
-      ],
+      32,
+      48,
+      56,
+      64,
+      80,
+      96,
+      112,
+      128,
+      160,
+      192,
+      224,
+      256,
+      320,
+      384,
+    ],
     (Mp3MpegVersion.mpeg1, Mp3Layer.layer3) => const [
-        32,
-        40,
-        48,
-        56,
-        64,
-        80,
-        96,
-        112,
-        128,
-        160,
-        192,
-        224,
-        256,
-        320,
-      ],
+      32,
+      40,
+      48,
+      56,
+      64,
+      80,
+      96,
+      112,
+      128,
+      160,
+      192,
+      224,
+      256,
+      320,
+    ],
     (_, Mp3Layer.layer1) => const [
-        32,
-        48,
-        56,
-        64,
-        80,
-        96,
-        112,
-        128,
-        144,
-        160,
-        176,
-        192,
-        224,
-        256,
-      ],
+      32,
+      48,
+      56,
+      64,
+      80,
+      96,
+      112,
+      128,
+      144,
+      160,
+      176,
+      192,
+      224,
+      256,
+    ],
     _ => const [8, 16, 24, 32, 40, 48, 56, 64, 80, 96, 112, 128, 144, 160],
   };
 

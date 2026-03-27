@@ -7,31 +7,35 @@ import 'package:tts_flow_dart/tts_flow_dart.dart';
 
 void main() {
   group('M6 integration', () {
-    test('service emits chunks with resolved format using MemoryOutput',
-        () async {
-      final service = TtsFlow(
-        engine: SineTtsEngine(
-          engineId: 'fake-engine',
-          supportsStreaming: true,
-          chunkCount: 3,
-        ),
-        defaultOutput: MemoryOutput(),
-      );
+    test(
+      'service emits chunks with resolved format using MemoryOutput',
+      () async {
+        final service = TtsFlow(
+          engine: SineTtsEngine(
+            engineId: 'fake-engine',
+            supportsStreaming: true,
+            chunkCount: 3,
+          ),
+          defaultOutput: MemoryOutput(),
+        );
 
-      await service.init();
-      service.preferredFormat = TtsAudioFormat.pcm;
+        await service.init();
+        service.preferredFormat = TtsAudioFormat.pcm;
 
-      final chunks =
-          await service.speak('i-1', 'integration sample text').toList();
+        final chunks = await service
+            .speak('i-1', 'integration sample text')
+            .toList();
 
-      expect(chunks, isNotEmpty);
-      expect(
+        expect(chunks, isNotEmpty);
+        expect(
           chunks.every((chunk) => chunk.audioSpec.format == TtsAudioFormat.pcm),
-          isTrue);
-      expect(chunks.last.isLastChunk, isTrue);
+          isTrue,
+        );
+        expect(chunks.last.isLastChunk, isTrue);
 
-      await service.dispose();
-    });
+        await service.dispose();
+      },
+    );
 
     test('queue halts and cancels pending requests after failure', () async {
       final service = TtsFlow(
@@ -61,47 +65,50 @@ void main() {
       await service.dispose();
     });
 
-    test('Multicast fanout writes file while streaming with failFast',
-        () async {
-      final tempDir = await Directory.systemTemp.createTemp('uni_tts_m6_');
-      try {
-        final service = TtsFlow(
-          engine: SineTtsEngine(
-            engineId: 'fake-engine',
-            supportsStreaming: true,
-            chunkCount: 3,
-          ),
-          defaultOutput: MulticastOutput(
-            outputs: [
-              MemoryOutput(outputId: 'memory'),
-              WavFileOutput(
-                '${tempDir.path}${Platform.pathSeparator}fanout-m6-1.wav',
-                outputId: 'file',
-              ),
-            ],
-            errorPolicy: MulticastOutputErrorPolicy.failFast,
-          ),
-        );
+    test(
+      'Multicast fanout writes file while streaming with failFast',
+      () async {
+        final tempDir = await Directory.systemTemp.createTemp('uni_tts_m6_');
+        try {
+          final service = TtsFlow(
+            engine: SineTtsEngine(
+              engineId: 'fake-engine',
+              supportsStreaming: true,
+              chunkCount: 3,
+            ),
+            defaultOutput: MulticastOutput(
+              outputs: [
+                MemoryOutput(outputId: 'memory'),
+                WavFileOutput(
+                  '${tempDir.path}${Platform.pathSeparator}fanout-m6-1.wav',
+                  outputId: 'file',
+                ),
+              ],
+              errorPolicy: MulticastOutputErrorPolicy.failFast,
+            ),
+          );
 
-        await service.init();
-        service.preferredFormat = TtsAudioFormat.pcm;
+          await service.init();
+          service.preferredFormat = TtsAudioFormat.pcm;
 
-        final chunks = await service
-            .speak('fanout-m6-1', 'fanout integration request')
-            .toList();
+          final chunks = await service
+              .speak('fanout-m6-1', 'fanout integration request')
+              .toList();
 
-        expect(chunks, isNotEmpty);
+          expect(chunks, isNotEmpty);
 
-        final file =
-            File('${tempDir.path}${Platform.pathSeparator}fanout-m6-1.wav');
-        expect(await file.exists(), isTrue);
-        expect(await file.length(), greaterThan(0));
+          final file = File(
+            '${tempDir.path}${Platform.pathSeparator}fanout-m6-1.wav',
+          );
+          expect(await file.exists(), isTrue);
+          expect(await file.length(), greaterThan(0));
 
-        await service.dispose();
-      } finally {
-        await tempDir.delete(recursive: true);
-      }
-    });
+          await service.dispose();
+        } finally {
+          await tempDir.delete(recursive: true);
+        }
+      },
+    );
   });
 }
 
@@ -114,14 +121,12 @@ final class _FailingEngine implements TtsEngine {
 
   @override
   Set<AudioCapability> get supportedCapabilities => {
-        const SimpleFormatCapability(format: TtsAudioFormat.mp3),
-      };
+    const SimpleFormatCapability(format: TtsAudioFormat.mp3),
+  };
 
   @override
   Future<List<TtsVoice>> getAvailableVoices({String? locale}) async {
-    return const [
-      TtsVoice(voiceId: 'failing-default', isDefault: true),
-    ];
+    return const [TtsVoice(voiceId: 'failing-default', isDefault: true)];
   }
 
   @override
@@ -133,6 +138,9 @@ final class _FailingEngine implements TtsEngine {
   Future<TtsVoice> getDefaultVoiceForLocale(String locale) async {
     return getDefaultVoice();
   }
+
+  @override
+  Future<void> init() async {}
 
   @override
   Future<void> dispose() async {}

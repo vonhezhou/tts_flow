@@ -17,10 +17,8 @@ const int _defaultWavBitsPerSample = 16;
 const int _defaultWavChannels = 1;
 
 final class WavFileOutput implements TtsOutput {
-  WavFileOutput(
-    this.filePath, {
-    this.outputId = 'wav-file-output',
-  }) : _state = _WavFileOutputSessionState();
+  WavFileOutput(this.filePath, {this.outputId = 'wav-file-output'})
+    : _state = _WavFileOutputSessionState();
 
   final String filePath;
   final _WavFileOutputSessionState _state;
@@ -29,9 +27,10 @@ final class WavFileOutput implements TtsOutput {
   final String outputId;
 
   @override
-  Set<AudioCapability> get acceptedCapabilities => {
-        PcmCapability.wav(),
-      };
+  Set<AudioCapability> get acceptedCapabilities => {PcmCapability.wav()};
+
+  @override
+  Future<void> init() async {}
 
   @override
   Future<void> initSession(TtsOutputSession session) async {
@@ -46,8 +45,10 @@ final class WavFileOutput implements TtsOutput {
     final target = File(filePath);
     await target.parent.create(recursive: true);
 
-    final lockedDescriptor =
-        await _readLockedTargetDescriptor(target, requestId: session.requestId);
+    final lockedDescriptor = await _readLockedTargetDescriptor(
+      target,
+      requestId: session.requestId,
+    );
     final declaredDescriptor = _resolveDeclaredSessionDescriptor(session);
     if (lockedDescriptor != null &&
         declaredDescriptor != null &&
@@ -84,10 +85,7 @@ final class WavFileOutput implements TtsOutput {
     }
 
     try {
-      final parsed = _parseChunk(
-        chunk,
-        session: session,
-      );
+      final parsed = _parseChunk(chunk, session: session);
       final lockedDescriptor = _state.lockedDescriptor;
       if (lockedDescriptor != null && lockedDescriptor != parsed.descriptor) {
         throw TtsError(
@@ -196,10 +194,7 @@ final class WavFileOutput implements TtsOutput {
 
       return FileAudioArtifact(
         requestId: session.requestId,
-        audioSpec: TtsAudioSpec(
-          format: TtsAudioFormat.pcm,
-          pcm: descriptor,
-        ),
+        audioSpec: TtsAudioSpec(format: TtsAudioFormat.pcm, pcm: descriptor),
         filePath: targetFile.path,
         fileSizeBytes: fileSize,
       );
@@ -419,7 +414,8 @@ final class WavFileOutput implements TtsOutput {
   }) {
     final chunkFormat = chunk.audioSpec.format;
     if (chunkFormat == TtsAudioFormat.pcm) {
-      final descriptor = chunk.audioSpec.pcm ??
+      final descriptor =
+          chunk.audioSpec.pcm ??
           session.audioSpec.pcm ??
           _state.descriptorFromChunks;
       if (descriptor == null) {
@@ -430,10 +426,7 @@ final class WavFileOutput implements TtsOutput {
           requestId: session.requestId,
         );
       }
-      return _ParsedWavChunk(
-        descriptor: descriptor,
-        payload: chunk.bytes,
-      );
+      return _ParsedWavChunk(descriptor: descriptor, payload: chunk.bytes);
     }
 
     throw TtsError(
@@ -516,10 +509,7 @@ final class _ExistingTargetWav {
 }
 
 final class _ParsedWavChunk {
-  const _ParsedWavChunk({
-    required this.descriptor,
-    required this.payload,
-  });
+  const _ParsedWavChunk({required this.descriptor, required this.payload});
 
   final PcmDescriptor descriptor;
   final Uint8List payload;
