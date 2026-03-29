@@ -45,6 +45,8 @@ class XiaomiTts extends OpenAiTtsEngine {
   final String _effectiveApiKey;
   final String _configuredEndpoint;
   final String _configuredModel;
+  final Map<String, PcmDescriptor> _resolvedPcmByRequest =
+      <String, PcmDescriptor>{};
 
   static String _resolveEndpointFromConfig(String endpoint) {
     final trimmed = endpoint.trim();
@@ -135,6 +137,43 @@ class XiaomiTts extends OpenAiTtsEngine {
   }
 
   @override
+  Stream<TtsChunk> synthesize(
+    TtsRequest request,
+    SynthesisControl control,
+    TtsAudioSpec resolvedFormat,
+  ) async* {
+    try {
+      await for (final chunk in super.synthesize(
+        request,
+        control,
+        resolvedFormat,
+      )) {
+        if (resolvedFormat.format != TtsAudioFormat.pcm) {
+          yield chunk;
+          continue;
+        }
+
+        final descriptor = _resolvedPcmByRequest[request.requestId];
+        if (descriptor == null) {
+          yield chunk;
+          continue;
+        }
+
+        yield TtsChunk(
+          requestId: chunk.requestId,
+          sequenceNumber: chunk.sequenceNumber,
+          bytes: chunk.bytes,
+          audioSpec: TtsAudioSpec.pcm(descriptor),
+          isLastChunk: chunk.isLastChunk,
+          timestamp: chunk.timestamp,
+        );
+      }
+    } finally {
+      _resolvedPcmByRequest.remove(request.requestId);
+    }
+  }
+
+  @override
   Stream<List<int>> parseSuccessResponse(
     http.StreamedResponse response,
     TtsRequest request,
@@ -181,7 +220,12 @@ class XiaomiTts extends OpenAiTtsEngine {
 
           wavPrefixBuffer.add(audioChunk.audioBytes);
           final bufferedBytes = wavPrefixBuffer.toBytes();
-          final normalized = _stripWavHeaderIfPresent(bufferedBytes);
+          final normalized = _stripWavHeaderIfPresent(
+            bufferedBytes,
+            onHeader: (descriptor) {
+              _resolvedPcmByRequest[request.requestId] = descriptor;
+            },
+          );
           if (normalized == null) {
             continue;
           }
@@ -221,7 +265,12 @@ class XiaomiTts extends OpenAiTtsEngine {
 
       wavPrefixBuffer.add(finalChunk.audioBytes);
       final bufferedBytes = wavPrefixBuffer.toBytes();
-      final normalized = _stripWavHeaderIfPresent(bufferedBytes);
+      final normalized = _stripWavHeaderIfPresent(
+        bufferedBytes,
+        onHeader: (descriptor) {
+          _resolvedPcmByRequest[request.requestId] = descriptor;
+        },
+      );
       if (normalized == null) {
         yield bufferedBytes;
         return;
@@ -233,13 +282,17 @@ class XiaomiTts extends OpenAiTtsEngine {
     }
   }
 
-  List<int>? _stripWavHeaderIfPresent(Uint8List bytes) {
+  List<int>? _stripWavHeaderIfPresent(
+    Uint8List bytes, {
+    void Function(PcmDescriptor descriptor)? onHeader,
+  }) {
     if (bytes.length < 44) {
       return null;
     }
 
     try {
-      WavHeader.parse(bytes.sublist(0, 44));
+      final header = WavHeader.parse(bytes.sublist(0, 44));
+      onHeader?.call(header.toPcmDescriptor());
       return bytes.sublist(44);
     } catch (_) {
       // If payload is not a WAV container, treat it as raw PCM bytes.

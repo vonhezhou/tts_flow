@@ -23,7 +23,8 @@ final class TtsFormatNegotiator {
     if (intersection.isEmpty) {
       throw TtsError(
         code: TtsErrorCode.formatNegotiationFailed,
-        message: 'Engine and output do not share a common audio format. '
+        message:
+            'Engine and output do not share a common audio format. '
             'engineFormats: ${_sortedFormats(engineCapabilities)}, '
             'outputFormats: ${_sortedFormats(outputCapabilities)}, '
             'preferredFormat: $preferredFormat, '
@@ -55,6 +56,7 @@ final class TtsFormatNegotiator {
       requestId: requestId,
       preferredSampleRateHz: preferredSampleRateHz,
     );
+    // If no intersection for PCM descriptor fields, return format-only spec (descriptor null)
     return TtsAudioSpec.pcm(pcmDescriptor);
   }
 
@@ -66,12 +68,8 @@ final class TtsFormatNegotiator {
     TtsAudioFormat? preferredFormat,
   }) {
     final resolved = negotiateSpec(
-      engineCapabilities: engineFormats
-          .map(_formatToCapability)
-          .toSet(),
-      outputCapabilities: outputFormats
-          .map(_formatToCapability)
-          .toSet(),
+      engineCapabilities: engineFormats.map(_formatToCapability).toSet(),
+      outputCapabilities: outputFormats.map(_formatToCapability).toSet(),
       preferredOrder: preferredOrder,
       requestId: requestId,
       preferredFormat: preferredFormat,
@@ -115,7 +113,8 @@ final class TtsFormatNegotiator {
 
     throw TtsError(
       code: TtsErrorCode.formatNegotiationFailed,
-      message: 'No compatible format found using preferred format order. '
+      message:
+          'No compatible format found using preferred format order. '
           'sharedFormats: ${_sortedFormatSet(intersection)}, '
           'preferredFormat: $preferredFormat, '
           'preferredOrder: $preferredOrder',
@@ -135,11 +134,9 @@ final class TtsFormatNegotiator {
     for (final e in enginePcm) {
       for (final o in outputPcm) {
         final encodings = _resolveEncodings(engine: e, output: o);
-
         if (encodings.isEmpty) {
           continue;
         }
-
         final sampleRateHz = _resolveSampleRate(
           engine: e,
           output: o,
@@ -157,7 +154,6 @@ final class TtsFormatNegotiator {
           continue;
         }
         final encoding = _pickEncoding(encodings);
-
         return PcmDescriptor(
           sampleRateHz: sampleRateHz,
           bitsPerSample: bitsPerSample,
@@ -169,7 +165,8 @@ final class TtsFormatNegotiator {
 
     throw TtsError(
       code: TtsErrorCode.formatNegotiationFailed,
-      message: 'PCM format selected but no compatible PCM descriptor exists. '
+      message:
+          'PCM format selected but no compatible PCM descriptor exists. '
           'preferredSampleRateHz: $preferredSampleRateHz, '
           'enginePcmCapabilities: $enginePcm, '
           'outputPcmCapabilities: $outputPcm',
@@ -296,13 +293,11 @@ final class TtsFormatNegotiator {
       return _pickPreferredOrMax(candidates, preferredValue: preferredValue);
     }
 
-    return domainMax;
+    // No discrete sets: do not fabricate a value, return null
+    return null;
   }
 
-  int _pickPreferredOrMax(
-    Set<int> values, {
-    int? preferredValue,
-  }) {
+  int _pickPreferredOrMax(Set<int> values, {int? preferredValue}) {
     if (preferredValue != null && values.contains(preferredValue)) {
       return preferredValue;
     }

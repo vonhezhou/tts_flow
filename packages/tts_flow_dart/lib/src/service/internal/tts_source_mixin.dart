@@ -129,29 +129,53 @@ mixin TtsSourceMixin on TtsFlowEventBus {
           requestId: request.requestId,
         );
       }
-      if (!effectiveOutput.acceptsSpec(audioSpec)) {
-        throw TtsError(
-          code: TtsErrorCode.formatNegotiationFailed,
-          message:
-              'Negotiated audio spec is not accepted by output "${effectiveOutput.outputId}".',
-          requestId: request.requestId,
+      var activeAudioSpec = audioSpec;
+      var outputSessionInitialized = false;
+
+      Future<void> ensureOutputSessionInitialized(TtsAudioSpec spec) async {
+        if (outputSessionInitialized) {
+          return;
+        }
+        if (!effectiveOutput.acceptsSpec(spec)) {
+          throw TtsError(
+            code: TtsErrorCode.formatNegotiationFailed,
+            message:
+                'Resolved audio spec is not accepted by output "${effectiveOutput.outputId}".',
+            requestId: request.requestId,
+          );
+        }
+
+        await effectiveOutput.initSession(
+          TtsOutputSession(
+            requestId: request.requestId,
+            audioSpec: spec,
+            voice: request.voice,
+            options: request.options,
+            params: request.params,
+          ),
         );
+        activeAudioSpec = spec;
+        outputSessionInitialized = true;
       }
-      await effectiveOutput.initSession(
-        TtsOutputSession(
-          requestId: request.requestId,
-          audioSpec: audioSpec,
-          voice: request.voice,
-          options: request.options,
-          params: request.params,
-        ),
-      );
 
       await for (final chunk
           in engine.synthesize(request, control, audioSpec)) {
         if (control.isCanceled) {
           break;
         }
+
+        if (!outputSessionInitialized) {
+          await ensureOutputSessionInitialized(chunk.audioSpec);
+        } else if (chunk.audioSpec != activeAudioSpec) {
+          throw TtsError(
+            code: TtsErrorCode.invalidRequest,
+            message:
+                'Chunk audio spec changed after session initialization. '
+                'expected: $activeAudioSpec, received: ${chunk.audioSpec}',
+            requestId: request.requestId,
+          );
+        }
+
         await handleSynthesizedChunk(
             item, request, control, chunk, effectiveOutput);
         if (control.isCanceled) {
@@ -169,7 +193,9 @@ mixin TtsSourceMixin on TtsFlowEventBus {
       }
 
       if (control.isCanceled) {
-        await effectiveOutput.onCancelSession(control);
+        if (outputSessionInitialized) {
+          await effectiveOutput.onCancelSession(control);
+        }
         await _cancelPlaybackCompletionListenerForRequest(request.requestId);
         emitRequestEvent(
           TtsRequestEventType.requestStopped,
@@ -177,6 +203,9 @@ mixin TtsSourceMixin on TtsFlowEventBus {
           state: TtsRequestState.stopped,
         );
       } else {
+        if (!outputSessionInitialized) {
+          await ensureOutputSessionInitialized(audioSpec);
+        }
         await effectiveOutput.finalizeSession();
         emitRequestEvent(
           TtsRequestEventType.requestCompleted,

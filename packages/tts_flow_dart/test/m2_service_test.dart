@@ -155,6 +155,29 @@ void main() {
       await service.dispose();
     });
 
+    test('initializes output session using first chunk audioSpec', () async {
+      final output = _TrackingOutput(outputId: 'tracking-output');
+      final service = TtsFlow(
+        engine: _ChunkSpecEngine(
+          negotiatedCapabilities: {PcmCapability.wav(), const Mp3Capability()},
+          emittedSpec: const TtsAudioSpec.mp3(),
+        ),
+        defaultOutput: output,
+      );
+
+      await service.init();
+      service.preferredFormat = TtsAudioFormat.pcm;
+
+      final chunks = await service.speak('chunk-spec-init', 'hello').toList();
+
+      expect(chunks, hasLength(1));
+      expect(chunks.single.audioSpec.format, TtsAudioFormat.mp3);
+      expect(output.lastInitAudioSpec, isNotNull);
+      expect(output.lastInitAudioSpec!.format, TtsAudioFormat.mp3);
+
+      await service.dispose();
+    });
+
     test(
       'fails during negotiation when multicast children have disjoint PCM',
       () async {
@@ -747,6 +770,7 @@ final class _TrackingOutput implements TtsOutput {
 
   final List<TtsChunk> consumedChunks = [];
   TtsOutputSession? _session;
+  TtsAudioSpec? lastInitAudioSpec;
 
   @override
   Set<AudioCapability> get acceptedCapabilities => {
@@ -760,6 +784,7 @@ final class _TrackingOutput implements TtsOutput {
   @override
   Future<void> initSession(TtsOutputSession session) async {
     _session = session;
+    lastInitAudioSpec = session.audioSpec;
     consumedChunks.clear();
   }
 
@@ -788,7 +813,66 @@ final class _TrackingOutput implements TtsOutput {
   @override
   Future<void> dispose() async {
     _session = null;
+    lastInitAudioSpec = null;
   }
+}
+
+final class _ChunkSpecEngine implements TtsEngine {
+  _ChunkSpecEngine({
+    required Set<AudioCapability> negotiatedCapabilities,
+    required this.emittedSpec,
+  }) : _negotiatedCapabilities = Set<AudioCapability>.from(
+         negotiatedCapabilities,
+       );
+
+  final Set<AudioCapability> _negotiatedCapabilities;
+  final TtsAudioSpec emittedSpec;
+
+  @override
+  String get engineId => 'chunk-spec-engine';
+
+  @override
+  bool get supportsStreaming => true;
+
+  @override
+  Set<AudioCapability> get supportedCapabilities => _negotiatedCapabilities;
+
+  @override
+  Future<List<TtsVoice>> getAvailableVoices({String? locale}) async {
+    return const [TtsVoice(voiceId: 'default', isDefault: true)];
+  }
+
+  @override
+  Future<TtsVoice> getDefaultVoice() async {
+    return const TtsVoice(voiceId: 'default', isDefault: true);
+  }
+
+  @override
+  Future<TtsVoice> getDefaultVoiceForLocale(String locale) async {
+    return const TtsVoice(voiceId: 'default', isDefault: true);
+  }
+
+  @override
+  Future<void> init() async {}
+
+  @override
+  Stream<TtsChunk> synthesize(
+    TtsRequest request,
+    SynthesisControl control,
+    TtsAudioSpec resolvedFormat,
+  ) async* {
+    yield TtsChunk(
+      requestId: request.requestId,
+      sequenceNumber: 0,
+      bytes: Uint8List.fromList(<int>[1, 2, 3]),
+      audioSpec: emittedSpec,
+      isLastChunk: true,
+      timestamp: DateTime.now().toUtc(),
+    );
+  }
+
+  @override
+  Future<void> dispose() async {}
 }
 
 final class _PlaybackAwareTestOutput implements TtsOutput, PlaybackAwareOutput {
