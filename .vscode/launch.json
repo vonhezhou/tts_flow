@@ -2,12 +2,18 @@
   "version": "0.2.0",
   "configurations": [
     {
-      "name": "Run Pure Dart Tests",
+      "name": "Run Flutter Example",
       "type": "dart",
       "request": "launch",
-      "cwd": "packages/tts_flow_dart",
-      "program": "test/",
-      "args": ["--reporter", "expanded"]
+      "cwd": "apps/tts_flow_flutter_example",
+      "program": "lib/main.dart"
+    },
+    {
+      "name": "Run Dart Example",
+      "type": "dart",
+      "request": "launch",
+      "cwd": "apps/tts_flow_dart_example",
+      "program": "lib/main.dart"
     }
   ]
 }
