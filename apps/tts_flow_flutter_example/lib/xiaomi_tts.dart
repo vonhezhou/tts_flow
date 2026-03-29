@@ -180,9 +180,7 @@ class XiaomiTts extends OpenAiTtsEngine {
     TtsAudioFormat resolvedFormat,
   ) async* {
     final lineBuffer = StringBuffer();
-    final wavPrefixBuffer = BytesBuilder(copy: false);
     final shouldNormalizeWav = resolvedFormat == TtsAudioFormat.pcm;
-    var wavPrefixConsumed = !shouldNormalizeWav;
     var isDone = false;
 
     await for (final bytes in response.stream) {
@@ -213,36 +211,17 @@ class XiaomiTts extends OpenAiTtsEngine {
             continue;
           }
 
-          if (wavPrefixConsumed) {
-            yield audioChunk.audioBytes;
-            continue;
-          }
-
-          wavPrefixBuffer.add(audioChunk.audioBytes);
-          final bufferedBytes = wavPrefixBuffer.toBytes();
           final normalized = _stripWavHeaderIfPresent(
-            bufferedBytes,
+            Uint8List.fromList(audioChunk.audioBytes),
             onHeader: (descriptor) {
               _resolvedPcmByRequest[request.requestId] = descriptor;
             },
           );
-          if (normalized == null) {
-            continue;
-          }
-
-          wavPrefixConsumed = true;
-          if (normalized.isNotEmpty) {
+          if (normalized != null && normalized.isNotEmpty) {
             yield normalized;
           }
         }
       }
-    }
-
-    if (shouldNormalizeWav &&
-        !wavPrefixConsumed &&
-        wavPrefixBuffer.isNotEmpty) {
-      // If no complete header was observed, pass through buffered bytes.
-      yield wavPrefixBuffer.takeBytes();
     }
 
     if (isDone) {
@@ -258,25 +237,13 @@ class XiaomiTts extends OpenAiTtsEngine {
         return;
       }
 
-      if (wavPrefixConsumed) {
-        yield finalChunk.audioBytes;
-        return;
-      }
-
-      wavPrefixBuffer.add(finalChunk.audioBytes);
-      final bufferedBytes = wavPrefixBuffer.toBytes();
       final normalized = _stripWavHeaderIfPresent(
-        bufferedBytes,
+        Uint8List.fromList(finalChunk.audioBytes),
         onHeader: (descriptor) {
           _resolvedPcmByRequest[request.requestId] = descriptor;
         },
       );
-      if (normalized == null) {
-        yield bufferedBytes;
-        return;
-      }
-
-      if (normalized.isNotEmpty) {
+      if (normalized != null && normalized.isNotEmpty) {
         yield normalized;
       }
     }
