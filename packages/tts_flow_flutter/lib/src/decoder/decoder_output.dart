@@ -7,16 +7,21 @@ import 'package:tts_flow_dart/tts_flow_dart.dart';
 /// (MP3, AAC, Opus) to PCM using the audio_decoder package.
 ///
 /// This output accepts any supported audio format and decodes it to
-/// a PCM format negotiated with [output], then forwards the decoded
-/// chunks to [output].
+/// a PCM format negotiated with [output] or specified by [targetPcmDescriptor],
+/// then forwards the decoded chunks to [output].
 final class Decoder implements TtsOutput {
   /// Creates a new [Decoder] instance.
   ///
   /// [outputId] is the unique identifier for this decoder.
   /// [output] is the downstream output that receives decoded PCM chunks.
+  /// [targetPcmDescriptor] optionally specifies the target PCM format.
+  ///   If not specified, the format will be negotiated with [output].
+  ///   If specified, this format will be used regardless of
+  ///   [output]'s capabilities.
   Decoder({
     required this.outputId,
     required this.output,
+    this.targetPcmDescriptor,
   });
 
   @override
@@ -25,8 +30,26 @@ final class Decoder implements TtsOutput {
   /// The downstream output that receives decoded PCM chunks.
   final TtsOutput output;
 
+  /// Optional target PCM descriptor. If specified, the decoder will use this
+  /// format instead of negotiating with [output].
+  final PcmDescriptor? targetPcmDescriptor;
+
   @override
   Set<AudioCapability> get acceptedCapabilities {
+    if (targetPcmDescriptor != null) {
+      return {
+        PcmCapability(
+          sampleRatesHz: {targetPcmDescriptor!.sampleRateHz},
+          bitsPerSample: {targetPcmDescriptor!.bitsPerSample},
+          channels: {targetPcmDescriptor!.channels},
+          encodings: {targetPcmDescriptor!.encoding},
+        ),
+        const Mp3Capability(),
+        const OpusCapability(),
+        const AacCapability(),
+      };
+    }
+
     final pcmCapabilities = output.acceptedCapabilities
         .whereType<PcmCapability>()
         .toList();
@@ -118,33 +141,14 @@ final class Decoder implements TtsOutput {
     _session = session;
     _buffer = BytesBuilder(copy: false);
 
-    final outputPcmCapabilities = output.acceptedCapabilities
-        .whereType<PcmCapability>()
-        .toList();
-
-    if (outputPcmCapabilities.isEmpty) {
-      _negotiatedSpec = const TtsAudioSpec.pcm(
-        PcmDescriptor(
-          sampleRateHz: 16000,
-          channels: 1,
-          bitsPerSample: 16,
-        ),
-      );
+    if (targetPcmDescriptor != null) {
+      _negotiatedSpec = TtsAudioSpec.pcm(targetPcmDescriptor);
     } else {
-      final intersectedPcm = _intersectPcmCapabilities(outputPcmCapabilities);
-      if (intersectedPcm != null) {
-        final sampleRate = intersectedPcm.sampleRatesHz?.first ?? 16000;
-        final channels = intersectedPcm.channels?.first ?? 1;
-        final bitsPerSample = intersectedPcm.bitsPerSample?.first ?? 16;
+      final outputPcmCapabilities = output.acceptedCapabilities
+          .whereType<PcmCapability>()
+          .toList();
 
-        _negotiatedSpec = TtsAudioSpec.pcm(
-          PcmDescriptor(
-            sampleRateHz: sampleRate,
-            channels: channels,
-            bitsPerSample: bitsPerSample,
-          ),
-        );
-      } else {
+      if (outputPcmCapabilities.isEmpty) {
         _negotiatedSpec = const TtsAudioSpec.pcm(
           PcmDescriptor(
             sampleRateHz: 16000,
@@ -152,38 +156,58 @@ final class Decoder implements TtsOutput {
             bitsPerSample: 16,
           ),
         );
+      } else {
+        final intersectedPcm = _intersectPcmCapabilities(outputPcmCapabilities);
+        if (intersectedPcm != null) {
+          final sampleRate = intersectedPcm.sampleRatesHz?.first ?? 16000;
+          final channels = intersectedPcm.channels?.first ?? 1;
+          final bitsPerSample = intersectedPcm.bitsPerSample?.first ?? 16;
+
+          _negotiatedSpec = TtsAudioSpec.pcm(
+            PcmDescriptor(
+              sampleRateHz: sampleRate,
+              channels: channels,
+              bitsPerSample: bitsPerSample,
+            ),
+          );
+        } else {
+          _negotiatedSpec = const TtsAudioSpec.pcm(
+            PcmDescriptor(
+              sampleRateHz: 16000,
+              channels: 1,
+              bitsPerSample: 16,
+            ),
+          );
+        }
       }
     }
 
-    await output.initSession(session);
+    final outputSession = session.copyWith(
+      audioSpec: _negotiatedSpec,
+    );
+
+    await output.initSession(outputSession);
   }
+
+  int _chunkSequenceNumber = 0;
 
   @override
   Future<void> consumeChunk(TtsChunk chunk) async {
     final session = _session;
     final buffer = _buffer;
     if (session == null || buffer == null) {
-      throw StateError('DecoderOutput session is not initialized.');
+      throw StateError('Decoder session is not initialized.');
     }
     if (chunk.requestId != session.requestId) {
       throw StateError('Chunk requestId does not match active session.');
     }
-    buffer.add(chunk.bytes);
-  }
 
-  @override
-  Future<AudioArtifact> finalizeSession() async {
-    final session = _session;
-    final buffer = _buffer;
     final negotiatedSpec = _negotiatedSpec;
-    if (session == null || buffer == null || negotiatedSpec == null) {
-      throw StateError('Decoder session is not initialized.');
+    if (negotiatedSpec == null) {
+      throw StateError('Negotiated spec not available.');
     }
 
-    final inputBytes = buffer.takeBytes();
-
     Uint8List decodedPcmBytes;
-
     if (session.audioSpec.format == TtsAudioFormat.pcm) {
       final inputPcm = session.audioSpec.requirePcm;
       final targetPcm = negotiatedSpec.requirePcm;
@@ -194,7 +218,7 @@ final class Decoder implements TtsOutput {
 
       if (needsConversion) {
         decodedPcmBytes = await AudioDecoder.convertToWavBytes(
-          inputBytes,
+          chunk.bytes,
           formatHint: 'pcm',
           sampleRate: targetPcm.sampleRateHz,
           channels: targetPcm.channels,
@@ -202,12 +226,12 @@ final class Decoder implements TtsOutput {
           includeHeader: false,
         );
       } else {
-        decodedPcmBytes = inputBytes;
+        decodedPcmBytes = chunk.bytes;
       }
     } else {
       final formatHint = session.audioSpec.format.name;
       decodedPcmBytes = await AudioDecoder.convertToWavBytes(
-        inputBytes,
+        chunk.bytes,
         formatHint: formatHint,
         sampleRate: negotiatedSpec.requirePcm.sampleRateHz,
         channels: negotiatedSpec.requirePcm.channels,
@@ -218,21 +242,24 @@ final class Decoder implements TtsOutput {
 
     final decodedChunk = TtsChunk(
       requestId: session.requestId,
-      sequenceNumber: 0,
+      sequenceNumber: _chunkSequenceNumber++,
       bytes: decodedPcmBytes,
       audioSpec: negotiatedSpec,
-      isLastChunk: true,
+      isLastChunk: chunk.isLastChunk,
       timestamp: DateTime.now(),
     );
 
     await output.consumeChunk(decodedChunk);
-    final artifact = await output.finalizeSession();
+  }
 
+  @override
+  Future<AudioArtifact> finalizeSession() async {
     _session = null;
     _buffer = null;
     _negotiatedSpec = null;
+    _chunkSequenceNumber = 0;
 
-    return artifact;
+    return output.finalizeSession();
   }
 
   @override
@@ -241,6 +268,7 @@ final class Decoder implements TtsOutput {
     _session = null;
     _buffer = null;
     _negotiatedSpec = null;
+    _chunkSequenceNumber = 0;
   }
 
   @override
@@ -249,5 +277,6 @@ final class Decoder implements TtsOutput {
     _session = null;
     _buffer = null;
     _negotiatedSpec = null;
+    _chunkSequenceNumber = 0;
   }
 }

@@ -72,7 +72,15 @@ class _TtsFlowExamplePageState extends State<TtsFlowExamplePage> {
       defaultOutput: MulticastOutput(
         outputs: [
           SpeakerOutput(backend: JustAudioBackend()),
-          WavFileOutput("D:/Codes/flutter_uni_tts/test_out.wav"),
+          Decoder(
+            outputId: 'decoder',
+            output: WavFileOutput("D:/Codes/flutter_uni_tts/test_out.wav"),
+            targetPcmDescriptor: const PcmDescriptor(
+              sampleRateHz: 16000, // 强制 16kHz
+              channels: 1, // 强制单声道
+              bitsPerSample: 16, // 强制 16 位
+            ),
+          ),
         ],
       ),
     );

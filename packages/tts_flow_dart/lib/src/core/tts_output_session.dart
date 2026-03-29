@@ -11,6 +11,20 @@ final class TtsOutputSession {
     this.params = const {},
   });
 
+  TtsOutputSession copyWith({
+    String? requestId,
+    TtsAudioSpec? audioSpec,
+    TtsVoice? voice,
+    TtsOptions? options,
+    Map<String, Object>? params,
+  }) => TtsOutputSession(
+    requestId: requestId ?? this.requestId,
+    audioSpec: audioSpec ?? this.audioSpec,
+    voice: voice ?? this.voice,
+    options: options ?? this.options,
+    params: params ?? this.params,
+  );
+
   final String requestId;
   final TtsAudioSpec audioSpec;
   final TtsVoice? voice;
