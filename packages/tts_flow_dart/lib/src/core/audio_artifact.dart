@@ -38,16 +38,9 @@ final class PlaybackAudioArtifact extends AudioArtifact {
     required super.requestId,
     required super.audioSpec,
     required this.playbackId,
-    required this.bufferedAudioDuration,
   });
 
   final String playbackId;
-
-  /// Duration of audio accepted by the speaker backend when ingestion closed.
-  ///
-  /// This is not guaranteed to be the wall-clock time when device playback
-  /// physically finished.
-  final Duration bufferedAudioDuration;
 }
 
 final class MulticastAudioArtifact extends AudioArtifact {

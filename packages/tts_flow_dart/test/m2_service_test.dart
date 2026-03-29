@@ -862,7 +862,6 @@ final class _PlaybackAwareTestOutput implements TtsOutput, PlaybackAwareOutput {
       requestId: session.requestId,
       audioSpec: session.audioSpec,
       playbackId: playbackId,
-      bufferedAudioDuration: Duration(milliseconds: _bytesCount),
     );
   }
 

@@ -164,7 +164,50 @@ void main() {
       expect(events, hasLength(1));
       expect(events.single.requestId, 'r1');
       expect(events.single.playbackId, playbackId);
+      expect(sources, isEmpty);
+      await expectLater(
+        () => backend.pausePlayback(playbackId: playbackId),
+        throwsStateError,
+      );
     });
+
+    test(
+      'completion removes finished sources and continues to next playback',
+      () async {
+        final backend = JustAudioBackend.testing(player: player);
+        addTearDown(backend.dispose);
+
+        final firstPlaybackId = await backend.startPlayback(
+          requestId: 'r1',
+          audioSpec: const TtsAudioSpec.mp3(),
+        );
+        await backend.appendAudio(playbackId: firstPlaybackId, bytes: [1, 2]);
+        await backend.finalizeIngestion(playbackId: firstPlaybackId);
+
+        final secondPlaybackId = await backend.startPlayback(
+          requestId: 'r2',
+          audioSpec: const TtsAudioSpec.mp3(),
+        );
+        await backend.appendAudio(playbackId: secondPlaybackId, bytes: [9, 8]);
+
+        currentIndex = 0;
+        playing = true;
+
+        processingController.add(ProcessingState.completed);
+        await Future<void>.delayed(Duration.zero);
+
+        expect(sources, hasLength(1));
+        final remaining = sources.single as ChunkAudioSource;
+        expect(remaining.playbackId, secondPlaybackId);
+        expect(currentIndex, 0);
+        expect(playing, isTrue);
+
+        await expectLater(
+          () => backend.resumePlayback(playbackId: firstPlaybackId),
+          throwsStateError,
+        );
+      },
+    );
 
     test(
       'stop current playback resumes immediately to next playback',

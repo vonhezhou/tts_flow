@@ -61,14 +61,14 @@ abstract interface class SpeakerBackend {
     required List<int> bytes,
   });
 
-  /// Closes ingestion for [playbackId] and returns the buffered media duration.
+  /// Closes ingestion for [playbackId].
   ///
   /// This call must not be interpreted as physical speaker completion. Backends
   /// can continue rendering buffered audio after this method returns.
   ///
   /// After ingestion finalization, the playback session should no longer accept
   /// new audio data.
-  Future<Duration> finalizeIngestion({required String playbackId});
+  Future<void> finalizeIngestion({required String playbackId});
 
   /// Stops [playbackId] before normal completion.
   ///
@@ -174,7 +174,7 @@ final class SpeakerOutput implements TtsOutput, PlaybackAwareOutput {
       throw StateError('SpeakerOutput session is not initialized.');
     }
 
-    final duration = await _backend.finalizeIngestion(playbackId: playbackId);
+    await _backend.finalizeIngestion(playbackId: playbackId);
     _session = null;
     _playbackId = null;
 
@@ -182,7 +182,6 @@ final class SpeakerOutput implements TtsOutput, PlaybackAwareOutput {
       requestId: session.requestId,
       audioSpec: session.audioSpec,
       playbackId: playbackId,
-      bufferedAudioDuration: duration,
     );
   }
 

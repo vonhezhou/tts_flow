@@ -307,15 +307,13 @@ Lifecycle per request:
    - `stopPlayback(playbackId, reason)` for cancellation/interruption.
 4. If the backend can distinguish real device playback completion, emit
    `playbackCompletedEvents` after the speaker actually finishes.
-4. `dispose()` must release resources even if a session is still active.
+5. `dispose()` must release resources even if a session is still active.
 
 Semantics:
 
 - `requestCompleted` means synthesis/output ingestion is finished.
 - `requestPlaybackCompleted` means the speaker backend reported physical
   playback completion.
-- `PlaybackAudioArtifact.bufferedAudioDuration` is the buffered media duration
-  observed at ingestion close, not guaranteed wall-clock playback completion.
 
 Implementation checklist:
 
@@ -363,13 +361,12 @@ final class MySpeakerBackend implements SpeakerBackend {
   }
 
   @override
-  Future<Duration> finalizeIngestion({required String playbackId}) async {
+  Future<void> finalizeIngestion({required String playbackId}) async {
     final buffer = _sessions.remove(playbackId);
     if (buffer == null) {
       throw StateError('Unknown playbackId: $playbackId');
     }
     // Replace with the backend's ingestion-close behavior.
-    return Duration(milliseconds: buffer.length);
   }
 
   @override

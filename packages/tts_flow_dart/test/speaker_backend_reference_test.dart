@@ -41,13 +41,12 @@ final class _ReferenceSpeakerBackend implements SpeakerBackend {
   }
 
   @override
-  Future<Duration> finalizeIngestion({required String playbackId}) async {
+  Future<void> finalizeIngestion({required String playbackId}) async {
     final buffer = _buffers.remove(playbackId);
     if (buffer == null) {
       throw StateError('Unknown playbackId: $playbackId');
     }
     _closed.add(playbackId);
-    return Duration(milliseconds: buffer.length);
   }
 
   @override
@@ -85,8 +84,7 @@ void main() {
       await backend.appendAudio(playbackId: playbackId, bytes: [1, 2]);
       await backend.appendAudio(playbackId: playbackId, bytes: [3]);
 
-      final duration = await backend.finalizeIngestion(playbackId: playbackId);
-      expect(duration, const Duration(milliseconds: 3));
+      await backend.finalizeIngestion(playbackId: playbackId);
       await expectLater(
         () => backend.appendAudio(playbackId: playbackId, bytes: [4]),
         throwsStateError,

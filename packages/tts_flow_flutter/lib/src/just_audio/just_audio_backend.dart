@@ -21,10 +21,9 @@ final class _PlaybackSession {
 
   ChunkAudioSource? tailSource;
   int totalBytes = 0;
-  bool hasEnqueuedData = false;
   bool isFinalized = false;
   bool isStopped = false;
-  Duration? finalizedDuration;
+  Duration? playedDuration;
 }
 
 final class _SourceRange {
@@ -38,17 +37,21 @@ final class _SourceRange {
 class JustAudioBackend implements SpeakerBackend {
   /// constructor
   JustAudioBackend() : _player = AudioPlayer() {
-    _processingStateSubscription = _player.processingStateStream.listen(
-      _onProcessingStateChanged,
-    );
+    _processingStateSubscription = _player.processingStateStream.listen((
+      state,
+    ) {
+      unawaited(_onProcessingStateChanged(state));
+    });
   }
 
   /// Testing constructor that injects a preconfigured player.
   @visibleForTesting
   JustAudioBackend.testing({required AudioPlayer player}) : _player = player {
-    _processingStateSubscription = _player.processingStateStream.listen(
-      _onProcessingStateChanged,
-    );
+    _processingStateSubscription = _player.processingStateStream.listen((
+      state,
+    ) {
+      unawaited(_onProcessingStateChanged(state));
+    });
   }
 
   final AudioPlayer _player;
@@ -108,19 +111,19 @@ class JustAudioBackend implements SpeakerBackend {
   }
 
   @override
-  Future<Duration> finalizeIngestion({required String playbackId}) async {
+  Future<void> finalizeIngestion({required String playbackId}) async {
     final session = _requireSession(playbackId);
     if (session.isStopped) {
       throw StateError('Playback is stopped: $playbackId');
     }
     if (session.isFinalized) {
-      return session.finalizedDuration ?? Duration.zero;
+      return;
     }
 
     session.isFinalized = true;
-    final duration = _estimateBufferedDuration(session);
-    session.finalizedDuration = duration;
-    return duration;
+    if (session.audioSpec.format == TtsAudioFormat.pcm) {
+      session.playedDuration = _estimatePcmDuration(session);
+    }
   }
 
   @override
@@ -229,8 +232,7 @@ class JustAudioBackend implements SpeakerBackend {
     );
 
     session
-      ..tailSource = source
-      ..hasEnqueuedData = true;
+      ..tailSource = source;
     await _player.addAudioSource(source);
     _logger.fine('Added new segment for ${session.playbackId}');
     return source;
@@ -308,28 +310,24 @@ class JustAudioBackend implements SpeakerBackend {
     await _player.play();
   }
 
-  Duration _estimateBufferedDuration(_PlaybackSession session) {
-    if (!session.hasEnqueuedData || session.totalBytes == 0) {
+  Duration _estimatePcmDuration(_PlaybackSession session) {
+    if (session.totalBytes == 0) {
       return Duration.zero;
     }
 
-    if (session.audioSpec.format == TtsAudioFormat.pcm) {
-      final pcm = session.audioSpec.requirePcm;
-      final bytesPerSample = (pcm.bitsPerSample / 8).ceil();
-      final bytesPerFrame = bytesPerSample * pcm.channels;
-      if (bytesPerFrame <= 0 || pcm.sampleRateHz <= 0) {
-        return Duration.zero;
-      }
-      final frames = session.totalBytes / bytesPerFrame;
-      final micros =
-          (frames * Duration.microsecondsPerSecond / pcm.sampleRateHz).round();
-      return Duration(microseconds: micros);
+    final pcm = session.audioSpec.requirePcm;
+    final bytesPerSample = (pcm.bitsPerSample / 8).ceil();
+    final bytesPerFrame = bytesPerSample * pcm.channels;
+    if (bytesPerFrame <= 0 || pcm.sampleRateHz <= 0) {
+      return Duration.zero;
     }
-
-    return Duration(milliseconds: session.totalBytes);
+    final frames = session.totalBytes / bytesPerFrame;
+    final micros =
+        (frames * Duration.microsecondsPerSecond / pcm.sampleRateHz).round();
+    return Duration(microseconds: micros);
   }
 
-  void _onProcessingStateChanged(ProcessingState state) {
+  Future<void> _onProcessingStateChanged(ProcessingState state) async {
     if (state != ProcessingState.completed) {
       return;
     }
@@ -363,8 +361,24 @@ class JustAudioBackend implements SpeakerBackend {
       SpeakerPlaybackCompletedEvent(
         requestId: session.requestId,
         playbackId: playbackId,
-        playedDuration: session.finalizedDuration,
+        playedDuration: session.playedDuration,
       ),
     );
+
+    final range = _findRangeForPlayback(playbackId);
+    if (range == null) {
+      _sessions.remove(playbackId);
+      return;
+    }
+
+    final currentIndex = _player.currentIndex;
+    await _player.removeAudioSourceRange(range.start, range.endExclusive);
+    _sessions.remove(playbackId);
+
+    if (currentIndex != null &&
+        currentIndex >= range.start &&
+        currentIndex < range.endExclusive) {
+      await _resumeAfterRemoval(range.start);
+    }
   }
 }

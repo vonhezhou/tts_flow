@@ -36,7 +36,6 @@ void main() {
       expect(speaker.requestId, 'spk-1');
       expect(speaker.audioSpec.format, TtsAudioFormat.mp3);
       expect(speaker.playbackId, 'playback-spk-1');
-      expect(speaker.bufferedAudioDuration, const Duration(milliseconds: 3));
       expect(backend.writtenBytes['playback-spk-1'], [1, 2, 3]);
       expect(
         backend.startedSpecs['playback-spk-1']?.format,
@@ -158,10 +157,7 @@ final class _FakeSpeakerBackend implements SpeakerBackend {
   }
 
   @override
-  Future<Duration> finalizeIngestion({required String playbackId}) async {
-    final length = writtenBytes[playbackId]?.length ?? 0;
-    return Duration(milliseconds: length);
-  }
+  Future<void> finalizeIngestion({required String playbackId}) async {}
 
   @override
   Future<void> stopPlayback({
