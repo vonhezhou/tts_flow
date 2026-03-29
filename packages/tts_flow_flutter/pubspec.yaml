@@ -16,6 +16,7 @@ dependencies:
   logging: ^1.3.0
   media_kit_libs_linux: ^1.2.1
   media_kit_libs_windows_audio: ^1.0.9
+  meta: ^1.17.0
   tts_flow_dart: ^0.1.0
 
 dev_dependencies:
