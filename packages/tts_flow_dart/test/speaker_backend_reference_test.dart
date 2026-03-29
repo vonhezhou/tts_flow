@@ -15,6 +15,9 @@ final class _ReferenceSpeakerBackend implements SpeakerBackend {
   Set<AudioCapability> get supportedCapabilities => {const Mp3Capability()};
 
   @override
+  Future<void> init() async {}
+
+  @override
   Future<String> startPlayback({
     required String requestId,
     required TtsAudioSpec audioSpec,

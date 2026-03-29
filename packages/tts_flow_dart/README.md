@@ -298,16 +298,17 @@ Use this when implementing a custom backend for `SpeakerOutput`.
 
 Lifecycle per request:
 
-1. `startPlayback(requestId, audioSpec)` creates session state and returns a
+1. `init()` prepares backend resources before any playback begins.
+2. `startPlayback(requestId, audioSpec)` creates session state and returns a
    stable `playbackId`.
-2. `appendAudio(playbackId, bytes)` appends ordered bytes for that session.
-3. End with either:
+3. `appendAudio(playbackId, bytes)` appends ordered bytes for that session.
+4. End with either:
    - `finalizeIngestion(playbackId)` when all synthesized bytes have been
      handed to the backend.
    - `stopPlayback(playbackId, reason)` for cancellation/interruption.
-4. If the backend can distinguish real device playback completion, emit
+5. If the backend can distinguish real device playback completion, emit
    `playbackCompletedEvents` after the speaker actually finishes.
-5. `dispose()` must release resources even if a session is still active.
+6. `dispose()` must release resources even if a session is still active.
 
 Semantics:
 
@@ -337,6 +338,9 @@ final class MySpeakerBackend implements SpeakerBackend {
 
   @override
   Set<AudioCapability> get supportedCapabilities => {const Mp3Capability()};
+
+  @override
+  Future<void> init() async {}
 
   @override
   Future<String> startPlayback({

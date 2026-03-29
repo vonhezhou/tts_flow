@@ -1,6 +1,7 @@
 import 'dart:async';
 
 import 'package:just_audio/just_audio.dart';
+import 'package:just_audio_media_kit/just_audio_media_kit.dart';
 import 'package:logging/logging.dart';
 import 'package:meta/meta.dart';
 import 'package:tts_flow_dart/tts_flow_dart.dart';
@@ -54,6 +55,19 @@ class JustAudioBackend implements SpeakerBackend {
     });
   }
 
+  static bool _isInitialized = false;
+
+  /// Ensure that just_audio media kit is initialized.
+  /// It is recommended to call this in main.dart once
+  static void ensureInitialized() {
+    if (_isInitialized) {
+      return;
+    }
+
+    JustAudioMediaKit.ensureInitialized();
+    _isInitialized = true;
+  }
+
   final AudioPlayer _player;
   final Map<String, _PlaybackSession> _sessions = <String, _PlaybackSession>{};
   final Set<String> _completedPlaybackIds = <String>{};
@@ -61,6 +75,11 @@ class JustAudioBackend implements SpeakerBackend {
   _playbackCompletedController =
       StreamController<SpeakerPlaybackCompletedEvent>.broadcast();
   late final StreamSubscription<ProcessingState> _processingStateSubscription;
+
+  @override
+  Future<void> init() async {
+    ensureInitialized();
+  }
 
   @override
   Stream<SpeakerPlaybackCompletedEvent> get playbackCompletedEvents =>
@@ -231,8 +250,7 @@ class JustAudioBackend implements SpeakerBackend {
       isTerminalSegment: true,
     );
 
-    session
-      ..tailSource = source;
+    session.tailSource = source;
     await _player.addAudioSource(source);
     _logger.fine('Added new segment for ${session.playbackId}');
     return source;
@@ -322,8 +340,8 @@ class JustAudioBackend implements SpeakerBackend {
       return Duration.zero;
     }
     final frames = session.totalBytes / bytesPerFrame;
-    final micros =
-        (frames * Duration.microsecondsPerSecond / pcm.sampleRateHz).round();
+    final micros = (frames * Duration.microsecondsPerSecond / pcm.sampleRateHz)
+        .round();
     return Duration(microseconds: micros);
   }
 

@@ -138,6 +138,9 @@ final class _FakeSpeakerBackend implements SpeakerBackend {
   final Map<String, TtsAudioSpec> startedSpecs = <String, TtsAudioSpec>{};
 
   @override
+  Future<void> init() async {}
+
+  @override
   Future<String> startPlayback({
     required String requestId,
     required TtsAudioSpec audioSpec,

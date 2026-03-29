@@ -28,6 +28,7 @@ import 'package:tts_flow_dart/src/core/tts_policy.dart';
 /// - Keep audio ordering exactly as received by [appendAudio].
 /// - Reject writes after [finalizeIngestion] or [stopPlayback] closes a
 ///   session.
+/// - Ensure [init] can be safely called before playback begins.
 /// - Make [dispose] release resources even when sessions are still active.
 abstract interface class SpeakerBackend {
   /// Emits events when a playback stream physically finishes on the speaker.
@@ -41,6 +42,12 @@ abstract interface class SpeakerBackend {
   /// [SpeakerOutput] uses this value as its accepted capabilities and forwards
   /// only compatible audio streams to the backend.
   Set<AudioCapability> get supportedCapabilities;
+
+  /// Prepares backend resources needed for playback.
+  ///
+  /// This method should be safe to call exactly once before any playback
+  /// operation and should complete before [startPlayback].
+  Future<void> init();
 
   /// Starts a new playback session for [requestId] using [audioSpec].
   ///
@@ -141,7 +148,9 @@ final class SpeakerOutput implements TtsOutput, PlaybackAwareOutput {
   String? _playbackId;
 
   @override
-  Future<void> init() async {}
+  Future<void> init() async {
+    await _backend.init();
+  }
 
   @override
   Future<void> initSession(TtsOutputSession session) async {
