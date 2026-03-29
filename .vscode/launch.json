@@ -2,11 +2,14 @@
   "version": "0.2.0",
   "configurations": [
     {
-      "name": "Run Flutter Example",
+      "name": "Run Flutter Example (Xiaomi Mimo)",
       "type": "dart",
       "request": "launch",
       "cwd": "apps/tts_flow_flutter_example",
-      "program": "lib/main.dart"
+      "program": "lib/main.dart",
+      "toolArgs": [
+        "--dart-define-from-file=${workspaceFolder}/apps/tts_flow_flutter_example/.env.json"
+      ]
     },
     {
       "name": "Run Dart Example",

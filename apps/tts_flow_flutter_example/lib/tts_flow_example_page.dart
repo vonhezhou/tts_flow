@@ -4,6 +4,10 @@ import 'package:flutter/material.dart';
 import 'package:logging/logging.dart';
 import 'package:tts_flow_dart/tts_flow_dart.dart';
 import 'package:tts_flow_flutter/tts_flow_flutter.dart';
+import 'package:tts_flow_flutter_example/xiaomi_tts.dart';
+
+const bool _useXiaomiTts = true;
+const String _xiaomiApiKey = String.fromEnvironment('XIAOMI_MIMO_API_KEY');
 
 class TtsFlowExamplePage extends StatefulWidget {
   const TtsFlowExamplePage({super.key});
@@ -28,6 +32,8 @@ class _TtsFlowExamplePageState extends State<TtsFlowExamplePage> {
   var _requestCounter = 0;
   var _status = 'Initializing TtsFlow...';
 
+  String get _engineLabel => _useXiaomiTts ? 'Xiaomi Mimo' : 'Sine';
+
   @override
   void initState() {
     super.initState();
@@ -46,13 +52,23 @@ class _TtsFlowExamplePageState extends State<TtsFlowExamplePage> {
   }
 
   Future<void> _initService() async {
+    final engine = _useXiaomiTts
+        ? XiaomiTts.fromClientConfig(
+            config: OpenAiClientConfig(
+              apiKey: _xiaomiApiKey,
+              endpoint: XiaomiTts.xiaomiEndpoint,
+              model: XiaomiTts.xiaomiModel,
+            ),
+          )
+        : SineTtsEngine(
+            engineId: 'flutter-sine-engine',
+            supportsStreaming: true,
+            chunkCount: 6,
+            chunkDelay: const Duration(milliseconds: 20),
+          );
+
     final service = TtsFlow(
-      engine: SineTtsEngine(
-        engineId: 'flutter-sine-engine',
-        supportsStreaming: true,
-        chunkCount: 6,
-        chunkDelay: const Duration(milliseconds: 20),
-      ),
+      engine: engine,
       defaultOutput: MulticastOutput(
         outputs: [
           SpeakerOutput(backend: JustAudioBackend()),
@@ -63,7 +79,9 @@ class _TtsFlowExamplePageState extends State<TtsFlowExamplePage> {
 
     try {
       await service.init();
-      service.preferredFormat = TtsAudioFormat.pcm;
+      service.preferredFormat = _useXiaomiTts
+          ? TtsAudioFormat.mp3
+          : TtsAudioFormat.pcm;
 
       _queueSub = service.queueEvents.listen(_onQueueEvent);
       _requestSub = service.requestEvents.listen(_onRequestEvent);
@@ -77,7 +95,8 @@ class _TtsFlowExamplePageState extends State<TtsFlowExamplePage> {
       setState(() {
         _service = service;
         _isReady = true;
-        _status = 'Ready. Tap "Speak" to play through the device speaker.';
+        _status =
+            'Ready using $_engineLabel engine. Tap "Speak" to play through the device speaker.';
       });
     } catch (error, stackTrace) {
       _log.severe('Failed to initialize TtsFlow.', error, stackTrace);
@@ -183,7 +202,7 @@ class _TtsFlowExamplePageState extends State<TtsFlowExamplePage> {
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        title: const Text('TtsFlow + JustAudioBackend'),
+        title: Text('TtsFlow + JustAudioBackend ($_engineLabel)'),
         backgroundColor: Theme.of(context).colorScheme.inversePrimary,
       ),
       body: Padding(
