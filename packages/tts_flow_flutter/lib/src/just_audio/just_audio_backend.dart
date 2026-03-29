@@ -244,7 +244,7 @@ class JustAudioBackend implements SpeakerBackend {
     }
 
     final source = ChunkAudioSource(
-      format: session.audioSpec.format,
+      audioSpec: session.audioSpec,
       playbackId: session.playbackId,
       requestId: session.requestId,
       isTerminalSegment: true,
