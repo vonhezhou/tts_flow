@@ -12,7 +12,7 @@ enum TtsAudioFormat {
   opus,
 
   /// aac frames with ADTS header
-  aac
+  aac,
 }
 
 extension TtsAudioFormatX on TtsAudioFormat {
@@ -45,21 +45,15 @@ extension TtsAudioFormatX on TtsAudioFormat {
 
 /// Unified audio format specification carrying both the format type and optional PCM descriptor.
 class TtsAudioSpec {
-  const TtsAudioSpec.pcm(PcmDescriptor pcm)
+  const TtsAudioSpec.pcm(PcmDescriptor? pcm)
     : format = TtsAudioFormat.pcm,
       _pcm = pcm;
 
-  const TtsAudioSpec.mp3()
-    : format = TtsAudioFormat.mp3,
-      _pcm = null;
+  const TtsAudioSpec.mp3() : format = TtsAudioFormat.mp3, _pcm = null;
 
-  const TtsAudioSpec.opus()
-    : format = TtsAudioFormat.opus,
-      _pcm = null;
+  const TtsAudioSpec.opus() : format = TtsAudioFormat.opus, _pcm = null;
 
-  const TtsAudioSpec.aac()
-    : format = TtsAudioFormat.aac,
-      _pcm = null;
+  const TtsAudioSpec.aac() : format = TtsAudioFormat.aac, _pcm = null;
 
   /// The audio format type (mp3, pcm, opus, aac)
   final TtsAudioFormat format;

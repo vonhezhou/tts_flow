@@ -53,10 +53,32 @@ final class TtsFormatNegotiator {
     final pcmDescriptor = _resolvePcmDescriptor(
       engineCapabilities: engineCapabilities,
       outputCapabilities: outputCapabilities,
-      requestId: requestId,
       preferredSampleRateHz: preferredSampleRateHz,
     );
-    // If no intersection for PCM descriptor fields, return format-only spec (descriptor null)
+    // When PCM capabilities are open-ended (e.g., PcmCapability.wav()),
+    // descriptor may be null - the actual format will be determined
+    // when the engine receives the first chunk from the server
+    if (pcmDescriptor == null) {
+      // Check if PCM capabilities are open-ended (no discrete constraints)
+      final enginePcm = engineCapabilities.whereType<PcmCapability>();
+      final outputPcm = outputCapabilities.whereType<PcmCapability>();
+
+      final hasOpenEndedCapability =
+          enginePcm.any(_isOpenEnded) || outputPcm.any(_isOpenEnded);
+
+      if (!hasOpenEndedCapability) {
+        // Concrete PCM capabilities failed to match - throw error
+        throw TtsError(
+          code: TtsErrorCode.formatNegotiationFailed,
+          message:
+              'PCM format selected but no compatible PCM descriptor exists. '
+              'preferredSampleRateHz: $preferredSampleRateHz, '
+              'enginePcmCapabilities: ${enginePcm.toList()}, '
+              'outputPcmCapabilities: ${outputPcm.toList()}',
+          requestId: requestId,
+        );
+      }
+    }
     return TtsAudioSpec.pcm(pcmDescriptor);
   }
 
@@ -122,10 +144,9 @@ final class TtsFormatNegotiator {
     );
   }
 
-  PcmDescriptor _resolvePcmDescriptor({
+  PcmDescriptor? _resolvePcmDescriptor({
     required Set<AudioCapability> engineCapabilities,
     required Set<AudioCapability> outputCapabilities,
-    required String requestId,
     int? preferredSampleRateHz,
   }) {
     final enginePcm = engineCapabilities.whereType<PcmCapability>().toList();
@@ -163,15 +184,7 @@ final class TtsFormatNegotiator {
       }
     }
 
-    throw TtsError(
-      code: TtsErrorCode.formatNegotiationFailed,
-      message:
-          'PCM format selected but no compatible PCM descriptor exists. '
-          'preferredSampleRateHz: $preferredSampleRateHz, '
-          'enginePcmCapabilities: $enginePcm, '
-          'outputPcmCapabilities: $outputPcm',
-      requestId: requestId,
-    );
+    return null;
   }
 
   int? _resolveSampleRate({
@@ -331,5 +344,11 @@ final class TtsFormatNegotiator {
     final sorted = formats.toList();
     sorted.sort((a, b) => a.index.compareTo(b.index));
     return sorted;
+  }
+
+  bool _isOpenEnded(PcmCapability capability) {
+    return capability.sampleRatesHz == null &&
+        capability.bitsPerSample == null &&
+        capability.channels == null;
   }
 }

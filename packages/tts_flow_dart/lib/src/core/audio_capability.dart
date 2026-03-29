@@ -40,15 +40,15 @@ final class PcmCapability extends AudioCapability {
     Set<int>? bitsPerSample,
     Set<int>? channels,
     Set<PcmEncoding>? encodings,
-  })  : sampleRatesHz = sampleRatesHz == null
-            ? null
-            : Set.unmodifiable(sampleRatesHz),
-        bitsPerSample = bitsPerSample == null
-            ? null
-            : Set.unmodifiable(bitsPerSample),
-        channels = channels == null ? null : Set.unmodifiable(channels),
-        encodings = encodings == null ? null : Set.unmodifiable(encodings),
-        super(format: TtsAudioFormat.pcm) {
+  }) : sampleRatesHz = sampleRatesHz == null
+           ? null
+           : Set.unmodifiable(sampleRatesHz),
+       bitsPerSample = bitsPerSample == null
+           ? null
+           : Set.unmodifiable(bitsPerSample),
+       channels = channels == null ? null : Set.unmodifiable(channels),
+       encodings = encodings == null ? null : Set.unmodifiable(encodings),
+       super(format: TtsAudioFormat.pcm) {
     for (final sampleRate in this.sampleRatesHz ?? const <int>{}) {
       if (sampleRate < wavMinSampleRateHz || sampleRate > wavMaxSampleRateHz) {
         throw ArgumentError.value(
@@ -81,10 +81,7 @@ final class PcmCapability extends AudioCapability {
     }
   }
 
-  PcmCapability.wav()
-      : this(
-          encodings: Set.from(PcmEncoding.values),
-        );
+  PcmCapability.wav() : this(encodings: Set.from(PcmEncoding.values));
 
   final Set<int>? sampleRatesHz;
   final Set<int>? bitsPerSample;
@@ -153,19 +150,25 @@ final class PcmCapability extends AudioCapability {
     }
     final pcm = spec.pcm;
     if (pcm == null) {
-      return false;
+      // When pcm is null, this spec is open-ended - only open-ended
+      // capabilities (no discrete constraints) can support it
+      return _isOpenEnded();
     }
     return supportsSampleRateHz(pcm.sampleRateHz) &&
         supportsBitsPerSample(pcm.bitsPerSample) &&
         supportsChannelCount(pcm.channels) &&
-      supportsEncoding(pcm.encoding);
+        supportsEncoding(pcm.encoding);
+  }
+
+  bool _isOpenEnded() {
+    return sampleRatesHz == null && bitsPerSample == null && channels == null;
   }
 
   @override
   String toString() {
     return 'PcmCapability(sampleRatesHz: $sampleRatesHz, '
-      'bitsPerSample: $bitsPerSample, '
-      'channels: $channels, '
+        'bitsPerSample: $bitsPerSample, '
+        'channels: $channels, '
         'encodings: $encodings)';
   }
 
@@ -181,11 +184,11 @@ final class PcmCapability extends AudioCapability {
 
   @override
   int get hashCode => Object.hash(
-        _hashNullableIntSet(sampleRatesHz),
-        _hashNullableIntSet(bitsPerSample),
-        _hashNullableIntSet(channels),
-        _hashNullableEncodingSet(encodings),
-      );
+    _hashNullableIntSet(sampleRatesHz),
+    _hashNullableIntSet(bitsPerSample),
+    _hashNullableIntSet(channels),
+    _hashNullableEncodingSet(encodings),
+  );
 }
 
 bool _sameNullableIntSet(Set<int>? a, Set<int>? b) {
