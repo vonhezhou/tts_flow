@@ -10,13 +10,14 @@ import 'package:tts_flow_dart/src/core/tts_output.dart';
 import 'package:tts_flow_dart/src/core/tts_policy.dart';
 import 'package:tts_flow_dart/src/core/tts_request.dart';
 import 'package:tts_flow_dart/src/core/tts_voice.dart';
-import 'package:tts_flow_dart/src/service/internal/tts_source_mixin.dart';
+import 'package:tts_flow_dart/src/service/internal/tts_utterance_queue_mixin.dart';
 import 'package:tts_flow_dart/src/service/tts_events.dart';
 
 import 'internal/tts_flow_event_mixin.dart';
 import 'internal/tts_options_mixin.dart';
 
-final class TtsFlow with TtsOptionsMixin, TtsFlowEventBus, TtsSourceMixin {
+final class TtsFlow
+    with TtsOptionsMixin, TtsFlowEventBus, TtsUtteranceQueueMixin {
   TtsFlow({
     required TtsEngine engine,
     TtsOutput? defaultOutput,

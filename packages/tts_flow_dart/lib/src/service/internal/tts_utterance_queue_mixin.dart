@@ -28,7 +28,7 @@ final class QueuedRequest {
   final StreamController<TtsChunk> controller;
 }
 
-mixin TtsSourceMixin on TtsFlowEventBus {
+mixin TtsUtteranceQueueMixin on TtsFlowEventBus {
   TtsEngine get engine;
   TtsOutput? get defaultOutput;
   TtsFlowConfig get config;
@@ -97,9 +97,7 @@ mixin TtsSourceMixin on TtsFlowEventBus {
   }
 
   @protected
-  Future<bool> processQueuedRequest(
-    QueuedRequest item,
-  ) async {
+  Future<bool> processQueuedRequest(QueuedRequest item) async {
     final request = item.request;
     final effectiveOutput = request.output ?? defaultOutput!;
 
@@ -111,8 +109,11 @@ mixin TtsSourceMixin on TtsFlowEventBus {
     final control = SynthesisControl();
     state.activeControl = control;
 
-    emitQueueEvent(TtsQueueEventType.requestDequeued,
-        queueLength: scheduler.length, requestId: request.requestId);
+    emitQueueEvent(
+      TtsQueueEventType.requestDequeued,
+      queueLength: scheduler.length,
+      requestId: request.requestId,
+    );
     emitRequestEvent(
       TtsRequestEventType.requestStarted,
       requestId: request.requestId,
@@ -158,8 +159,11 @@ mixin TtsSourceMixin on TtsFlowEventBus {
         outputSessionInitialized = true;
       }
 
-      await for (final chunk
-          in engine.synthesize(request, control, audioSpec)) {
+      await for (final chunk in engine.synthesize(
+        request,
+        control,
+        audioSpec,
+      )) {
         if (control.isCanceled) {
           break;
         }
@@ -177,7 +181,12 @@ mixin TtsSourceMixin on TtsFlowEventBus {
         }
 
         await handleSynthesizedChunk(
-            item, request, control, chunk, effectiveOutput);
+          item,
+          request,
+          control,
+          chunk,
+          effectiveOutput,
+        );
         if (control.isCanceled) {
           break;
         }
@@ -232,8 +241,11 @@ mixin TtsSourceMixin on TtsFlowEventBus {
 
       if (config.queueFailurePolicy == TtsQueueFailurePolicy.failFast) {
         state.haltQueue();
-        emitQueueEvent(TtsQueueEventType.queueHalted,
-            queueLength: scheduler.length, requestId: request.requestId);
+        emitQueueEvent(
+          TtsQueueEventType.queueHalted,
+          queueLength: scheduler.length,
+          requestId: request.requestId,
+        );
         await cancelPendingAfterFailure();
         return true;
       }
