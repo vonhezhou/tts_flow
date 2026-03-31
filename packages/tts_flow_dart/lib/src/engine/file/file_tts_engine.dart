@@ -47,6 +47,9 @@ final class FileTtsEngine implements TtsEngine {
   @override
   final String engineId;
 
+  @override
+  final int maxInputByteSize = 0;
+
   final FileContentProvider provider;
 
   TtsAudioSpec get audioSpec => provider.audioSpec;

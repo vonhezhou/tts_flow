@@ -65,6 +65,11 @@ class OpenAiTtsEngine implements TtsEngine {
   final OpenAiApiClient apiClient;
   @override
   final String engineId;
+
+  /// openai has a 4096 char limit, not sure about
+  @override
+  final int maxInputByteSize = 4096;
+
   final String defaultVoiceId;
   final int nonStreamingChunkSizeBytes;
   final String model;

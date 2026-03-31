@@ -840,6 +840,9 @@ final class _ChunkSpecEngine implements TtsEngine {
   String get engineId => 'chunk-spec-engine';
 
   @override
+  int get maxInputByteSize => 0;
+
+  @override
   bool get supportsStreaming => true;
 
   @override

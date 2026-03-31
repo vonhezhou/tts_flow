@@ -1,5 +1,6 @@
 enum TtsErrorCode {
   invalidRequest,
+  maxInputByteSizeExceeded,
   engineUnavailable,
   authFailed,
   networkError,

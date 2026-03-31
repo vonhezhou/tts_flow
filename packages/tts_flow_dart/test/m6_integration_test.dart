@@ -121,6 +121,9 @@ final class _FailingEngine implements TtsEngine {
   String get engineId => 'failing-engine';
 
   @override
+  int get maxInputByteSize => 0;
+
+  @override
   bool get supportsStreaming => true;
 
   @override

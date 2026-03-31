@@ -101,6 +101,14 @@ final class TtsFlow
   }) {
     _ensureReady();
 
+    if (engine.maxInputByteSize > 0 && text.length > engine.maxInputByteSize) {
+      throw TtsError(
+        code: TtsErrorCode.maxInputByteSizeExceeded,
+        message: 'Text length exceeds maximum allowed byte size.',
+        requestId: requestId,
+      );
+    }
+
     if (output == null && defaultOutput == null) {
       throw TtsError(
         code: TtsErrorCode.invalidRequest,
