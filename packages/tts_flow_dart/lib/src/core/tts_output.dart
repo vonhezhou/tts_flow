@@ -28,7 +28,7 @@ abstract interface class TtsOutput {
   ///
   /// The service negotiates a format by intersecting these capabilities with
   /// engine capabilities.
-  Set<AudioCapability> get acceptedCapabilities;
+  Set<AudioCapability> get inAudioCapabilities;
 
   /// Initializes output-wide resources.
   ///
@@ -92,7 +92,7 @@ final class TtsOutputPlaybackCompletedEvent {
 extension TtsOutputCapabilities on TtsOutput {
   /// Returns true when any accepted capability can consume [spec].
   bool acceptsSpec(TtsAudioSpec spec) {
-    for (final capability in acceptedCapabilities) {
+    for (final capability in inAudioCapabilities) {
       if (capability.supports(spec)) {
         return true;
       }

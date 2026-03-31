@@ -25,9 +25,7 @@ final class Mp3FileOutput implements TtsOutput {
   final String outputId;
 
   @override
-  Set<AudioCapability> get acceptedCapabilities => {
-    const Mp3Capability(),
-  };
+  Set<AudioCapability> get inAudioCapabilities => {const Mp3Capability()};
 
   @override
   Future<void> init() async {}

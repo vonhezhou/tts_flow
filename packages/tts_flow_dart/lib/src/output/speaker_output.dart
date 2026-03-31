@@ -137,7 +137,7 @@ final class SpeakerOutput implements TtsOutput, PlaybackAwareOutput {
   final String outputId;
 
   @override
-  Set<AudioCapability> get acceptedCapabilities =>
+  Set<AudioCapability> get inAudioCapabilities =>
       _backend.supportedCapabilities;
 
   @override

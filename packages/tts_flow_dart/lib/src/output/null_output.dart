@@ -15,12 +15,12 @@ final class NullOutput implements TtsOutput {
   final String outputId;
 
   @override
-  Set<AudioCapability> get acceptedCapabilities => {
-        PcmCapability.wav(),
-        const Mp3Capability(),
-        const OpusCapability(),
-        const AacCapability(),
-      };
+  Set<AudioCapability> get inAudioCapabilities => {
+    PcmCapability.wav(),
+    const Mp3Capability(),
+    const OpusCapability(),
+    const AacCapability(),
+  };
 
   TtsOutputSession? _session;
 

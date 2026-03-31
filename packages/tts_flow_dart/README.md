@@ -13,8 +13,8 @@ Core design choices in this repository:
 
 Audio negotiation is capability-based and request-scoped.
 
-- Engines expose `supportedCapabilities`.
-- Outputs expose `acceptedCapabilities`.
+- Engines expose `outAudioCapabilities`.
+- Outputs expose `inAudioCapabilities`.
 - `TtsFormatNegotiator` resolves a `TtsAudioSpec` for each request.
 - For PCM, negotiation intersects sample rates, bit depth, channels, and
   encoding, then applies deterministic selection rules.

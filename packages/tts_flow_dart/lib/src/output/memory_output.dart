@@ -15,7 +15,7 @@ final class MemoryOutput implements TtsOutput {
   final String outputId;
 
   @override
-  Set<AudioCapability> get acceptedCapabilities => {
+  Set<AudioCapability> get inAudioCapabilities => {
     PcmCapability(
       sampleRatesHz: {16000, 22050, 24000, 44100, 48000},
       bitsPerSample: {16},

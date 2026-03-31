@@ -45,10 +45,7 @@ void main() {
 
       expect(engine.mapFormat(TtsAudioFormat.mp3), 'mp3');
       expect(engine.mapFormat(TtsAudioFormat.pcm), 'wav');
-      expect(
-        engine.supportedCapabilities.contains(PcmCapability.wav()),
-        isTrue,
-      );
+      expect(engine.outAudioCapabilities.contains(PcmCapability.wav()), isTrue);
     });
 
     test('parses streamed audio chunks and stops on done marker', () async {

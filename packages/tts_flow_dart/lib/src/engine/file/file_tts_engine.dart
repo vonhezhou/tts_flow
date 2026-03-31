@@ -60,7 +60,7 @@ final class FileTtsEngine implements TtsEngine {
   final List<TtsVoice> _voices;
 
   @override
-  Set<AudioCapability> get supportedCapabilities =>
+  Set<AudioCapability> get outAudioCapabilities =>
       provider.supportedCapabilities;
 
   @override

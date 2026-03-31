@@ -81,7 +81,7 @@ class XiaomiTts extends OpenAiTtsEngine {
   }
 
   @override
-  Set<AudioCapability> get supportedCapabilities => {
+  Set<AudioCapability> get outAudioCapabilities => {
     const Mp3Capability(),
     PcmCapability.wav(),
   };

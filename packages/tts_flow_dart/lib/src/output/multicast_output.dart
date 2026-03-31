@@ -55,10 +55,10 @@ final class MulticastOutput implements TtsOutput {
   final Map<String, TtsError> _outputErrors = <String, TtsError>{};
 
   @override
-  Set<AudioCapability> get acceptedCapabilities {
-    var current = _outputs.first.acceptedCapabilities.toSet();
+  Set<AudioCapability> get inAudioCapabilities {
+    var current = _outputs.first.inAudioCapabilities.toSet();
     for (final output in _outputs.skip(1)) {
-      current = intersectCapabilities(current, output.acceptedCapabilities);
+      current = intersectCapabilities(current, output.inAudioCapabilities);
       if (current.isEmpty) {
         break;
       }
@@ -333,5 +333,4 @@ final class MulticastOutput implements TtsOutput {
       }
     }
   }
-
 }

@@ -35,42 +35,26 @@ final class Decoder implements TtsOutput {
   final PcmDescriptor? targetPcmDescriptor;
 
   @override
-  Set<AudioCapability> get acceptedCapabilities {
-    if (targetPcmDescriptor != null) {
-      return {
+  Set<AudioCapability> get inAudioCapabilities {
+    return {
+      if (targetPcmDescriptor != null)
         PcmCapability(
           sampleRatesHz: {targetPcmDescriptor!.sampleRateHz},
           bitsPerSample: {targetPcmDescriptor!.bitsPerSample},
           channels: {targetPcmDescriptor!.channels},
           encodings: {targetPcmDescriptor!.encoding},
-        ),
-        const Mp3Capability(),
-        const OpusCapability(),
-        const AacCapability(),
-      };
-    }
-
-    final pcmCapabilities = output.acceptedCapabilities
-        .whereType<PcmCapability>()
-        .toList();
-
-    if (pcmCapabilities.isEmpty) {
-      return {
+        )
+      else
         PcmCapability.wav(),
-        const Mp3Capability(),
-        const OpusCapability(),
-        const AacCapability(),
-      };
-    }
-
-    final intersectedPcm = _intersectPcmCapabilities(pcmCapabilities);
-
-    return {
-      if (intersectedPcm != null) intersectedPcm else PcmCapability.wav(),
       const Mp3Capability(),
       const OpusCapability(),
       const AacCapability(),
     };
+  }
+
+  /// the decoder only supports PCM output.
+  Set<AudioCapability> get outAudioCapabilities {
+    return {PcmCapability.wav()};
   }
 
   TtsOutputSession? _session;
@@ -144,7 +128,7 @@ final class Decoder implements TtsOutput {
     if (targetPcmDescriptor != null) {
       _negotiatedSpec = TtsAudioSpec.pcm(targetPcmDescriptor);
     } else {
-      final outputPcmCapabilities = output.acceptedCapabilities
+      final outputPcmCapabilities = output.inAudioCapabilities
           .whereType<PcmCapability>()
           .toList();
 

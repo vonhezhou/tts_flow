@@ -116,7 +116,7 @@ class OpenAiTtsEngine implements TtsEngine {
   bool get supportsStreaming => true;
 
   @override
-  Set<AudioCapability> get supportedCapabilities => {
+  Set<AudioCapability> get outAudioCapabilities => {
     const Mp3Capability(),
     const AacCapability(),
     const OpusCapability(),

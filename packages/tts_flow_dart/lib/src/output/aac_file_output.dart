@@ -37,9 +37,7 @@ final class AacFileOutput implements TtsOutput {
   final String outputId;
 
   @override
-  Set<AudioCapability> get acceptedCapabilities => {
-    const AacCapability(),
-  };
+  Set<AudioCapability> get inAudioCapabilities => {const AacCapability()};
 
   @override
   Future<void> init() async {}

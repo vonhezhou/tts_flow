@@ -557,7 +557,7 @@ final class _AlwaysFailOutput implements TtsOutput {
   final String outputId;
 
   @override
-  Set<AudioCapability> get acceptedCapabilities => {PcmCapability.wav()};
+  Set<AudioCapability> get inAudioCapabilities => {PcmCapability.wav()};
 
   @override
   Future<void> init() async {}
@@ -601,7 +601,7 @@ final class _FailByRequestIdOutput implements TtsOutput {
   TtsOutputSession? _session;
 
   @override
-  Set<AudioCapability> get acceptedCapabilities => {PcmCapability.wav()};
+  Set<AudioCapability> get inAudioCapabilities => {PcmCapability.wav()};
 
   @override
   Future<void> init() async {}
@@ -657,7 +657,7 @@ final class _CaptureCancelOutput implements TtsOutput {
   String get outputId => 'capture-cancel-output';
 
   @override
-  Set<AudioCapability> get acceptedCapabilities => {
+  Set<AudioCapability> get inAudioCapabilities => {
     PcmCapability.wav(),
     const Mp3Capability(),
   };
@@ -717,7 +717,7 @@ final class _PcmOnlyOutput implements TtsOutput {
   TtsOutputSession? _session;
 
   @override
-  Set<AudioCapability> get acceptedCapabilities => {
+  Set<AudioCapability> get inAudioCapabilities => {
     PcmCapability(
       sampleRatesHz: _sampleRatesHz,
       bitsPerSample: const {16},
@@ -773,7 +773,7 @@ final class _TrackingOutput implements TtsOutput {
   TtsAudioSpec? lastInitAudioSpec;
 
   @override
-  Set<AudioCapability> get acceptedCapabilities => {
+  Set<AudioCapability> get inAudioCapabilities => {
     PcmCapability.wav(),
     const Mp3Capability(),
   };
@@ -835,7 +835,7 @@ final class _ChunkSpecEngine implements TtsEngine {
   bool get supportsStreaming => true;
 
   @override
-  Set<AudioCapability> get supportedCapabilities => _negotiatedCapabilities;
+  Set<AudioCapability> get outAudioCapabilities => _negotiatedCapabilities;
 
   @override
   Future<List<TtsVoice>> getAvailableVoices({String? locale}) async {
@@ -894,7 +894,7 @@ final class _PlaybackAwareTestOutput implements TtsOutput, PlaybackAwareOutput {
   int _bytesCount = 0;
 
   @override
-  Set<AudioCapability> get acceptedCapabilities => {
+  Set<AudioCapability> get inAudioCapabilities => {
     PcmCapability.wav(),
     const Mp3Capability(),
   };

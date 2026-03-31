@@ -15,7 +15,7 @@ import 'package:tts_flow_dart/src/core/tts_voice.dart';
 ///
 /// Implementer expectations:
 /// - [engineId] should be stable and unique enough for diagnostics.
-/// - [supportedCapabilities] must reflect real format support.
+/// - [outAudioCapabilities] must reflect real format support.
 /// - [synthesize] should emit ordered chunks with the same request id as
 ///   [TtsRequest.requestId].
 /// - [supportsStreaming] should indicate whether chunks can arrive incrementally
@@ -34,7 +34,7 @@ abstract interface class TtsEngine {
   ///
   /// Capability negotiation uses this set against output capabilities to choose
   /// a request format.
-  Set<AudioCapability> get supportedCapabilities;
+  Set<AudioCapability> get outAudioCapabilities;
 
   /// Returns voices supported by this engine.
   ///
@@ -79,7 +79,7 @@ abstract interface class TtsEngine {
 extension TtsEngineCapabilities on TtsEngine {
   /// Returns true when any supported capability can synthesize [spec].
   bool supportsSpec(TtsAudioSpec spec) {
-    for (final capability in supportedCapabilities) {
+    for (final capability in outAudioCapabilities) {
       if (capability.supports(spec)) {
         return true;
       }

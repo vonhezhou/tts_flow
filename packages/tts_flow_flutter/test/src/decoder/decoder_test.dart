@@ -33,16 +33,16 @@ void main() {
       expect(decoder.output, mockOutput);
     });
 
-    group('acceptedCapabilities', () {
+    group('inAudioCapabilities', () {
       test(
         'returns default capabilities when output has no PCM capabilities',
         () {
-          when(() => mockOutput.acceptedCapabilities).thenReturn({
+          when(() => mockOutput.inAudioCapabilities).thenReturn({
             const Mp3Capability(),
             const OpusCapability(),
           });
 
-          final capabilities = decoder.acceptedCapabilities;
+          final capabilities = decoder.inAudioCapabilities;
 
           expect(capabilities, contains(isA<PcmCapability>()));
           expect(capabilities, contains(const Mp3Capability()));
@@ -52,7 +52,7 @@ void main() {
       );
 
       test('intersects PCM capabilities with output', () {
-        when(() => mockOutput.acceptedCapabilities).thenReturn({
+        when(() => mockOutput.inAudioCapabilities).thenReturn({
           PcmCapability(
             sampleRatesHz: {16000, 22050},
             bitsPerSample: {16},
@@ -61,7 +61,7 @@ void main() {
           const Mp3Capability(),
         });
 
-        final capabilities = decoder.acceptedCapabilities;
+        final capabilities = decoder.inAudioCapabilities;
         final pcmCapability = capabilities.whereType<PcmCapability>().first;
 
         expect(pcmCapability.sampleRatesHz, contains(16000));
@@ -71,7 +71,7 @@ void main() {
       });
 
       test('returns empty intersection when no common capabilities', () {
-        when(() => mockOutput.acceptedCapabilities).thenReturn({
+        when(() => mockOutput.inAudioCapabilities).thenReturn({
           PcmCapability(
             sampleRatesHz: {8000},
             bitsPerSample: {8},
@@ -79,7 +79,7 @@ void main() {
           ),
         });
 
-        final capabilities = decoder.acceptedCapabilities;
+        final capabilities = decoder.inAudioCapabilities;
         final pcmCapability = capabilities.whereType<PcmCapability>().first;
 
         expect(pcmCapability.sampleRatesHz, contains(8000));

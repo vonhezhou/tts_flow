@@ -314,8 +314,8 @@ mixin TtsUtteranceQueueMixin on TtsFlowEventBus {
   @protected
   TtsAudioSpec resolveAudioSpec(TtsRequest request, TtsOutput effectiveOutput) {
     return formatNegotiator.negotiateSpec(
-      engineCapabilities: engine.supportedCapabilities,
-      outputCapabilities: effectiveOutput.acceptedCapabilities,
+      engineCapabilities: engine.outAudioCapabilities,
+      outputCapabilities: effectiveOutput.inAudioCapabilities,
       preferredOrder: config.preferredFormatOrder,
       requestId: request.requestId,
       preferredFormat: request.preferredFormat,

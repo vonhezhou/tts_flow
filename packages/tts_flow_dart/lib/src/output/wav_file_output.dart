@@ -27,7 +27,7 @@ final class WavFileOutput implements TtsOutput {
   final String outputId;
 
   @override
-  Set<AudioCapability> get acceptedCapabilities => {PcmCapability.wav()};
+  Set<AudioCapability> get inAudioCapabilities => {PcmCapability.wav()};
 
   @override
   Future<void> init() async {}

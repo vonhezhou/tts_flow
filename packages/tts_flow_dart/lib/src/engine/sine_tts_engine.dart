@@ -26,7 +26,7 @@ final class SineTtsEngine implements TtsEngine {
   final bool supportsStreaming;
 
   @override
-  Set<AudioCapability> get supportedCapabilities => {
+  Set<AudioCapability> get outAudioCapabilities => {
     PcmCapability(
       sampleRatesHz: {16000, 22050, 24000, 44100, 48000},
       bitsPerSample: {16},

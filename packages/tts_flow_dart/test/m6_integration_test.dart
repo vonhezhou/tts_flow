@@ -120,9 +120,7 @@ final class _FailingEngine implements TtsEngine {
   bool get supportsStreaming => true;
 
   @override
-  Set<AudioCapability> get supportedCapabilities => {
-    const Mp3Capability(),
-  };
+  Set<AudioCapability> get outAudioCapabilities => {const Mp3Capability()};
 
   @override
   Future<List<TtsVoice>> getAvailableVoices({String? locale}) async {
