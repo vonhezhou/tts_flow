@@ -50,11 +50,12 @@ final class TtsFormatNegotiator {
       return const TtsAudioSpec.aac();
     }
 
-    final pcmDescriptor = _resolvePcmDescriptor(
+    final pcmDescriptor = resolvePcmDescriptor(
       engineCapabilities: engineCapabilities,
       outputCapabilities: outputCapabilities,
       preferredSampleRateHz: preferredSampleRateHz,
     );
+
     // When PCM capabilities are open-ended (e.g., PcmCapability.wav()),
     // descriptor may be null - the actual format will be determined
     // when the engine receives the first chunk from the server
@@ -97,6 +98,49 @@ final class TtsFormatNegotiator {
       preferredFormat: preferredFormat,
     );
     return resolved.format;
+  }
+
+  PcmDescriptor? resolvePcmDescriptor({
+    required Set<AudioCapability> engineCapabilities,
+    required Set<AudioCapability> outputCapabilities,
+    int? preferredSampleRateHz,
+  }) {
+    final enginePcm = engineCapabilities.whereType<PcmCapability>().toList();
+    final outputPcm = outputCapabilities.whereType<PcmCapability>().toList();
+
+    for (final e in enginePcm) {
+      for (final o in outputPcm) {
+        final encodings = _resolveEncodings(engine: e, output: o);
+        if (encodings.isEmpty) {
+          continue;
+        }
+        final sampleRateHz = _resolveSampleRate(
+          engine: e,
+          output: o,
+          preferredSampleRateHz: preferredSampleRateHz,
+        );
+        if (sampleRateHz == null) {
+          continue;
+        }
+        final bitsPerSample = _resolveBitsPerSample(engine: e, output: o);
+        if (bitsPerSample == null) {
+          continue;
+        }
+        final channelCount = _resolveChannelCount(engine: e, output: o);
+        if (channelCount == null) {
+          continue;
+        }
+        final encoding = _pickEncoding(encodings);
+        return PcmDescriptor(
+          sampleRateHz: sampleRateHz,
+          bitsPerSample: bitsPerSample,
+          channels: channelCount,
+          encoding: encoding,
+        );
+      }
+    }
+
+    return null;
   }
 
   AudioCapability _formatToCapability(TtsAudioFormat format) {
@@ -142,49 +186,6 @@ final class TtsFormatNegotiator {
           'preferredOrder: $preferredOrder',
       requestId: requestId,
     );
-  }
-
-  PcmDescriptor? _resolvePcmDescriptor({
-    required Set<AudioCapability> engineCapabilities,
-    required Set<AudioCapability> outputCapabilities,
-    int? preferredSampleRateHz,
-  }) {
-    final enginePcm = engineCapabilities.whereType<PcmCapability>().toList();
-    final outputPcm = outputCapabilities.whereType<PcmCapability>().toList();
-
-    for (final e in enginePcm) {
-      for (final o in outputPcm) {
-        final encodings = _resolveEncodings(engine: e, output: o);
-        if (encodings.isEmpty) {
-          continue;
-        }
-        final sampleRateHz = _resolveSampleRate(
-          engine: e,
-          output: o,
-          preferredSampleRateHz: preferredSampleRateHz,
-        );
-        if (sampleRateHz == null) {
-          continue;
-        }
-        final bitsPerSample = _resolveBitsPerSample(engine: e, output: o);
-        if (bitsPerSample == null) {
-          continue;
-        }
-        final channelCount = _resolveChannelCount(engine: e, output: o);
-        if (channelCount == null) {
-          continue;
-        }
-        final encoding = _pickEncoding(encodings);
-        return PcmDescriptor(
-          sampleRateHz: sampleRateHz,
-          bitsPerSample: bitsPerSample,
-          channels: channelCount,
-          encoding: encoding,
-        );
-      }
-    }
-
-    return null;
   }
 
   int? _resolveSampleRate({
@@ -346,9 +347,11 @@ final class TtsFormatNegotiator {
     return sorted;
   }
 
+  /// if any of the dimensions is open ended,
+  /// then it is open ended
   bool _isOpenEnded(PcmCapability capability) {
-    return capability.sampleRatesHz == null &&
-        capability.bitsPerSample == null &&
+    return capability.sampleRatesHz == null ||
+        capability.bitsPerSample == null ||
         capability.channels == null;
   }
 }

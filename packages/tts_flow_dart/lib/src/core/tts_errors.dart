@@ -31,10 +31,7 @@ final class TtsError implements Exception {
 }
 
 final class TtsOutputFailure implements Exception {
-  const TtsOutputFailure({
-    required this.outputId,
-    required this.error,
-  });
+  const TtsOutputFailure({required this.outputId, required this.error});
 
   final String outputId;
   final TtsError error;

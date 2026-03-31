@@ -75,7 +75,7 @@ class _TtsFlowExamplePageState extends State<TtsFlowExamplePage> {
           Decoder(
             outputId: 'decoder',
             output: WavFileOutput("D:/Codes/flutter_uni_tts/test_out.wav"),
-            targetPcmDescriptor: const PcmDescriptor(
+            pcmFormat: const PcmDescriptor(
               sampleRateHz: 16000, // 强制 16kHz
               channels: 1, // 强制单声道
               bitsPerSample: 16, // 强制 16 位

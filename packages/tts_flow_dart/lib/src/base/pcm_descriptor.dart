@@ -21,12 +21,20 @@ class PcmDescriptor {
     required this.bitsPerSample,
     required this.channels,
     this.encoding = PcmEncoding.signedInt,
-  })  : assert(sampleRateHz >= wavMinSampleRateHz),
-        assert(sampleRateHz <= wavMaxSampleRateHz),
-        assert(bitsPerSample >= wavMinBitsPerSample),
-        assert(bitsPerSample <= wavMaxBitsPerSample),
-        assert(channels >= wavMinChannels),
-        assert(channels <= wavMaxChannels);
+  }) : assert(sampleRateHz >= wavMinSampleRateHz),
+       assert(sampleRateHz <= wavMaxSampleRateHz),
+       assert(bitsPerSample >= wavMinBitsPerSample),
+       assert(bitsPerSample <= wavMaxBitsPerSample),
+       assert(channels >= wavMinChannels),
+       assert(channels <= wavMaxChannels);
+
+  const PcmDescriptor.s16Mono24KHz()
+    : this(
+        sampleRateHz: 24000,
+        bitsPerSample: 16,
+        channels: 1,
+        encoding: PcmEncoding.signedInt,
+      );
 
   /// Sample rate in Hz (e.g., 24000, 44100)
   final int sampleRateHz;

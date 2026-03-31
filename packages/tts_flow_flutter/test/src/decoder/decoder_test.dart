@@ -33,7 +33,7 @@ void main() {
       expect(decoder.output, mockOutput);
     });
 
-    group('inAudioCapabilities', () {
+    group('resolveAudioSpecForTest', () {
       test(
         'returns default capabilities when output has no PCM capabilities',
         () {
@@ -42,12 +42,16 @@ void main() {
             const OpusCapability(),
           });
 
-          final capabilities = decoder.inAudioCapabilities;
+          /// should throw
 
-          expect(capabilities, contains(isA<PcmCapability>()));
-          expect(capabilities, contains(const Mp3Capability()));
-          expect(capabilities, contains(const OpusCapability()));
-          expect(capabilities, contains(const AacCapability()));
+          expect(
+            () => decoder.resolveAudioSpecForTest('test-request'),
+            throwsA(
+              (e) =>
+                  e is TtsError &&
+                  e.code == TtsErrorCode.formatNegotiationFailed,
+            ),
+          );
         },
       );
 
@@ -61,13 +65,13 @@ void main() {
           const Mp3Capability(),
         });
 
-        final capabilities = decoder.inAudioCapabilities;
-        final pcmCapability = capabilities.whereType<PcmCapability>().first;
-
-        expect(pcmCapability.sampleRatesHz, contains(16000));
-        expect(pcmCapability.sampleRatesHz, contains(22050));
-        expect(pcmCapability.bitsPerSample, contains(16));
-        expect(pcmCapability.channels, contains(1));
+        final pcmCapability = decoder
+            .resolveAudioSpecForTest('test-request')
+            .pcm;
+        expect(pcmCapability, isNotNull);
+        expect(pcmCapability!.sampleRateHz, 22050);
+        expect(pcmCapability.bitsPerSample, 16);
+        expect(pcmCapability.channels, 1);
       });
 
       test('returns empty intersection when no common capabilities', () {
@@ -79,10 +83,14 @@ void main() {
           ),
         });
 
-        final capabilities = decoder.inAudioCapabilities;
-        final pcmCapability = capabilities.whereType<PcmCapability>().first;
+        final pcmCapability = decoder
+            .resolveAudioSpecForTest('test-request')
+            .pcm;
 
-        expect(pcmCapability.sampleRatesHz, contains(8000));
+        expect(pcmCapability, isNotNull);
+        expect(pcmCapability!.sampleRateHz, 8000);
+        expect(pcmCapability.bitsPerSample, 8);
+        expect(pcmCapability.channels, 1);
       });
     });
 

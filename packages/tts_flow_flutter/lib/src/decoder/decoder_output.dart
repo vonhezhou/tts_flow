@@ -7,21 +7,22 @@ import 'package:tts_flow_dart/tts_flow_dart.dart';
 /// (MP3, AAC, Opus) to PCM using the audio_decoder package.
 ///
 /// This output accepts any supported audio format and decodes it to
-/// a PCM format negotiated with [output] or specified by [targetPcmDescriptor],
+/// a PCM format negotiated with [output] or specified by [pcmFormat],
 /// then forwards the decoded chunks to [output].
 final class Decoder implements TtsOutput {
   /// Creates a new [Decoder] instance.
   ///
   /// [outputId] is the unique identifier for this decoder.
   /// [output] is the downstream output that receives decoded PCM chunks.
-  /// [targetPcmDescriptor] optionally specifies the target PCM format.
+  /// [pcmFormat] optionally specifies the target PCM format.
   ///   If not specified, the format will be negotiated with [output].
   ///   If specified, this format will be used regardless of
   ///   [output]'s capabilities.
   Decoder({
     required this.outputId,
     required this.output,
-    this.targetPcmDescriptor,
+    this.pcmFormat,
+    this.defaultPcmFormat = const PcmDescriptor.s16Mono24KHz(),
   });
 
   @override
@@ -32,20 +33,18 @@ final class Decoder implements TtsOutput {
 
   /// Optional target PCM descriptor. If specified, the decoder will use this
   /// format instead of negotiating with [output].
-  final PcmDescriptor? targetPcmDescriptor;
+  final PcmDescriptor? pcmFormat;
+
+  /// The default PCM format to use if [Decoder] and [Decoder.output]
+  /// are open-ended and can not agree on a fixed format.
+  final PcmDescriptor defaultPcmFormat;
+
+  final _formatNegotiator = TtsFormatNegotiator();
 
   @override
   Set<AudioCapability> get inAudioCapabilities {
     return {
-      if (targetPcmDescriptor != null)
-        PcmCapability(
-          sampleRatesHz: {targetPcmDescriptor!.sampleRateHz},
-          bitsPerSample: {targetPcmDescriptor!.bitsPerSample},
-          channels: {targetPcmDescriptor!.channels},
-          encodings: {targetPcmDescriptor!.encoding},
-        )
-      else
-        PcmCapability.wav(),
+      PcmCapability.wav(),
       const Mp3Capability(),
       const OpusCapability(),
       const AacCapability(),
@@ -54,66 +53,22 @@ final class Decoder implements TtsOutput {
 
   /// the decoder only supports PCM output.
   Set<AudioCapability> get outAudioCapabilities {
-    return {PcmCapability.wav()};
+    return {
+      if (pcmFormat != null)
+        PcmCapability(
+          sampleRatesHz: {pcmFormat!.sampleRateHz},
+          bitsPerSample: {pcmFormat!.bitsPerSample},
+          channels: {pcmFormat!.channels},
+          encodings: {pcmFormat!.encoding},
+        )
+      else
+        PcmCapability.wav(),
+    };
   }
 
   TtsOutputSession? _session;
   BytesBuilder? _buffer;
   TtsAudioSpec? _negotiatedSpec;
-
-  PcmCapability? _intersectPcmCapabilities(List<PcmCapability> capabilities) {
-    if (capabilities.isEmpty) {
-      return null;
-    }
-
-    Set<int>? sampleRates;
-    Set<int>? bitDepths;
-    Set<int>? channels;
-    Set<PcmEncoding>? encodings;
-
-    for (final capability in capabilities) {
-      if (capability.sampleRatesHz != null) {
-        sampleRates = sampleRates == null
-            ? Set<int>.from(capability.sampleRatesHz!)
-            : sampleRates.intersection(capability.sampleRatesHz!);
-      }
-      if (capability.bitsPerSample != null) {
-        bitDepths = bitDepths == null
-            ? Set<int>.from(capability.bitsPerSample!)
-            : bitDepths.intersection(capability.bitsPerSample!);
-      }
-      if (capability.channels != null) {
-        channels = channels == null
-            ? Set<int>.from(capability.channels!)
-            : channels.intersection(capability.channels!);
-      }
-      if (capability.encodings != null) {
-        encodings = encodings == null
-            ? Set<PcmEncoding>.from(capability.encodings!)
-            : encodings.intersection(capability.encodings!);
-      }
-    }
-
-    if (sampleRates != null && sampleRates.isEmpty) {
-      return null;
-    }
-    if (bitDepths != null && bitDepths.isEmpty) {
-      return null;
-    }
-    if (channels != null && channels.isEmpty) {
-      return null;
-    }
-    if (encodings != null && encodings.isEmpty) {
-      return null;
-    }
-
-    return PcmCapability(
-      sampleRatesHz: sampleRates,
-      bitsPerSample: bitDepths,
-      channels: channels,
-      encodings: encodings,
-    );
-  }
 
   @override
   Future<void> init() async {
@@ -125,46 +80,7 @@ final class Decoder implements TtsOutput {
     _session = session;
     _buffer = BytesBuilder(copy: false);
 
-    if (targetPcmDescriptor != null) {
-      _negotiatedSpec = TtsAudioSpec.pcm(targetPcmDescriptor);
-    } else {
-      final outputPcmCapabilities = output.inAudioCapabilities
-          .whereType<PcmCapability>()
-          .toList();
-
-      if (outputPcmCapabilities.isEmpty) {
-        _negotiatedSpec = const TtsAudioSpec.pcm(
-          PcmDescriptor(
-            sampleRateHz: 16000,
-            channels: 1,
-            bitsPerSample: 16,
-          ),
-        );
-      } else {
-        final intersectedPcm = _intersectPcmCapabilities(outputPcmCapabilities);
-        if (intersectedPcm != null) {
-          final sampleRate = intersectedPcm.sampleRatesHz?.first ?? 16000;
-          final channels = intersectedPcm.channels?.first ?? 1;
-          final bitsPerSample = intersectedPcm.bitsPerSample?.first ?? 16;
-
-          _negotiatedSpec = TtsAudioSpec.pcm(
-            PcmDescriptor(
-              sampleRateHz: sampleRate,
-              channels: channels,
-              bitsPerSample: bitsPerSample,
-            ),
-          );
-        } else {
-          _negotiatedSpec = const TtsAudioSpec.pcm(
-            PcmDescriptor(
-              sampleRateHz: 16000,
-              channels: 1,
-              bitsPerSample: 16,
-            ),
-          );
-        }
-      }
-    }
+    _negotiatedSpec = _resolveAudioSpec(requestId: session.requestId);
 
     final outputSession = session.copyWith(
       audioSpec: _negotiatedSpec,
@@ -262,5 +178,26 @@ final class Decoder implements TtsOutput {
     _buffer = null;
     _negotiatedSpec = null;
     _chunkSequenceNumber = 0;
+  }
+
+  /// for test only
+  TtsAudioSpec resolveAudioSpecForTest(String requestId) {
+    return _resolveAudioSpec(requestId: requestId);
+  }
+
+  TtsAudioSpec _resolveAudioSpec({required String requestId}) {
+    final spec = _formatNegotiator.negotiateSpec(
+      engineCapabilities: outAudioCapabilities,
+      outputCapabilities: output.inAudioCapabilities,
+      preferredOrder: TtsAudioFormat.values,
+      preferredFormat: TtsAudioFormat.pcm,
+      requestId: requestId,
+    );
+
+    if (spec.format == TtsAudioFormat.pcm && spec.pcm == null) {
+      return TtsAudioSpec.pcm(defaultPcmFormat);
+    }
+
+    return spec;
   }
 }
