@@ -138,7 +138,7 @@ final class FileTtsEngine implements TtsEngine {
       }
 
       if (pendingChunk != null) {
-        yield TtsChunk(
+        yield TtsAudioChunk(
           requestId: request.requestId,
           sequenceNumber: sequence,
           bytes: pendingChunk,
@@ -154,7 +154,7 @@ final class FileTtsEngine implements TtsEngine {
     }
 
     if (pendingChunk != null && !control.isCanceled) {
-      yield TtsChunk(
+      yield TtsAudioChunk(
         requestId: request.requestId,
         sequenceNumber: sequence,
         bytes: pendingChunk,

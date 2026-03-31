@@ -301,9 +301,9 @@ Lifecycle per request:
 1. `init()` prepares backend resources before any playback begins.
 2. `startPlayback(requestId, audioSpec)` creates session state and returns a
    stable `playbackId`.
-3. `appendAudio(playbackId, bytes)` appends ordered bytes for that session.
+3. `appendChunk(playbackId, chunks)` appends ordered bytes for that session.
 4. End with either:
-   - `finalizeIngestion(playbackId)` when all synthesized bytes have been
+   - `finalizePlayback(playbackId)` when all synthesized bytes have been
      handed to the backend.
    - `stopPlayback(playbackId, reason)` for cancellation/interruption.
 5. If the backend can distinguish real device playback completion, emit
@@ -319,9 +319,9 @@ Semantics:
 Implementation checklist:
 
 - Store per-session state by `playbackId`.
-- Preserve write order in `appendAudio`.
+- Preserve write order in `appendChunk`.
 - Reject unknown `playbackId` and writes after completion/stop.
-- Make `finalizeIngestion` idempotent or clearly fail on second call.
+- Make `finalizePlayback` idempotent or clearly fail on second call.
 - Ensure `stopPlayback` is safe to call after partial writes.
 - Return capabilities from `supportedCapabilities` that match the real device.
 - Emit `playbackCompletedEvents` only for true physical completion.
@@ -353,19 +353,23 @@ final class MySpeakerBackend implements SpeakerBackend {
   }
 
   @override
-  Future<void> appendAudio({
+  Future<void> appendChunk({
     required String playbackId,
-    required List<int> bytes,
+    required TtsChunk chunks,
   }) async {
+    if (chunks is! TtsAudioChunk) {
+      return;
+    }
+
     final buffer = _sessions[playbackId];
     if (buffer == null) {
       throw StateError('Unknown playbackId: $playbackId');
     }
-    buffer.addAll(bytes);
+    buffer.addAll(chunks.bytes);
   }
 
   @override
-  Future<void> finalizeIngestion({required String playbackId}) async {
+  Future<void> finalizePlayback({required String playbackId}) async {
     final buffer = _sessions.remove(playbackId);
     if (buffer == null) {
       throw StateError('Unknown playbackId: $playbackId');

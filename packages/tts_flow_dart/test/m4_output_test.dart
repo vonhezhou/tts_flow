@@ -841,7 +841,7 @@ void main() {
   });
 
   group('M4 Multicast output', () {
-    test('acceptedCapabilities intersects PCM constraints across children', () {
+    test('inAudioCapabilities intersects PCM constraints across children', () {
       final output = MulticastOutput(
         outputs: [
           _PcmConstraintOutput(outputId: 'pcm-16k', sampleRatesHz: {16000}),
@@ -849,7 +849,7 @@ void main() {
         ],
       );
 
-      final capabilities = output.acceptedCapabilities;
+      final capabilities = output.inAudioCapabilities;
       expect(capabilities, isEmpty);
     });
 
@@ -1019,9 +1019,7 @@ final class _FailingTestOutput implements TtsOutput {
   TtsOutputSession? _session;
 
   @override
-  Set<AudioCapability> get acceptedCapabilities => {
-    PcmCapability.wav(),
-  };
+  Set<AudioCapability> get inAudioCapabilities => {PcmCapability.wav()};
 
   @override
   Future<void> consumeChunk(TtsChunk chunk) async {
@@ -1089,7 +1087,7 @@ final class _PcmConstraintOutput implements TtsOutput {
   final Set<int> _sampleRatesHz;
 
   @override
-  Set<AudioCapability> get acceptedCapabilities => {
+  Set<AudioCapability> get inAudioCapabilities => {
     PcmCapability(
       sampleRatesHz: _sampleRatesHz,
       bitsPerSample: const {16},
@@ -1126,7 +1124,7 @@ TtsChunk _chunk(
   TtsAudioFormat format, {
   bool isLast = false,
 }) {
-  return TtsChunk(
+  return TtsAudioChunk(
     requestId: requestId,
     sequenceNumber: seq,
     bytes: Uint8List.fromList(bytes),
@@ -1156,7 +1154,7 @@ TtsChunk _pcmChunk(
   PcmDescriptor descriptor, {
   bool isLast = false,
 }) {
-  return TtsChunk(
+  return TtsAudioChunk(
     requestId: requestId,
     sequenceNumber: seq,
     bytes: Uint8List.fromList(bytes),

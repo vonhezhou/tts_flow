@@ -1,3 +1,5 @@
+import 'dart:typed_data';
+
 import 'package:test/test.dart';
 import 'package:tts_flow_dart/tts_flow_dart.dart';
 
@@ -29,9 +31,9 @@ final class _ReferenceSpeakerBackend implements SpeakerBackend {
   }
 
   @override
-  Future<void> appendAudio({
+  Future<void> appendChunk({
     required String playbackId,
-    required List<int> bytes,
+    required TtsChunk chunk,
   }) async {
     if (_closed.contains(playbackId)) {
       throw StateError('Playback already closed: $playbackId');
@@ -40,11 +42,15 @@ final class _ReferenceSpeakerBackend implements SpeakerBackend {
     if (buffer == null) {
       throw StateError('Unknown playbackId: $playbackId');
     }
-    buffer.addAll(bytes);
+    if (chunk is! TtsAudioChunk) {
+      return;
+    }
+
+    buffer.addAll(chunk.bytes);
   }
 
   @override
-  Future<void> finalizeIngestion({required String playbackId}) async {
+  Future<void> finalizePlayback({required String playbackId}) async {
     final buffer = _buffers.remove(playbackId);
     if (buffer == null) {
       throw StateError('Unknown playbackId: $playbackId');
@@ -84,12 +90,42 @@ void main() {
         audioSpec: const TtsAudioSpec.mp3(),
       );
 
-      await backend.appendAudio(playbackId: playbackId, bytes: [1, 2]);
-      await backend.appendAudio(playbackId: playbackId, bytes: [3]);
+      await backend.appendChunk(
+        playbackId: playbackId,
+        chunk: TtsAudioChunk(
+          bytes: Uint8List.fromList([1, 2]),
+          requestId: '',
+          sequenceNumber: 0,
+          isLastChunk: false,
+          timestamp: DateTime.now(),
+          audioSpec: const TtsAudioSpec.mp3(),
+        ),
+      );
+      await backend.appendChunk(
+        playbackId: playbackId,
+        chunk: TtsAudioChunk(
+          bytes: Uint8List.fromList([3]),
+          requestId: '',
+          sequenceNumber: 0,
+          isLastChunk: true,
+          timestamp: DateTime.now(),
+          audioSpec: const TtsAudioSpec.mp3(),
+        ),
+      );
 
-      await backend.finalizeIngestion(playbackId: playbackId);
+      await backend.finalizePlayback(playbackId: playbackId);
       await expectLater(
-        () => backend.appendAudio(playbackId: playbackId, bytes: [4]),
+        () => backend.appendChunk(
+          playbackId: playbackId,
+          chunk: TtsAudioChunk(
+            bytes: Uint8List.fromList([4]),
+            requestId: '',
+            sequenceNumber: 0,
+            isLastChunk: false,
+            timestamp: DateTime.now(),
+            audioSpec: const TtsAudioSpec.mp3(),
+          ),
+        ),
         throwsStateError,
       );
     });
@@ -101,11 +137,31 @@ void main() {
         requestId: 'r2',
         audioSpec: const TtsAudioSpec.mp3(),
       );
-      await backend.appendAudio(playbackId: playbackId, bytes: [9]);
+      await backend.appendChunk(
+        playbackId: playbackId,
+        chunk: TtsAudioChunk(
+          bytes: Uint8List.fromList([9]),
+          requestId: '',
+          sequenceNumber: 0,
+          isLastChunk: true,
+          timestamp: DateTime.now(),
+          audioSpec: const TtsAudioSpec.mp3(),
+        ),
+      );
       await backend.stopPlayback(playbackId: playbackId, reason: 'cancelled');
 
       await expectLater(
-        () => backend.appendAudio(playbackId: playbackId, bytes: [10]),
+        () => backend.appendChunk(
+          playbackId: playbackId,
+          chunk: TtsAudioChunk(
+            bytes: Uint8List.fromList([10]),
+            requestId: '',
+            sequenceNumber: 0,
+            isLastChunk: true,
+            timestamp: DateTime.now(),
+            audioSpec: const TtsAudioSpec.mp3(),
+          ),
+        ),
         throwsStateError,
       );
     });

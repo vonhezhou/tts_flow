@@ -15,9 +15,9 @@ import 'package:tts_flow_dart/src/core/tts_policy.dart';
 /// Typical lifecycle for one synthesis request:
 /// 1. [startPlayback] is called once with the request metadata and returns a
 ///    backend-owned playback identifier.
-/// 2. [appendAudio] is called zero or more times with ordered audio chunks for
+/// 2. [appendChunk] is called zero or more times with ordered audio chunks for
 ///    that playback.
-/// 3. The session ends with either [finalizeIngestion] (normal finish) or
+/// 3. The session ends with either [finalizePlayback] (normal finish) or
 ///    [stopPlayback] (cancellation/interruption).
 ///
 /// Playback control methods [pausePlayback] and [resumePlayback] are optional
@@ -25,8 +25,8 @@ import 'package:tts_flow_dart/src/core/tts_policy.dart';
 ///
 /// Contract expectations for implementers:
 /// - Treat [playbackId] as the stable key for all per-session state.
-/// - Keep audio ordering exactly as received by [appendAudio].
-/// - Reject writes after [finalizeIngestion] or [stopPlayback] closes a
+/// - Keep audio ordering exactly as received by [appendChunk].
+/// - Reject writes after [finalizePlayback] or [stopPlayback] closes a
 ///   session.
 /// - Ensure [init] can be safely called before playback begins.
 /// - Make [dispose] release resources even when sessions are still active.
@@ -34,7 +34,7 @@ abstract interface class SpeakerBackend {
   /// Emits events when a playback stream physically finishes on the speaker.
   ///
   /// This stream is independent from ingestion completion and can emit after
-  /// [finalizeIngestion] has returned.
+  /// [finalizePlayback] has returned.
   Stream<SpeakerPlaybackCompletedEvent> get playbackCompletedEvents;
 
   /// Audio capabilities accepted by this backend.
@@ -52,20 +52,20 @@ abstract interface class SpeakerBackend {
   /// Starts a new playback session for [requestId] using [audioSpec].
   ///
   /// Returns a backend-generated playback identifier that must be passed to
-  /// subsequent calls such as [appendAudio], [finalizeIngestion], and
+  /// subsequent calls such as [appendChunk], [finalizePlayback], and
   /// [stopPlayback].
   Future<String> startPlayback({
     required String requestId,
     required TtsAudioSpec audioSpec,
   });
 
-  /// Appends synthesized audio [bytes] to an existing [playbackId] session.
+  /// Appends TtsChunk [chunk] to an existing [playbackId] session.
   ///
   /// This method may be called repeatedly as chunks arrive and should preserve
   /// chunk ordering within the playback stream.
-  Future<void> appendAudio({
+  Future<void> appendChunk({
     required String playbackId,
-    required List<int> bytes,
+    required TtsChunk chunk,
   });
 
   /// Closes ingestion for [playbackId].
@@ -75,7 +75,7 @@ abstract interface class SpeakerBackend {
   ///
   /// After ingestion finalization, the playback session should no longer accept
   /// new audio data.
-  Future<void> finalizeIngestion({required String playbackId});
+  Future<void> finalizePlayback({required String playbackId});
 
   /// Stops [playbackId] before normal completion.
   ///
@@ -172,7 +172,7 @@ final class SpeakerOutput implements TtsOutput, PlaybackAwareOutput {
       throw StateError('Chunk requestId does not match active session.');
     }
 
-    await _backend.appendAudio(playbackId: playbackId, bytes: chunk.bytes);
+    await _backend.appendChunk(playbackId: playbackId, chunk: chunk);
   }
 
   @override
@@ -183,7 +183,7 @@ final class SpeakerOutput implements TtsOutput, PlaybackAwareOutput {
       throw StateError('SpeakerOutput session is not initialized.');
     }
 
-    await _backend.finalizeIngestion(playbackId: playbackId);
+    await _backend.finalizePlayback(playbackId: playbackId);
     _session = null;
     _playbackId = null;
 

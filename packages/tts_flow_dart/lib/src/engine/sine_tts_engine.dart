@@ -140,7 +140,7 @@ final class SineTtsEngine implements TtsEngine {
         await Future<void>.delayed(chunkDelay);
       }
 
-      yield TtsChunk(
+      yield TtsAudioChunk(
         requestId: request.requestId,
         sequenceNumber: i,
         bytes: chunkBytes,

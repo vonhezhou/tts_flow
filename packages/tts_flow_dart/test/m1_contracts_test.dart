@@ -42,7 +42,11 @@ void main() {
       expect(chunks, hasLength(1));
       expect(chunks.first.sequenceNumber, 0);
       expect(chunks.first.isLastChunk, isTrue);
-      expect(chunks.first.audioSpec.format, TtsAudioFormat.pcm);
+      expect(chunks.first, isA<TtsAudioChunk>());
+      expect(
+        (chunks.first as TtsAudioChunk).audioSpec.format,
+        TtsAudioFormat.pcm,
+      );
     });
 
     test('audio spec named constructors preserve descriptor semantics', () {
@@ -73,41 +77,47 @@ void main() {
       expect(chunks.length, greaterThanOrEqualTo(2));
       for (var i = 0; i < chunks.length; i++) {
         expect(chunks[i].sequenceNumber, i);
-        expect(chunks[i].audioSpec.format, TtsAudioFormat.mp3);
+        expect(chunks[i], isA<TtsAudioChunk>());
+        expect(
+          (chunks[i] as TtsAudioChunk).audioSpec.format,
+          TtsAudioFormat.mp3,
+        );
       }
       expect(chunks.last.isLastChunk, isTrue);
     });
 
-    test('null output discards bytes while preserving resolved format',
-        () async {
-      final output = NullOutput();
-      const session = TtsOutputSession(
-        requestId: 'r3',
-        audioSpec: _pcmSpec,
-        voice: null,
-        options: null,
-      );
-
-      await output.initSession(session);
-      await output.consumeChunk(
-        TtsChunk(
+    test(
+      'null output discards bytes while preserving resolved format',
+      () async {
+        final output = NullOutput();
+        const session = TtsOutputSession(
           requestId: 'r3',
-          sequenceNumber: 0,
-          bytes: Uint8List.fromList([1, 2, 3]),
           audioSpec: _pcmSpec,
-          isLastChunk: true,
-          timestamp: DateTime.now().toUtc(),
-        ),
-      );
+          voice: null,
+          options: null,
+        );
 
-      final artifact = await output.finalizeSession();
-      expect(artifact, isA<InMemoryAudioArtifact>());
+        await output.initSession(session);
+        await output.consumeChunk(
+          TtsAudioChunk(
+            requestId: 'r3',
+            sequenceNumber: 0,
+            bytes: Uint8List.fromList([1, 2, 3]),
+            audioSpec: _pcmSpec,
+            isLastChunk: true,
+            timestamp: DateTime.now().toUtc(),
+          ),
+        );
 
-      final memoryArtifact = artifact as InMemoryAudioArtifact;
-      expect(memoryArtifact.requestId, 'r3');
-      expect(memoryArtifact.audioSpec.format, TtsAudioFormat.pcm);
-      expect(memoryArtifact.totalBytes, 0);
-    });
+        final artifact = await output.finalizeSession();
+        expect(artifact, isA<InMemoryAudioArtifact>());
+
+        final memoryArtifact = artifact as InMemoryAudioArtifact;
+        expect(memoryArtifact.requestId, 'r3');
+        expect(memoryArtifact.audioSpec.format, TtsAudioFormat.pcm);
+        expect(memoryArtifact.totalBytes, 0);
+      },
+    );
 
     test('fake engine reports available voices and global default', () async {
       final engine = SineTtsEngine(
@@ -121,7 +131,9 @@ void main() {
       expect(voices, isNotEmpty);
       expect(defaultVoice.isDefault, isTrue);
       expect(
-          voices.any((voice) => voice.voiceId == defaultVoice.voiceId), isTrue);
+        voices.any((voice) => voice.voiceId == defaultVoice.voiceId),
+        isTrue,
+      );
     });
 
     test('fake engine resolves locale default voice with fallback', () async {
@@ -223,10 +235,7 @@ void main() {
 
     test('wav header parser rejects non-wav bytes', () {
       final invalid = Uint8List(44);
-      expect(
-        () => WavHeader.parse(invalid),
-        throwsA(isA<FormatException>()),
-      );
+      expect(() => WavHeader.parse(invalid), throwsA(isA<FormatException>()));
     });
   });
 }

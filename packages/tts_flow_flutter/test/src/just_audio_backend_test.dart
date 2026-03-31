@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'dart:typed_data';
 
 import 'package:flutter_test/flutter_test.dart';
 import 'package:just_audio/just_audio.dart';
@@ -92,9 +93,16 @@ void main() {
           audioSpec: const TtsAudioSpec.mp3(),
         );
 
-        await backend.appendAudio(
+        await backend.appendChunk(
           playbackId: firstPlaybackId,
-          bytes: [1, 2, 3],
+          chunk: TtsAudioChunk(
+            bytes: Uint8List.fromList([1, 2, 3]),
+            requestId: '',
+            sequenceNumber: 0,
+            isLastChunk: false,
+            timestamp: DateTime.now(),
+            audioSpec: const TtsAudioSpec.mp3(),
+          ),
         );
         expect(sources, hasLength(1));
 
@@ -102,14 +110,24 @@ void main() {
         expect(firstSource.playbackId, firstPlaybackId);
         expect(firstSource.isTerminalSegment, isTrue);
 
-        await backend.finalizeIngestion(playbackId: firstPlaybackId);
+        await backend.finalizePlayback(playbackId: firstPlaybackId);
         expect(firstSource.isTerminalSegment, isTrue);
 
         final secondPlaybackId = await backend.startPlayback(
           requestId: 'r2',
           audioSpec: const TtsAudioSpec.mp3(),
         );
-        await backend.appendAudio(playbackId: secondPlaybackId, bytes: [9]);
+        await backend.appendChunk(
+          playbackId: secondPlaybackId,
+          chunk: TtsAudioChunk(
+            bytes: Uint8List.fromList([9]),
+            requestId: '',
+            sequenceNumber: 0,
+            isLastChunk: true,
+            timestamp: DateTime.now(),
+            audioSpec: const TtsAudioSpec.mp3(),
+          ),
+        );
 
         expect(sources, hasLength(2));
         final secondSource = sources[1] as ChunkAudioSource;
@@ -129,7 +147,17 @@ void main() {
           requestId: 'r1',
           audioSpec: const TtsAudioSpec.mp3(),
         );
-        await backend.appendAudio(playbackId: playbackId, bytes: [1]);
+        await backend.appendChunk(
+          playbackId: playbackId,
+          chunk: TtsAudioChunk(
+            bytes: Uint8List.fromList([1]),
+            requestId: '',
+            sequenceNumber: 0,
+            isLastChunk: false,
+            timestamp: DateTime.now(),
+            audioSpec: const TtsAudioSpec.mp3(),
+          ),
+        );
 
         sources.add(_FakeAudioSource());
 
@@ -152,8 +180,18 @@ void main() {
         requestId: 'r1',
         audioSpec: const TtsAudioSpec.mp3(),
       );
-      await backend.appendAudio(playbackId: playbackId, bytes: [1, 2]);
-      await backend.finalizeIngestion(playbackId: playbackId);
+      await backend.appendChunk(
+        playbackId: playbackId,
+        chunk: TtsAudioChunk(
+          bytes: Uint8List.fromList([1, 2]),
+          requestId: '',
+          sequenceNumber: 0,
+          isLastChunk: false,
+          timestamp: DateTime.now(),
+          audioSpec: const TtsAudioSpec.mp3(),
+        ),
+      );
+      await backend.finalizePlayback(playbackId: playbackId);
 
       currentIndex = 0;
       processingController
@@ -181,14 +219,34 @@ void main() {
           requestId: 'r1',
           audioSpec: const TtsAudioSpec.mp3(),
         );
-        await backend.appendAudio(playbackId: firstPlaybackId, bytes: [1, 2]);
-        await backend.finalizeIngestion(playbackId: firstPlaybackId);
+        await backend.appendChunk(
+          playbackId: firstPlaybackId,
+          chunk: TtsAudioChunk(
+            bytes: Uint8List.fromList([1, 2]),
+            requestId: '',
+            sequenceNumber: 0,
+            isLastChunk: false,
+            timestamp: DateTime.now(),
+            audioSpec: const TtsAudioSpec.mp3(),
+          ),
+        );
+        await backend.finalizePlayback(playbackId: firstPlaybackId);
 
         final secondPlaybackId = await backend.startPlayback(
           requestId: 'r2',
           audioSpec: const TtsAudioSpec.mp3(),
         );
-        await backend.appendAudio(playbackId: secondPlaybackId, bytes: [9, 8]);
+        await backend.appendChunk(
+          playbackId: secondPlaybackId,
+          chunk: TtsAudioChunk(
+            bytes: Uint8List.fromList([9, 8]),
+            requestId: '',
+            sequenceNumber: 0,
+            isLastChunk: true,
+            timestamp: DateTime.now(),
+            audioSpec: const TtsAudioSpec.mp3(),
+          ),
+        );
 
         currentIndex = 0;
         playing = true;
@@ -219,13 +277,33 @@ void main() {
           requestId: 'r1',
           audioSpec: const TtsAudioSpec.mp3(),
         );
-        await backend.appendAudio(playbackId: firstPlaybackId, bytes: [1, 2]);
+        await backend.appendChunk(
+          playbackId: firstPlaybackId,
+          chunk: TtsAudioChunk(
+            bytes: Uint8List.fromList([1, 2]),
+            requestId: '',
+            sequenceNumber: 0,
+            isLastChunk: false,
+            timestamp: DateTime.now(),
+            audioSpec: const TtsAudioSpec.mp3(),
+          ),
+        );
 
         final secondPlaybackId = await backend.startPlayback(
           requestId: 'r2',
           audioSpec: const TtsAudioSpec.mp3(),
         );
-        await backend.appendAudio(playbackId: secondPlaybackId, bytes: [9]);
+        await backend.appendChunk(
+          playbackId: secondPlaybackId,
+          chunk: TtsAudioChunk(
+            bytes: Uint8List.fromList([9]),
+            requestId: '',
+            sequenceNumber: 0,
+            isLastChunk: true,
+            timestamp: DateTime.now(),
+            audioSpec: const TtsAudioSpec.mp3(),
+          ),
+        );
 
         expect(sources, hasLength(2));
         currentIndex = 0;

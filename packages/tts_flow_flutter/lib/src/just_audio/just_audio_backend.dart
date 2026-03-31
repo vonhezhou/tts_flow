@@ -96,11 +96,11 @@ class JustAudioBackend implements SpeakerBackend {
   }
 
   @override
-  Future<void> appendAudio({
+  Future<void> appendChunk({
     required String playbackId,
-    required List<int> bytes,
+    required TtsChunk chunk,
   }) async {
-    if (bytes.isEmpty) {
+    if (chunk is! TtsAudioChunk) {
       return;
     }
 
@@ -117,20 +117,20 @@ class JustAudioBackend implements SpeakerBackend {
       target = await _createSegment(session);
     }
 
-    if (!target.addChunk(bytes)) {
+    if (!target.addChunk(chunk.bytes)) {
       target = await _createSegment(session);
-      if (!target.addChunk(bytes)) {
+      if (!target.addChunk(chunk.bytes)) {
         throw StateError('Unable to buffer bytes for playback: $playbackId');
       }
     }
 
-    session.totalBytes += bytes.length;
+    session.totalBytes += chunk.bytes.length;
 
     await _ensurePlaybackRunning();
   }
 
   @override
-  Future<void> finalizeIngestion({required String playbackId}) async {
+  Future<void> finalizePlayback({required String playbackId}) async {
     final session = _requireSession(playbackId);
     if (session.isStopped) {
       throw StateError('Playback is stopped: $playbackId');

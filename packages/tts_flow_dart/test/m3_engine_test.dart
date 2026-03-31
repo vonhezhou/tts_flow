@@ -50,33 +50,35 @@ void main() {
       expect(resolved.requirePcm.channels, 1);
     });
 
-    test('negotiates PCM fallback sample rate when preferred not available',
-        () {
-      final resolved = negotiator.negotiateSpec(
-        engineCapabilities: {
-          PcmCapability(
-            sampleRatesHz: {16000, 22050},
-            bitsPerSample: {16},
-            channels: {1},
-            encodings: {PcmEncoding.signedInt},
-          ),
-        },
-        outputCapabilities: {
-          PcmCapability(
-            sampleRatesHz: {8000, 16000, 22050},
-            bitsPerSample: {16},
-            channels: {1},
-            encodings: {PcmEncoding.signedInt},
-          ),
-        },
-        preferredOrder: const [TtsAudioFormat.pcm],
-        requestId: 'n0b',
-        preferredSampleRateHz: 24000,
-      );
+    test(
+      'negotiates PCM fallback sample rate when preferred not available',
+      () {
+        final resolved = negotiator.negotiateSpec(
+          engineCapabilities: {
+            PcmCapability(
+              sampleRatesHz: {16000, 22050},
+              bitsPerSample: {16},
+              channels: {1},
+              encodings: {PcmEncoding.signedInt},
+            ),
+          },
+          outputCapabilities: {
+            PcmCapability(
+              sampleRatesHz: {8000, 16000, 22050},
+              bitsPerSample: {16},
+              channels: {1},
+              encodings: {PcmEncoding.signedInt},
+            ),
+          },
+          preferredOrder: const [TtsAudioFormat.pcm],
+          requestId: 'n0b',
+          preferredSampleRateHz: 24000,
+        );
 
-      expect(resolved.format, TtsAudioFormat.pcm);
-      expect(resolved.requirePcm.sampleRateHz, 22050);
-    });
+        expect(resolved.format, TtsAudioFormat.pcm);
+        expect(resolved.requirePcm.sampleRateHz, 22050);
+      },
+    );
 
     test('negotiates PCM using discrete-vs-range sample-rate constraints', () {
       final resolved = negotiator.negotiateSpec(
@@ -106,9 +108,7 @@ void main() {
 
     test('negotiates PCM using WAV full sample-rate range', () {
       final resolved = negotiator.negotiateSpec(
-        engineCapabilities: {
-          PcmCapability.wav(),
-        },
+        engineCapabilities: {PcmCapability.wav()},
         outputCapabilities: {
           PcmCapability(
             sampleRatesHz: {8000, 22050, 24000},
@@ -222,12 +222,8 @@ void main() {
     test('includes capability context when no shared format exists', () {
       try {
         negotiator.negotiateSpec(
-          engineCapabilities: {
-            const Mp3Capability(),
-          },
-          outputCapabilities: {
-            PcmCapability(),
-          },
+          engineCapabilities: {const Mp3Capability()},
+          outputCapabilities: {PcmCapability()},
           preferredOrder: const [TtsAudioFormat.pcm],
           requestId: 'n4',
           preferredFormat: TtsAudioFormat.pcm,
@@ -279,10 +275,7 @@ void main() {
       final payload = Uint8List.fromList(utf8.encode('fixed-audio-content'));
       final engine = FileTtsEngine(
         engineId: 'file-engine',
-        provider: RawBytesContentProvider(
-          bytes: payload,
-          audioSpec: _mp3Spec,
-        ),
+        provider: RawBytesContentProvider(bytes: payload, audioSpec: _mp3Spec),
         chunkSizeBytes: 5,
       );
       final control = SynthesisControl();
@@ -296,7 +289,10 @@ void main() {
           .toList();
 
       final reconstructed = Uint8List.fromList(
-        chunks.expand((chunk) => chunk.bytes).toList(growable: false),
+        chunks
+            .whereType<TtsAudioChunk>()
+            .expand((chunk) => chunk.bytes)
+            .toList(growable: false),
       );
 
       expect(reconstructed, payload);
@@ -305,14 +301,12 @@ void main() {
     });
 
     test('limits send speed when maxBytesPerSecond is set', () async {
-      final payload =
-          Uint8List.fromList(List<int>.generate(300, (i) => i % 251));
+      final payload = Uint8List.fromList(
+        List<int>.generate(300, (i) => i % 251),
+      );
       final engine = FileTtsEngine(
         engineId: 'file-engine-throttle',
-        provider: RawBytesContentProvider(
-          bytes: payload,
-          audioSpec: _mp3Spec,
-        ),
+        provider: RawBytesContentProvider(bytes: payload, audioSpec: _mp3Spec),
         chunkSizeBytes: 100,
         maxBytesPerSecond: 1000,
       );
@@ -333,43 +327,43 @@ void main() {
       expect(stopwatch.elapsedMilliseconds, greaterThanOrEqualTo(220));
     });
 
-    test('throws unsupportedFormat when resolved format is not supported',
-        () async {
-      final engine = FileTtsEngine(
-        engineId: 'file-engine-format-guard',
-        provider: RawBytesContentProvider(
-          bytes: Uint8List.fromList([1, 2, 3]),
-          audioSpec: _mp3Spec,
-        ),
-      );
-
-      await expectLater(
-        engine
-            .synthesize(
-              const TtsRequest(requestId: 'fx3', text: 'ignored'),
-              SynthesisControl(),
-              _pcmSpec,
-            )
-            .drain(),
-        throwsA(
-          isA<TtsError>().having(
-            (error) => error.code,
-            'code',
-            TtsErrorCode.unsupportedFormat,
+    test(
+      'throws unsupportedFormat when resolved format is not supported',
+      () async {
+        final engine = FileTtsEngine(
+          engineId: 'file-engine-format-guard',
+          provider: RawBytesContentProvider(
+            bytes: Uint8List.fromList([1, 2, 3]),
+            audioSpec: _mp3Spec,
           ),
-        ),
-      );
-    });
+        );
+
+        await expectLater(
+          engine
+              .synthesize(
+                const TtsRequest(requestId: 'fx3', text: 'ignored'),
+                SynthesisControl(),
+                _pcmSpec,
+              )
+              .drain(),
+          throwsA(
+            isA<TtsError>().having(
+              (error) => error.code,
+              'code',
+              TtsErrorCode.unsupportedFormat,
+            ),
+          ),
+        );
+      },
+    );
 
     test('stops streaming quickly after cancellation', () async {
-      final payload =
-          Uint8List.fromList(List<int>.generate(600, (index) => index % 255));
+      final payload = Uint8List.fromList(
+        List<int>.generate(600, (index) => index % 255),
+      );
       final engine = FileTtsEngine(
         engineId: 'file-engine-cancel',
-        provider: RawBytesContentProvider(
-          bytes: payload,
-          audioSpec: _mp3Spec,
-        ),
+        provider: RawBytesContentProvider(bytes: payload, audioSpec: _mp3Spec),
         chunkSizeBytes: 100,
         maxBytesPerSecond: 1200,
       );
@@ -380,20 +374,23 @@ void main() {
 
       engine
           .synthesize(
-        const TtsRequest(requestId: 'fx4', text: 'ignored too'),
-        control,
-        _mp3Spec,
-      )
+            const TtsRequest(requestId: 'fx4', text: 'ignored too'),
+            control,
+            _mp3Spec,
+          )
           .listen(
-        (chunk) {
-          received.add(chunk);
-          if (received.length == 1) {
-            control.cancel(CancelReason.stopCurrent, message: 'test cancel');
-          }
-        },
-        onDone: () => done.complete(),
-        onError: done.completeError,
-      );
+            (chunk) {
+              received.add(chunk);
+              if (received.length == 1) {
+                control.cancel(
+                  CancelReason.stopCurrent,
+                  message: 'test cancel',
+                );
+              }
+            },
+            onDone: () => done.complete(),
+            onError: done.completeError,
+          );
 
       await done.future;
       stopwatch.stop();
@@ -474,37 +471,40 @@ void main() {
       }
     });
 
-    test('throws format error when no MPEG frame exists after stripping',
-        () async {
-      final tempDir =
-          await Directory.systemTemp.createTemp('tts-mp3-invalid-data-');
-      try {
-        final file = File('${tempDir.path}/invalid.mp3');
-        final id3Header = Uint8List.fromList([
-          0x49,
-          0x44,
-          0x33,
-          0x04,
-          0x00,
-          0x00,
-          0x00,
-          0x00,
-          0x00,
-          0x00,
-        ]);
-        final invalidAudioPayload = Uint8List.fromList([0, 1, 2, 3, 4, 5]);
-        await file.writeAsBytes([...id3Header, ...invalidAudioPayload]);
-
-        final provider = Mp3FileContentProvider(file.path);
-
-        await expectLater(
-          provider.readChunks(4).drain(),
-          throwsA(isA<FormatException>()),
+    test(
+      'throws format error when no MPEG frame exists after stripping',
+      () async {
+        final tempDir = await Directory.systemTemp.createTemp(
+          'tts-mp3-invalid-data-',
         );
-      } finally {
-        await tempDir.delete(recursive: true);
-      }
-    });
+        try {
+          final file = File('${tempDir.path}/invalid.mp3');
+          final id3Header = Uint8List.fromList([
+            0x49,
+            0x44,
+            0x33,
+            0x04,
+            0x00,
+            0x00,
+            0x00,
+            0x00,
+            0x00,
+            0x00,
+          ]);
+          final invalidAudioPayload = Uint8List.fromList([0, 1, 2, 3, 4, 5]);
+          await file.writeAsBytes([...id3Header, ...invalidAudioPayload]);
+
+          final provider = Mp3FileContentProvider(file.path);
+
+          await expectLater(
+            provider.readChunks(4).drain(),
+            throwsA(isA<FormatException>()),
+          );
+        } finally {
+          await tempDir.delete(recursive: true);
+        }
+      },
+    );
   });
 
   group('M3 WAV file content provider', () {
@@ -614,8 +614,9 @@ void main() {
     });
 
     test('fromWav throws when header is too short', () async {
-      final tempDir =
-          await Directory.systemTemp.createTemp('tts-wav-short-header-');
+      final tempDir = await Directory.systemTemp.createTemp(
+        'tts-wav-short-header-',
+      );
       try {
         final file = File('${tempDir.path}/short.wav');
         await file.writeAsBytes([1, 2, 3, 4]);
@@ -630,8 +631,9 @@ void main() {
     });
 
     test('fromWav throws when bytes are not a WAV header', () async {
-      final tempDir =
-          await Directory.systemTemp.createTemp('tts-wav-invalid-header-');
+      final tempDir = await Directory.systemTemp.createTemp(
+        'tts-wav-invalid-header-',
+      );
       try {
         final file = File('${tempDir.path}/invalid.wav');
         await file.writeAsBytes(List<int>.filled(44, 0));
@@ -680,24 +682,28 @@ void main() {
       );
     });
 
-    test('per-model override replaces built-in catalog for that model',
-        () async {
-      const customVoices = [
-        TtsVoice(voiceId: 'custom-1'),
-        TtsVoice(voiceId: 'custom-2'),
-      ];
-      final engine = OpenAiTtsEngine(
-        apiClient: _SuccessApiClient(),
-        model: 'tts-1',
-        voiceCatalogOverrides: {'tts-1': customVoices},
-      );
+    test(
+      'per-model override replaces built-in catalog for that model',
+      () async {
+        const customVoices = [
+          TtsVoice(voiceId: 'custom-1'),
+          TtsVoice(voiceId: 'custom-2'),
+        ];
+        final engine = OpenAiTtsEngine(
+          apiClient: _SuccessApiClient(),
+          model: 'tts-1',
+          voiceCatalogOverrides: {'tts-1': customVoices},
+        );
 
-      final voices = await engine.getAvailableVoices();
+        final voices = await engine.getAvailableVoices();
 
-      expect(voices, hasLength(2));
-      expect(
-          voices.map((v) => v.voiceId), containsAll(['custom-1', 'custom-2']));
-    });
+        expect(voices, hasLength(2));
+        expect(
+          voices.map((v) => v.voiceId),
+          containsAll(['custom-1', 'custom-2']),
+        );
+      },
+    );
 
     test('unknown model falls back to generic voice list', () async {
       final engine = OpenAiTtsEngine(
@@ -711,25 +717,27 @@ void main() {
       expect(voices.any((v) => v.isDefault), isTrue);
     });
 
-    test('resolves default voice for locale using per-model override',
-        () async {
-      final engine = OpenAiTtsEngine(
-        apiClient: _SuccessApiClient(),
-        model: 'tts-1',
-        voiceCatalogOverrides: {
-          'tts-1': const [
-            TtsVoice(voiceId: 'en-voice', locale: 'en-US', isDefault: true),
-            TtsVoice(voiceId: 'es-voice', locale: 'es-ES'),
-          ],
-        },
-      );
+    test(
+      'resolves default voice for locale using per-model override',
+      () async {
+        final engine = OpenAiTtsEngine(
+          apiClient: _SuccessApiClient(),
+          model: 'tts-1',
+          voiceCatalogOverrides: {
+            'tts-1': const [
+              TtsVoice(voiceId: 'en-voice', locale: 'en-US', isDefault: true),
+              TtsVoice(voiceId: 'es-voice', locale: 'es-ES'),
+            ],
+          },
+        );
 
-      final localeDefault = await engine.getDefaultVoiceForLocale('es-ES');
-      final fallbackDefault = await engine.getDefaultVoiceForLocale('fr-FR');
+        final localeDefault = await engine.getDefaultVoiceForLocale('es-ES');
+        final fallbackDefault = await engine.getDefaultVoiceForLocale('fr-FR');
 
-      expect(localeDefault.voiceId, 'es-voice');
-      expect(fallbackDefault.voiceId, 'en-voice');
-    });
+        expect(localeDefault.voiceId, 'es-voice');
+        expect(fallbackDefault.voiceId, 'en-voice');
+      },
+    );
 
     test('adapts streaming response into ordered chunks', () async {
       final engine = OpenAiTtsEngine(
@@ -754,12 +762,19 @@ void main() {
       expect(chunks[0].sequenceNumber, 0);
       expect(chunks[1].sequenceNumber, 1);
       expect(chunks[2].sequenceNumber, 2);
-      expect(chunks[0].bytes, Uint8List.fromList([0, 1, 2, 3]));
-      expect(chunks[1].bytes, Uint8List.fromList([4, 5, 6]));
-      expect(chunks[2].bytes, Uint8List.fromList([7, 8, 9]));
+      expect(chunks[0], isA<TtsAudioChunk>());
+      expect(
+        (chunks[0] as TtsAudioChunk).bytes,
+        Uint8List.fromList([0, 1, 2, 3]),
+      );
+      expect((chunks[1] as TtsAudioChunk).bytes, Uint8List.fromList([4, 5, 6]));
+      expect((chunks[2] as TtsAudioChunk).bytes, Uint8List.fromList([7, 8, 9]));
       expect(chunks[2].isLastChunk, isTrue);
       expect(
-        chunks.every((chunk) => chunk.audioSpec.format == TtsAudioFormat.mp3),
+        chunks.every(
+          (chunk) =>
+              (chunk as TtsAudioChunk).audioSpec.format == TtsAudioFormat.mp3,
+        ),
         isTrue,
       );
     });
@@ -789,38 +804,38 @@ void main() {
       );
     });
 
-    test('retrying api client retries retryable failure then succeeds',
-        () async {
-      var attempts = 0;
-      final apiClient = OpenAiRetryingApiClient(
-        inner: _CallbackApiClient(() async {
-          attempts++;
-          if (attempts < 2) {
-            throw const OpenAiTransportException(
-              statusCode: 500,
-              message: 'server',
-            );
-          }
-          return _streamedResponse(
-            const [
+    test(
+      'retrying api client retries retryable failure then succeeds',
+      () async {
+        var attempts = 0;
+        final apiClient = OpenAiRetryingApiClient(
+          inner: _CallbackApiClient(() async {
+            attempts++;
+            if (attempts < 2) {
+              throw const OpenAiTransportException(
+                statusCode: 500,
+                message: 'server',
+              );
+            }
+            return _streamedResponse(const [
               [1, 2],
-            ],
-          );
-        }),
-        maxRetries: 2,
-        initialBackoff: const Duration(milliseconds: 1),
-      );
+            ]);
+          }),
+          maxRetries: 2,
+          initialBackoff: const Duration(milliseconds: 1),
+        );
 
-      final response = await apiClient.send(
-        OpenAiApiRequest.json(body: '{"input":"hi"}'),
-      );
-      final chunks = await response.stream.toList();
+        final response = await apiClient.send(
+          OpenAiApiRequest.json(body: '{"input":"hi"}'),
+        );
+        final chunks = await response.stream.toList();
 
-      expect(attempts, 2);
-      expect(chunks, const [
-        [1, 2],
-      ]);
-    });
+        expect(attempts, 2);
+        expect(chunks, const [
+          [1, 2],
+        ]);
+      },
+    );
 
     test('retrying api client does not retry auth failure', () async {
       var attempts = 0;
@@ -835,12 +850,9 @@ void main() {
         maxRetries: 3,
       );
 
-      await expectLater(
-        () async {
-          await apiClient.send(OpenAiApiRequest.json(body: '{"input":"hi"}'));
-        },
-        throwsA(isA<OpenAiTransportException>()),
-      );
+      await expectLater(() async {
+        await apiClient.send(OpenAiApiRequest.json(body: '{"input":"hi"}'));
+      }, throwsA(isA<OpenAiTransportException>()));
       expect(attempts, 1);
     });
 
@@ -896,29 +908,30 @@ void main() {
       );
     });
 
-    test('engine subclass can parse JSON-envelope response with base64 audio',
-        () async {
-      final audioBytes = Uint8List.fromList([10, 20, 30, 40, 50]);
-      final jsonBody = jsonEncode({'audio': base64Encode(audioBytes)});
+    test(
+      'engine subclass can parse JSON-envelope response with base64 audio',
+      () async {
+        final audioBytes = Uint8List.fromList([10, 20, 30, 40, 50]);
+        final jsonBody = jsonEncode({'audio': base64Encode(audioBytes)});
 
-      final engine = _JsonEnvelopeEngine(
-        apiClient: _SuccessApiClient(
-          streamChunks: [utf8.encode(jsonBody)],
-        ),
-      );
+        final engine = _JsonEnvelopeEngine(
+          apiClient: _SuccessApiClient(streamChunks: [utf8.encode(jsonBody)]),
+        );
 
-      final chunks = await engine
-          .synthesize(
-            const TtsRequest(requestId: 'j1', text: 'hello'),
-            SynthesisControl(),
-            _mp3Spec,
-          )
-          .toList();
+        final chunks = await engine
+            .synthesize(
+              const TtsRequest(requestId: 'j1', text: 'hello'),
+              SynthesisControl(),
+              _mp3Spec,
+            )
+            .toList();
 
-      expect(chunks, hasLength(1));
-      expect(chunks.single.bytes, audioBytes);
-      expect(chunks.single.isLastChunk, isTrue);
-    });
+        expect(chunks, hasLength(1));
+        expect(chunks.single, isA<TtsAudioChunk>());
+        expect((chunks.single as TtsAudioChunk).bytes, audioBytes);
+        expect(chunks.single.isLastChunk, isTrue);
+      },
+    );
   });
 }
 
@@ -929,10 +942,8 @@ final class _SuccessApiClient implements OpenAiApiClient {
 
   @override
   Future<http.StreamedResponse> send(OpenAiApiRequest request) async {
-    final chunks = streamChunks ??
-        [
-          Uint8List.fromList(List<int>.generate(10, (i) => i)),
-        ];
+    final chunks =
+        streamChunks ?? [Uint8List.fromList(List<int>.generate(10, (i) => i))];
     return _streamedResponse(chunks);
   }
 }

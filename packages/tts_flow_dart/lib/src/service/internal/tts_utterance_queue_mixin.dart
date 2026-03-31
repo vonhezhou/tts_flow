@@ -168,7 +168,8 @@ mixin TtsUtteranceQueueMixin on TtsFlowEventBus {
           break;
         }
 
-        if (!outputSessionInitialized) {
+        if (chunk is! TtsAudioChunk) {
+        } else if (!outputSessionInitialized) {
           await ensureOutputSessionInitialized(chunk.audioSpec);
         } else if (chunk.audioSpec != activeAudioSpec) {
           throw TtsError(
@@ -276,15 +277,17 @@ mixin TtsUtteranceQueueMixin on TtsFlowEventBus {
     if (state.isPaused &&
         config.pauseBufferPolicy == TtsPauseBufferPolicy.buffered) {
       state.pauseBuffer.add(chunk);
-      final newBytes = state.pauseBufferBytes + chunk.bytes.length;
-      if (state.pauseBufferBytes <= config.pauseBufferMaxBytes &&
-          newBytes > config.pauseBufferMaxBytes) {
-        _log.warning(
-          'TTS pause buffer exceeded ${config.pauseBufferMaxBytes} '
-          'bytes (current: $newBytes); chunks continue to accumulate.',
-        );
+      if (chunk is TtsAudioChunk) {
+        final newBytes = state.pauseBufferBytes + chunk.bytes.length;
+        if (state.pauseBufferBytes <= config.pauseBufferMaxBytes &&
+            newBytes > config.pauseBufferMaxBytes) {
+          _log.warning(
+            'TTS pause buffer exceeded ${config.pauseBufferMaxBytes} '
+            'bytes (current: $newBytes); chunks continue to accumulate.',
+          );
+        }
+        state.pauseBufferBytes = newBytes;
       }
-      state.pauseBufferBytes = newBytes;
       return;
     }
 

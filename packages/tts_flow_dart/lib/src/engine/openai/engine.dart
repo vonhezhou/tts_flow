@@ -226,7 +226,7 @@ class OpenAiTtsEngine implements TtsEngine {
         }
 
         if (pending != null) {
-          yield TtsChunk(
+          yield TtsAudioChunk(
             requestId: request.requestId,
             sequenceNumber: sequence,
             bytes: Uint8List.fromList(pending),
@@ -245,7 +245,7 @@ class OpenAiTtsEngine implements TtsEngine {
       }
 
       final lastBytes = pending ?? Uint8List(0);
-      yield TtsChunk(
+      yield TtsAudioChunk(
         requestId: request.requestId,
         sequenceNumber: sequence,
         bytes: Uint8List.fromList(lastBytes),

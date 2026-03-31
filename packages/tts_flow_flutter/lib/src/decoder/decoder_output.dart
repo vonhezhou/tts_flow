@@ -39,7 +39,7 @@ final class Decoder implements TtsOutput {
   /// are open-ended and can not agree on a fixed format.
   final PcmDescriptor defaultPcmFormat;
 
-  final _formatNegotiator = TtsFormatNegotiator();
+  final _formatNegotiator = const TtsFormatNegotiator();
 
   @override
   Set<AudioCapability> get inAudioCapabilities {
@@ -102,6 +102,11 @@ final class Decoder implements TtsOutput {
       throw StateError('Chunk requestId does not match active session.');
     }
 
+    if (chunk is! TtsAudioChunk) {
+      await output.consumeChunk(chunk);
+      return;
+    }
+
     final negotiatedSpec = _negotiatedSpec;
     if (negotiatedSpec == null) {
       throw StateError('Negotiated spec not available.');
@@ -140,7 +145,7 @@ final class Decoder implements TtsOutput {
       );
     }
 
-    final decodedChunk = TtsChunk(
+    final decodedChunk = TtsAudioChunk(
       requestId: session.requestId,
       sequenceNumber: _chunkSequenceNumber++,
       bytes: decodedPcmBytes,

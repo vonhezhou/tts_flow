@@ -27,8 +27,12 @@ void main() {
             .toList();
 
         expect(chunks, isNotEmpty);
+        expect(chunks.every((chunk) => chunk is TtsAudioChunk), isTrue);
         expect(
-          chunks.every((chunk) => chunk.audioSpec.format == TtsAudioFormat.pcm),
+          chunks.every(
+            (chunk) =>
+                (chunk as TtsAudioChunk).audioSpec.format == TtsAudioFormat.pcm,
+          ),
           isTrue,
         );
         expect(chunks.last.isLastChunk, isTrue);
@@ -157,7 +161,7 @@ final class _FailingEngine implements TtsEngine {
       );
     }
 
-    yield TtsChunk(
+    yield TtsAudioChunk(
       requestId: request.requestId,
       sequenceNumber: 0,
       bytes: Uint8List.fromList([1]),

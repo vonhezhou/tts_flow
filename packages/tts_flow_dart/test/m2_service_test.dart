@@ -171,7 +171,11 @@ void main() {
       final chunks = await service.speak('chunk-spec-init', 'hello').toList();
 
       expect(chunks, hasLength(1));
-      expect(chunks.single.audioSpec.format, TtsAudioFormat.mp3);
+      expect(chunks.single, isA<TtsAudioChunk>());
+      expect(
+        (chunks.single as TtsAudioChunk).audioSpec.format,
+        TtsAudioFormat.mp3,
+      );
       expect(output.lastInitAudioSpec, isNotNull);
       expect(output.lastInitAudioSpec!.format, TtsAudioFormat.mp3);
 
@@ -673,6 +677,10 @@ final class _CaptureCancelOutput implements TtsOutput {
 
   @override
   Future<void> consumeChunk(TtsChunk chunk) async {
+    if (chunk is! TtsAudioChunk) {
+      return;
+    }
+
     _buffer.add(chunk.bytes);
   }
 
@@ -861,7 +869,7 @@ final class _ChunkSpecEngine implements TtsEngine {
     SynthesisControl control,
     TtsAudioSpec resolvedFormat,
   ) async* {
-    yield TtsChunk(
+    yield TtsAudioChunk(
       requestId: request.requestId,
       sequenceNumber: 0,
       bytes: Uint8List.fromList(<int>[1, 2, 3]),
@@ -915,6 +923,9 @@ final class _PlaybackAwareTestOutput implements TtsOutput, PlaybackAwareOutput {
 
   @override
   Future<void> consumeChunk(TtsChunk chunk) async {
+    if (chunk is! TtsAudioChunk) {
+      return;
+    }
     _bytesCount += chunk.bytes.length;
   }
 

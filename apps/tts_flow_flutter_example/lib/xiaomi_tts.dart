@@ -148,6 +148,11 @@ class XiaomiTts extends OpenAiTtsEngine {
         control,
         resolvedFormat,
       )) {
+        if (chunk is! TtsAudioChunk) {
+          yield chunk;
+          continue;
+        }
+
         if (resolvedFormat.format != TtsAudioFormat.pcm) {
           yield chunk;
           continue;
@@ -159,7 +164,7 @@ class XiaomiTts extends OpenAiTtsEngine {
           continue;
         }
 
-        yield TtsChunk(
+        yield TtsAudioChunk(
           requestId: chunk.requestId,
           sequenceNumber: chunk.sequenceNumber,
           bytes: chunk.bytes,

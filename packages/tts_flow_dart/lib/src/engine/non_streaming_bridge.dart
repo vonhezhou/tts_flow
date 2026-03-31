@@ -14,7 +14,7 @@ final class NonStreamingBridge {
     DateTime Function()? clock,
   }) async* {
     if (audioBytes.isEmpty) {
-      yield TtsChunk(
+      yield TtsAudioChunk(
         requestId: requestId,
         sequenceNumber: 0,
         bytes: Uint8List(0),
@@ -31,7 +31,7 @@ final class NonStreamingBridge {
           ? audioBytes.length
           : start + chunkSizeBytes;
       final bytes = Uint8List.sublistView(audioBytes, start, end);
-      yield TtsChunk(
+      yield TtsAudioChunk(
         requestId: requestId,
         sequenceNumber: sequence,
         bytes: bytes,

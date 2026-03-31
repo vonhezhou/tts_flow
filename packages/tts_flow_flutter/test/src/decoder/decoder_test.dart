@@ -47,7 +47,7 @@ void main() {
           expect(
             () => decoder.resolveAudioSpecForTest('test-request'),
             throwsA(
-              (e) =>
+              (Object e) =>
                   e is TtsError &&
                   e.code == TtsErrorCode.formatNegotiationFailed,
             ),
@@ -106,7 +106,7 @@ void main() {
 
     group('consumeChunk', () {
       test('throws when session not initialized', () async {
-        final chunk = TtsChunk(
+        final chunk = TtsAudioChunk(
           requestId: 'test-request',
           sequenceNumber: 0,
           bytes: Uint8List.fromList([1, 2, 3]),

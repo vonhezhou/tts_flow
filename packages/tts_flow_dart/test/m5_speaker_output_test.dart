@@ -97,7 +97,7 @@ void main() {
 }
 
 TtsChunk _chunk(String requestId, List<int> bytes, TtsAudioFormat format) {
-  return TtsChunk(
+  return TtsAudioChunk(
     requestId: requestId,
     sequenceNumber: 0,
     bytes: Uint8List.fromList(bytes),
@@ -152,15 +152,19 @@ final class _FakeSpeakerBackend implements SpeakerBackend {
   }
 
   @override
-  Future<void> appendAudio({
+  Future<void> appendChunk({
     required String playbackId,
-    required List<int> bytes,
+    required TtsChunk chunk,
   }) async {
-    writtenBytes.putIfAbsent(playbackId, () => <int>[]).addAll(bytes);
+    if (chunk is! TtsAudioChunk) {
+      return;
+    }
+
+    writtenBytes.putIfAbsent(playbackId, () => <int>[]).addAll(chunk.bytes);
   }
 
   @override
-  Future<void> finalizeIngestion({required String playbackId}) async {}
+  Future<void> finalizePlayback({required String playbackId}) async {}
 
   @override
   Future<void> stopPlayback({

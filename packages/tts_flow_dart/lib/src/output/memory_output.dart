@@ -46,9 +46,15 @@ final class MemoryOutput implements TtsOutput {
     if (session == null || buffer == null) {
       throw StateError('MemoryOutput session is not initialized.');
     }
+
     if (chunk.requestId != session.requestId) {
       throw StateError('Chunk requestId does not match active session.');
     }
+
+    if (chunk is! TtsAudioChunk) {
+      return;
+    }
+
     buffer.add(chunk.bytes);
   }
 

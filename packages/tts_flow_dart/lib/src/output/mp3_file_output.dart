@@ -71,6 +71,10 @@ final class Mp3FileOutput implements TtsOutput {
       throw StateError('Chunk requestId does not match active session.');
     }
 
+    if (chunk is! TtsAudioChunk) {
+      return;
+    }
+
     try {
       sink.add(chunk.bytes);
       await sink.flush();

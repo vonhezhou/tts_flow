@@ -84,6 +84,10 @@ final class WavFileOutput implements TtsOutput {
       throw StateError('Chunk requestId does not match active session.');
     }
 
+    if (chunk is! TtsAudioChunk) {
+      return;
+    }
+
     try {
       final parsed = _parseChunk(chunk, session: session);
       final lockedDescriptor = _state.lockedDescriptor;
@@ -409,7 +413,7 @@ final class WavFileOutput implements TtsOutput {
   }
 
   _ParsedWavChunk _parseChunk(
-    TtsChunk chunk, {
+    TtsAudioChunk chunk, {
     required TtsOutputSession session,
   }) {
     final chunkFormat = chunk.audioSpec.format;
