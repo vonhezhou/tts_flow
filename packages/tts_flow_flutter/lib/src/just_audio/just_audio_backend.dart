@@ -1,11 +1,12 @@
 import 'dart:async';
 
+import 'package:flutter/foundation.dart';
 import 'package:just_audio/just_audio.dart';
 import 'package:just_audio_media_kit/just_audio_media_kit.dart';
 import 'package:logging/logging.dart';
-import 'package:meta/meta.dart';
 import 'package:tts_flow_dart/tts_flow_dart.dart';
 import 'package:tts_flow_flutter/src/just_audio/chunk_audio_source.dart';
+import 'package:tts_flow_flutter/src/just_audio/playback_pos.dart';
 
 final _logger = Logger('JustAudioPlayer');
 
@@ -24,7 +25,45 @@ final class _PlaybackSession {
   int totalBytes = 0;
   bool isFinalized = false;
   bool isStopped = false;
-  Duration? playedDuration;
+
+  int nextIndex = 0;
+
+  /// the last reported postion.
+  /// just_audio might report postion out of order.
+  /// let us filter it.
+  Duration? lastPosition;
+
+  final sourceDurationMap = <int, Duration>{};
+
+  void addOrUpdateSourceDuration(int index, Duration duration) {
+    sourceDurationMap[index] = duration;
+  }
+
+  Duration calcDurationOffset(int index) {
+    final prevSourceDurations = sourceDurationMap.entries
+        .where((entry) => entry.key < index)
+        .map((entry) => entry.value);
+
+    if (prevSourceDurations.isEmpty) {
+      return Duration.zero;
+    }
+
+    return prevSourceDurations.reduce((value, element) => value + element);
+  }
+
+  Duration? calcTotalDuration() {
+    if (sourceDurationMap.values.isEmpty) {
+      return null;
+    }
+
+    if (sourceDurationMap.keys.length != nextIndex) {
+      return sourceDurationMap.values.reduce(
+        (value, element) => value + element,
+      );
+    }
+
+    return sourceDurationMap.values.reduce((value, element) => value + element);
+  }
 }
 
 final class _SourceRange {
@@ -43,6 +82,9 @@ class JustAudioBackend implements SpeakerBackend {
     ) {
       unawaited(_onProcessingStateChanged(state));
     });
+
+    _durationSubscription = _player.durationStream.listen(_onDurationChanged);
+    _posSubscription = _player.positionStream.listen(_onPosChanged);
   }
 
   /// Testing constructor that injects a preconfigured player.
@@ -53,6 +95,8 @@ class JustAudioBackend implements SpeakerBackend {
     ) {
       unawaited(_onProcessingStateChanged(state));
     });
+    _durationSubscription = _player.durationStream.listen(_onDurationChanged);
+    _posSubscription = _player.positionStream.listen(_onPosChanged);
   }
 
   static bool _isInitialized = false;
@@ -75,6 +119,26 @@ class JustAudioBackend implements SpeakerBackend {
   _playbackCompletedController =
       StreamController<SpeakerPlaybackCompletedEvent>.broadcast();
   late final StreamSubscription<ProcessingState> _processingStateSubscription;
+
+  final StreamController<JustAudioDurationEvent> _durationEeventController =
+      StreamController<JustAudioDurationEvent>.broadcast();
+  late final StreamSubscription<Duration?> _durationSubscription;
+
+  final StreamController<JustAudioPosEvent> _posEeventController =
+      StreamController<JustAudioPosEvent>.broadcast();
+  late final StreamSubscription<Duration?> _posSubscription;
+
+  /// Stream of the current position in current playback session.
+  /// This stream is updated every time the position changes.
+  /// The position is in seconds.
+  Stream<JustAudioPosEvent> get playbackPositionStream =>
+      _posEeventController.stream;
+
+  /// Stream of duration change of the current playback session.
+  /// This stream is updated every time the duration changes.
+  /// The duration is in seconds.
+  Stream<JustAudioDurationEvent> get playbackDurationStream =>
+      _durationEeventController.stream;
 
   @override
   Future<void> init() async {
@@ -140,19 +204,20 @@ class JustAudioBackend implements SpeakerBackend {
     }
 
     session.isFinalized = true;
-    if (session.audioSpec.format == TtsAudioFormat.pcm) {
-      session.playedDuration = _estimatePcmDuration(session);
-    }
   }
 
   @override
   Future<void> dispose() async {
     await _processingStateSubscription.cancel();
+    await _durationSubscription.cancel();
+    await _posSubscription.cancel();
     await _player.stop();
     await _player.clearAudioSources();
     _sessions.clear();
     _completedPlaybackIds.clear();
     await _player.dispose();
+    await _posEeventController.close();
+    await _durationEeventController.close();
     await _playbackCompletedController.close();
   }
 
@@ -173,10 +238,10 @@ class JustAudioBackend implements SpeakerBackend {
     required String requestId,
     required TtsAudioSpec audioSpec,
   }) async {
-    var playbackId = 'playback-$requestId';
+    var playbackId = requestId;
     var suffix = 1;
     while (_sessions.containsKey(playbackId)) {
-      playbackId = 'playback-$requestId-$suffix';
+      playbackId = '$requestId-$suffix';
       suffix++;
     }
 
@@ -246,9 +311,11 @@ class JustAudioBackend implements SpeakerBackend {
     final source = ChunkAudioSource(
       audioSpec: session.audioSpec,
       playbackId: session.playbackId,
+      index: session.nextIndex,
       requestId: session.requestId,
       isTerminalSegment: true,
     );
+    session.nextIndex++;
 
     session.tailSource = source;
     await _player.addAudioSource(source);
@@ -328,23 +395,6 @@ class JustAudioBackend implements SpeakerBackend {
     await _player.play();
   }
 
-  Duration _estimatePcmDuration(_PlaybackSession session) {
-    if (session.totalBytes == 0) {
-      return Duration.zero;
-    }
-
-    final pcm = session.audioSpec.requirePcm;
-    final bytesPerSample = (pcm.bitsPerSample / 8).ceil();
-    final bytesPerFrame = bytesPerSample * pcm.channels;
-    if (bytesPerFrame <= 0 || pcm.sampleRateHz <= 0) {
-      return Duration.zero;
-    }
-    final frames = session.totalBytes / bytesPerFrame;
-    final micros = (frames * Duration.microsecondsPerSecond / pcm.sampleRateHz)
-        .round();
-    return Duration(microseconds: micros);
-  }
-
   Future<void> _onProcessingStateChanged(ProcessingState state) async {
     if (state != ProcessingState.completed) {
       return;
@@ -379,7 +429,7 @@ class JustAudioBackend implements SpeakerBackend {
       SpeakerPlaybackCompletedEvent(
         requestId: session.requestId,
         playbackId: playbackId,
-        playedDuration: session.playedDuration,
+        playedDuration: session.calcTotalDuration(),
       ),
     );
 
@@ -398,5 +448,86 @@ class JustAudioBackend implements SpeakerBackend {
         currentIndex < range.endExclusive) {
       await _resumeAfterRemoval(range.start);
     }
+  }
+
+  AudioSource? _currentSource() {
+    final index = _player.currentIndex;
+    if (index == null || index < 0 || index >= _player.audioSources.length) {
+      return null;
+    }
+
+    return _player.audioSources.elementAtOrNull(index);
+  }
+
+  void _onDurationChanged(Duration? duration) {
+    if (duration == null) {
+      return;
+    }
+
+    final curSource = _currentSource();
+    if (curSource == null) {
+      return;
+    }
+
+    if (curSource is! ChunkAudioSource) {
+      return;
+    }
+
+    final session = _sessions[curSource.playbackId];
+    if (session == null) {
+      return;
+    }
+
+    session.addOrUpdateSourceDuration(curSource.index, duration);
+    final prevDuration = session.calcDurationOffset(curSource.index);
+    curSource.playbackOffset = prevDuration;
+
+    _logger.fine(
+      'onDuration: '
+      '${curSource.requestId},${curSource.index} '
+      '$duration, ${curSource.playbackOffset}',
+    );
+
+    _durationEeventController.add(
+      JustAudioDurationEvent(
+        playbackId: curSource.playbackId,
+        requestId: session.requestId,
+        duration: prevDuration,
+      ),
+    );
+  }
+
+  void _onPosChanged(Duration pos) {
+    final curSource = _currentSource();
+    if (curSource == null || curSource is! ChunkAudioSource) {
+      return;
+    }
+
+    final session = _sessions[curSource.playbackId];
+    if (session == null) {
+      return;
+    }
+
+    // try to fix playbackOffset
+    if (curSource.index != 0 && curSource.playbackOffset == Duration.zero) {
+      curSource.playbackOffset = session.calcDurationOffset(
+        curSource.index,
+      );
+    }
+
+    var newPos = curSource.playbackOffset + pos;
+
+    if (session.lastPosition != null && session.lastPosition! > newPos) {
+      newPos = session.lastPosition!;
+    }
+    session.lastPosition = newPos;
+
+    _posEeventController.add(
+      JustAudioPosEvent(
+        playbackId: curSource.playbackId,
+        requestId: curSource.requestId,
+        position: newPos,
+      ),
+    );
   }
 }

@@ -11,6 +11,7 @@ class ChunkAudioSource extends StreamAudioSource {
     required this.audioSpec,
     required this.playbackId,
     required this.requestId,
+    required this.index,
     required this.isTerminalSegment,
   });
 
@@ -25,8 +26,14 @@ class ChunkAudioSource extends StreamAudioSource {
   /// The playback identifier for the session this segment belongs to.
   final String playbackId;
 
+  /// the index in the playback stream.
+  final int index;
+
   /// The request identifier for the TTS request this segment belongs to.
   final String requestId;
+
+  /// The previous duration of this session.
+  Duration playbackOffset = Duration.zero;
 
   /// True when this source is currently considered the final segment
   /// for its playback.
@@ -93,5 +100,4 @@ class ChunkAudioSource extends StreamAudioSource {
       contentType: contentType,
     );
   }
-
 }
