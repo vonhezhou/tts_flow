@@ -128,6 +128,9 @@ class JustAudioBackend implements SpeakerBackend {
       StreamController<JustAudioPosEvent>.broadcast();
   late final StreamSubscription<Duration?> _posSubscription;
 
+  final StreamController<TtsChunk> _ttsChunkController =
+      StreamController<TtsChunk>();
+
   /// Stream of the current position in current playback session.
   /// This stream is updated every time the position changes.
   /// The position is in seconds.
@@ -139,6 +142,15 @@ class JustAudioBackend implements SpeakerBackend {
   /// The duration is in seconds.
   Stream<JustAudioDurationEvent> get playbackDurationStream =>
       _durationEeventController.stream;
+
+
+  /// Stream of TtsChunks that are not audio chunks, such as subtitles.
+  /// NOTE: check the TtsEngine implementation
+  ///       to see what kind of non-audio chunks it emits.
+  Stream<TtsChunk> get ttsChunkStream => _ttsChunkController.stream;
+
+  /// The underlying just_audio player instance.
+  AudioPlayer get player => _player;
 
   @override
   Future<void> init() async {
@@ -165,6 +177,7 @@ class JustAudioBackend implements SpeakerBackend {
     required TtsChunk chunk,
   }) async {
     if (chunk is! TtsAudioChunk) {
+      _ttsChunkController.add(chunk);
       return;
     }
 
