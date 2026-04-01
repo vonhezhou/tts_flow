@@ -8,8 +8,18 @@
       "cwd": "apps/tts_flow_flutter_example",
       "program": "lib/main.dart",
       "toolArgs": [
-        "--dart-define-from-file=${workspaceFolder}/apps/tts_flow_flutter_example/.env.json"
+        "--dart-define-from-file=${workspaceFolder}/apps/tts_flow_flutter_example/.env.json",
+        "--dart-entrypoint-args",
+        "--xiaomi"
       ]
+    },
+    {
+      "name": "Run Flutter Example (Sine)",
+      "type": "dart",
+      "request": "launch",
+      "cwd": "apps/tts_flow_flutter_example",
+      "program": "lib/main.dart",
+      "args": ["--dart-entrypoint-args", "--sine"]
     },
     {
       "name": "Run Dart Example",

@@ -6,11 +6,12 @@ import 'package:tts_flow_dart/tts_flow_dart.dart';
 import 'package:tts_flow_flutter/tts_flow_flutter.dart';
 import 'package:tts_flow_flutter_example/xiaomi_tts.dart';
 
-const bool _useXiaomiTts = true;
 const String _xiaomiApiKey = String.fromEnvironment('XIAOMI_MIMO_API_KEY');
 
 class TtsFlowExamplePage extends StatefulWidget {
-  const TtsFlowExamplePage({super.key});
+  const TtsFlowExamplePage({required this.useXiaomiTts, super.key});
+
+  final bool useXiaomiTts;
 
   @override
   State<TtsFlowExamplePage> createState() => _TtsFlowExamplePageState();
@@ -18,6 +19,7 @@ class TtsFlowExamplePage extends StatefulWidget {
 
 class _TtsFlowExamplePageState extends State<TtsFlowExamplePage> {
   final _log = Logger('TtsFlowExamplePage');
+  final JustAudioBackend _backend = JustAudioBackend();
   final _textController = TextEditingController(
     text: 'Hello from TtsFlow. This is playing through JustAudioBackend.',
   );
@@ -26,13 +28,23 @@ class _TtsFlowExamplePageState extends State<TtsFlowExamplePage> {
   TtsFlow? _service;
   StreamSubscription<TtsQueueEvent>? _queueSub;
   StreamSubscription<TtsRequestEvent>? _requestSub;
+  StreamSubscription<JustAudioPosEvent>? _playbackPosSub;
+  StreamSubscription<JustAudioDurationEvent>? _playbackDurationSub;
+  StreamSubscription<Duration>? _playerPosSub;
+  StreamSubscription<Duration?>? _playerDurationSub;
 
   var _isReady = false;
   var _isBusy = false;
+  var _isPaused = false;
   var _requestCounter = 0;
   var _status = 'Initializing TtsFlow...';
 
-  String get _engineLabel => _useXiaomiTts ? 'Xiaomi Mimo' : 'Sine';
+  Duration _backendPos = Duration.zero;
+  Duration _backendDuration = Duration.zero;
+  Duration _playerPos = Duration.zero;
+  Duration _playerDuration = Duration.zero;
+
+  String get _engineLabel => widget.useXiaomiTts ? 'Xiaomi Mimo' : 'Sine';
 
   @override
   void initState() {
@@ -46,13 +58,17 @@ class _TtsFlowExamplePageState extends State<TtsFlowExamplePage> {
     _log.info('Disposing page and TtsFlow service.');
     unawaited(_queueSub?.cancel());
     unawaited(_requestSub?.cancel());
+    unawaited(_playbackPosSub?.cancel());
+    unawaited(_playbackDurationSub?.cancel());
+    unawaited(_playerPosSub?.cancel());
+    unawaited(_playerDurationSub?.cancel());
     unawaited(_service?.dispose());
     _textController.dispose();
     super.dispose();
   }
 
   Future<void> _initService() async {
-    final engine = _useXiaomiTts
+    final engine = widget.useXiaomiTts
         ? XiaomiTts.fromClientConfig(
             config: OpenAiClientConfig(
               apiKey: _xiaomiApiKey,
@@ -71,7 +87,7 @@ class _TtsFlowExamplePageState extends State<TtsFlowExamplePage> {
       engine: engine,
       defaultOutput: MulticastOutput(
         outputs: [
-          SpeakerOutput(backend: JustAudioBackend()),
+          SpeakerOutput(backend: _backend),
           Decoder(
             outputId: 'decoder',
             output: WavFileOutput("D:/Codes/flutter_uni_tts/test_out.wav"),
@@ -87,12 +103,52 @@ class _TtsFlowExamplePageState extends State<TtsFlowExamplePage> {
 
     try {
       await service.init();
-      service.preferredFormat = _useXiaomiTts
+      service.preferredFormat = widget.useXiaomiTts
           ? TtsAudioFormat.mp3
           : TtsAudioFormat.pcm;
 
       _queueSub = service.queueEvents.listen(_onQueueEvent);
       _requestSub = service.requestEvents.listen(_onRequestEvent);
+      _playbackPosSub = _backend.playbackPositionStream.listen((event) {
+        if (!mounted) {
+          return;
+        }
+        setState(() {
+          _backendPos = event.position;
+          if (_backendDuration < event.position) {
+            _backendDuration = event.position;
+          }
+        });
+      });
+      _playbackDurationSub = _backend.playbackDurationStream.listen((event) {
+        if (!mounted) {
+          return;
+        }
+        setState(() {
+          if (event.duration > _backendDuration) {
+            _backendDuration = event.duration;
+          }
+        });
+      });
+      _playerPosSub = _backend.player.positionStream.listen((event) {
+        if (!mounted) {
+          return;
+        }
+        setState(() {
+          _playerPos = event;
+          if (_playerDuration < event) {
+            _playerDuration = event;
+          }
+        });
+      });
+      _playerDurationSub = _backend.player.durationStream.listen((event) {
+        if (!mounted || event == null) {
+          return;
+        }
+        setState(() {
+          _playerDuration = event;
+        });
+      });
 
       if (!mounted) {
         await service.dispose();
@@ -191,7 +247,60 @@ class _TtsFlowExamplePageState extends State<TtsFlowExamplePage> {
     setState(() {
       _status = 'Current request stopped.';
       _isBusy = false;
+      _isPaused = false;
     });
+  }
+
+  Future<void> _pausePlayback() async {
+    if (!_isReady) {
+      return;
+    }
+
+    await _service?.pause();
+    if (!mounted) {
+      return;
+    }
+    setState(() {
+      _isPaused = true;
+      _status = 'Playback paused.';
+    });
+  }
+
+  Future<void> _resumePlayback() async {
+    if (!_isReady) {
+      return;
+    }
+
+    await _service?.resume();
+    if (!mounted) {
+      return;
+    }
+    setState(() {
+      _isPaused = false;
+      _status = 'Playback resumed.';
+    });
+  }
+
+  double _progressValue(Duration position, Duration total) {
+    final totalMs = total.inMilliseconds;
+    if (totalMs <= 0) {
+      return 0;
+    }
+    final ratio = position.inMilliseconds / totalMs;
+    return ratio.clamp(0, 1).toDouble();
+  }
+
+  String _formatDuration(Duration value) {
+    final hours = value.inHours;
+    final minutes = value.inMinutes.remainder(60);
+    final seconds = value.inSeconds.remainder(60);
+    final millis = value.inMilliseconds.remainder(1000);
+
+    if (hours > 0) {
+      return '$hours:${minutes.toString().padLeft(2, '0')}:${seconds.toString().padLeft(2, '0')}';
+    }
+
+    return '${minutes.toString().padLeft(2, '0')}:${seconds.toString().padLeft(2, '0')}.${(millis ~/ 10).toString().padLeft(2, '0')}';
   }
 
   void _pushEvent(String value) {
@@ -242,10 +351,43 @@ class _TtsFlowExamplePageState extends State<TtsFlowExamplePage> {
                   icon: const Icon(Icons.stop),
                   label: const Text('Stop Current'),
                 ),
+                OutlinedButton.icon(
+                  onPressed: _isReady
+                      ? (_isPaused ? _resumePlayback : _pausePlayback)
+                      : null,
+                  icon: Icon(_isPaused ? Icons.play_arrow : Icons.pause),
+                  label: Text(_isPaused ? 'Resume' : 'Pause'),
+                ),
               ],
             ),
             const SizedBox(height: 12),
             Text(_status, style: Theme.of(context).textTheme.bodyMedium),
+            const SizedBox(height: 12),
+            Text(
+              'Backend playbackPositionStream',
+              style: Theme.of(context).textTheme.titleSmall,
+            ),
+            LinearProgressIndicator(
+              value: _progressValue(_backendPos, _backendDuration),
+            ),
+            const SizedBox(height: 4),
+            Text(
+              '${_formatDuration(_backendPos)} / ${_formatDuration(_backendDuration)}',
+              style: Theme.of(context).textTheme.bodySmall,
+            ),
+            const SizedBox(height: 12),
+            Text(
+              'just_audio player.positionStream',
+              style: Theme.of(context).textTheme.titleSmall,
+            ),
+            LinearProgressIndicator(
+              value: _progressValue(_playerPos, _playerDuration),
+            ),
+            const SizedBox(height: 4),
+            Text(
+              '${_formatDuration(_playerPos)} / ${_formatDuration(_playerDuration)}',
+              style: Theme.of(context).textTheme.bodySmall,
+            ),
             const SizedBox(height: 12),
             Text('Events', style: Theme.of(context).textTheme.titleMedium),
             const SizedBox(height: 8),
