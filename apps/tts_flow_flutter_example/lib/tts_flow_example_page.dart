@@ -53,6 +53,12 @@ class _TtsFlowExamplePageState extends State<TtsFlowExamplePage> {
   double _volume = 1.0;
   double _speed = 1.0;
   double _pitch = 1.0;
+  double _minVolume = 0.0;
+  double _maxVolume = 0.0;
+  double _minSpeed = 0.0;
+  double _maxSpeed = 0.0;
+  double _minPitch = 0.0;
+  double _maxPitch = 0.0;
 
   String get _engineLabel => widget.useXiaomiTts ? 'Xiaomi Mimo' : 'Sine';
 
@@ -121,6 +127,18 @@ class _TtsFlowExamplePageState extends State<TtsFlowExamplePage> {
       service.preferredFormat = widget.useXiaomiTts
           ? TtsAudioFormat.mp3
           : TtsAudioFormat.pcm;
+
+      _minVolume = engine.minVolume;
+      _maxVolume = engine.maxVolume;
+      _minSpeed = engine.minSpeed;
+      _maxSpeed = engine.maxSpeed;
+      _minPitch = engine.minPitch;
+      _maxPitch = engine.maxPitch;
+
+      _volume = _normalizeControlValue(_volume, _minVolume, _maxVolume);
+      _speed = _normalizeControlValue(_speed, _minSpeed, _maxSpeed);
+      _pitch = _normalizeControlValue(_pitch, _minPitch, _maxPitch);
+
       service.volume = _volume;
       service.speed = _speed;
       service.pitch = _pitch;
@@ -382,6 +400,36 @@ class _TtsFlowExamplePageState extends State<TtsFlowExamplePage> {
     return voice.voiceId;
   }
 
+  bool _supportsControl(double min, double max) {
+    return max > min;
+  }
+
+  double _normalizeControlValue(double value, double min, double max) {
+    if (!_supportsControl(min, max)) {
+      return value;
+    }
+    return value.clamp(min, max).toDouble();
+  }
+
+  double _sliderValue(double value, double min, double max) {
+    if (!_supportsControl(min, max)) {
+      return 0.0;
+    }
+    return value.clamp(min, max).toDouble();
+  }
+
+  int? _sliderDivisions(double min, double max) {
+    if (!_supportsControl(min, max)) {
+      return null;
+    }
+    final span = max - min;
+    final steps = (span * 20).round();
+    if (steps < 1) {
+      return 1;
+    }
+    return steps > 200 ? 200 : steps;
+  }
+
   double _progressValue(Duration position, Duration total) {
     final totalMs = total.inMilliseconds;
     if (totalMs <= 0) {
@@ -423,7 +471,7 @@ class _TtsFlowExamplePageState extends State<TtsFlowExamplePage> {
         title: Text('TtsFlow + JustAudioBackend ($_engineLabel)'),
         backgroundColor: Theme.of(context).colorScheme.inversePrimary,
       ),
-      body: SingleChildScrollView(
+      body: Padding(
         padding: const EdgeInsets.fromLTRB(16, 16, 16, 24),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
@@ -472,29 +520,65 @@ class _TtsFlowExamplePageState extends State<TtsFlowExamplePage> {
                       onChanged: _isReady ? _onVoiceChanged : null,
                     ),
                     const SizedBox(height: 8),
-                    Text('Volume: ${_volume.toStringAsFixed(2)}'),
-                    Slider(
-                      min: 0,
-                      max: 2,
-                      divisions: 20,
-                      value: _volume,
-                      onChanged: _isReady ? _onVolumeChanged : null,
+                    Text(
+                      _supportsControl(_minVolume, _maxVolume)
+                          ? 'Volume: ${_volume.toStringAsFixed(2)} '
+                                '(range ${_minVolume.toStringAsFixed(2)} - ${_maxVolume.toStringAsFixed(2)})'
+                          : 'Volume: unsupported',
                     ),
-                    Text('Speed: ${_speed.toStringAsFixed(2)}'),
                     Slider(
-                      min: 0.5,
-                      max: 2,
-                      divisions: 15,
-                      value: _speed,
-                      onChanged: _isReady ? _onSpeedChanged : null,
+                      min: _supportsControl(_minVolume, _maxVolume)
+                          ? _minVolume
+                          : 0.0,
+                      max: _supportsControl(_minVolume, _maxVolume)
+                          ? _maxVolume
+                          : 1.0,
+                      divisions: _sliderDivisions(_minVolume, _maxVolume),
+                      value: _sliderValue(_volume, _minVolume, _maxVolume),
+                      onChanged:
+                          _isReady && _supportsControl(_minVolume, _maxVolume)
+                          ? _onVolumeChanged
+                          : null,
                     ),
-                    Text('Pitch: ${_pitch.toStringAsFixed(2)}'),
+                    Text(
+                      _supportsControl(_minSpeed, _maxSpeed)
+                          ? 'Speed: ${_speed.toStringAsFixed(2)} '
+                                '(range ${_minSpeed.toStringAsFixed(2)} - ${_maxSpeed.toStringAsFixed(2)})'
+                          : 'Speed: unsupported',
+                    ),
                     Slider(
-                      min: 0.5,
-                      max: 2,
-                      divisions: 15,
-                      value: _pitch,
-                      onChanged: _isReady ? _onPitchChanged : null,
+                      min: _supportsControl(_minSpeed, _maxSpeed)
+                          ? _minSpeed
+                          : 0.0,
+                      max: _supportsControl(_minSpeed, _maxSpeed)
+                          ? _maxSpeed
+                          : 1.0,
+                      divisions: _sliderDivisions(_minSpeed, _maxSpeed),
+                      value: _sliderValue(_speed, _minSpeed, _maxSpeed),
+                      onChanged:
+                          _isReady && _supportsControl(_minSpeed, _maxSpeed)
+                          ? _onSpeedChanged
+                          : null,
+                    ),
+                    Text(
+                      _supportsControl(_minPitch, _maxPitch)
+                          ? 'Pitch: ${_pitch.toStringAsFixed(2)} '
+                                '(range ${_minPitch.toStringAsFixed(2)} - ${_maxPitch.toStringAsFixed(2)})'
+                          : 'Pitch: unsupported',
+                    ),
+                    Slider(
+                      min: _supportsControl(_minPitch, _maxPitch)
+                          ? _minPitch
+                          : 0.0,
+                      max: _supportsControl(_minPitch, _maxPitch)
+                          ? _maxPitch
+                          : 1.0,
+                      divisions: _sliderDivisions(_minPitch, _maxPitch),
+                      value: _sliderValue(_pitch, _minPitch, _maxPitch),
+                      onChanged:
+                          _isReady && _supportsControl(_minPitch, _maxPitch)
+                          ? _onPitchChanged
+                          : null,
                     ),
                   ],
                 ),

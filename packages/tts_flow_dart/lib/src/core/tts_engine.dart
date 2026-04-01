@@ -82,6 +82,41 @@ abstract interface class TtsEngine {
   /// This should stop active synthesis work and clean up network or native
   /// handles if present.
   Future<void> dispose();
+
+  /// the speed range.
+  /// if maxSpeed <= minSpeed, the engine does not support speed adjustment.
+  double get minSpeed;
+  double get maxSpeed;
+
+  /// the pitch range.
+  /// if maxPitch <= minPitch, the engine does not support pitch adjustment.
+  double get minPitch;
+  double get maxPitch;
+
+  /// the volume range.
+  /// if maxVolume <= minVolume, the engine does not support volume adjustment.
+  double get minVolume;
+  double get maxVolume;
+}
+
+mixin TtsEngineDefaults implements TtsEngine {
+  @override
+  double get minSpeed => 0.0;
+
+  @override
+  double get maxSpeed => 0.0;
+
+  @override
+  double get minPitch => 0.0;
+
+  @override
+  double get maxPitch => 0.0;
+
+  @override
+  double get minVolume => 0.0;
+
+  @override
+  double get maxVolume => 0.0;
 }
 
 extension TtsEngineCapabilities on TtsEngine {

@@ -825,7 +825,7 @@ final class _TrackingOutput implements TtsOutput {
   }
 }
 
-final class _ChunkSpecEngine implements TtsEngine {
+final class _ChunkSpecEngine with TtsEngineDefaults implements TtsEngine {
   _ChunkSpecEngine({
     required Set<AudioCapability> negotiatedCapabilities,
     required this.emittedSpec,

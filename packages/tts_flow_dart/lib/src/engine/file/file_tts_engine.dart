@@ -13,7 +13,7 @@ import 'package:tts_flow_dart/src/engine/file/file_content_provider.dart';
 
 /// A deterministic engine that streams bytes from a [FileContentProvider]
 /// regardless of request text.
-final class FileTtsEngine implements TtsEngine {
+final class FileTtsEngine with TtsEngineDefaults implements TtsEngine {
   FileTtsEngine({
     required this.engineId,
     required this.provider,

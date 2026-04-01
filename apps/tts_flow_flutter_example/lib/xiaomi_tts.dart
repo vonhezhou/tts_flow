@@ -81,6 +81,12 @@ class XiaomiTts extends OpenAiTtsEngine {
   }
 
   @override
+  double get minSpeed => 0.0;
+
+  @override
+  double get maxSpeed => 0.0;
+
+  @override
   Set<AudioCapability> get outAudioCapabilities => {
     const Mp3Capability(),
     PcmCapability.wav(),
@@ -111,12 +117,17 @@ class XiaomiTts extends OpenAiTtsEngine {
   @override
   String buildRequestBody(TtsRequest request, TtsAudioSpec resolvedFormat) {
     final voiceId = request.voice?.voiceId ?? xiaomiDefaultVoice;
+    final audioArgs = <String, Object>{
+      'format': mapFormat(resolvedFormat.format),
+      'voice': voiceId,
+      ...buildProsodyRequestArgs(request),
+    };
     return jsonEncode({
       'model': _configuredModel,
       'messages': [
         {'role': 'assistant', 'content': request.text},
       ],
-      'audio': {'format': mapFormat(resolvedFormat.format), 'voice': voiceId},
+      'audio': audioArgs,
       'stream': true,
     });
   }

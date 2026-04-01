@@ -11,7 +11,7 @@ import 'package:tts_flow_dart/src/core/tts_engine.dart';
 import 'package:tts_flow_dart/src/core/tts_request.dart';
 import 'package:tts_flow_dart/src/core/tts_voice.dart';
 
-final class SineTtsEngine implements TtsEngine {
+final class SineTtsEngine with TtsEngineDefaults implements TtsEngine {
   SineTtsEngine({
     required this.engineId,
     required this.supportsStreaming,

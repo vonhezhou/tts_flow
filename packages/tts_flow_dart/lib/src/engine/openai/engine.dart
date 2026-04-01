@@ -17,7 +17,7 @@ import 'models.dart';
 import 'retrying_transport.dart';
 import 'transport.dart';
 
-class OpenAiTtsEngine implements TtsEngine {
+class OpenAiTtsEngine with TtsEngineDefaults implements TtsEngine {
   OpenAiTtsEngine({
     required this.apiClient,
     this.engineId = 'openai',
@@ -119,6 +119,12 @@ class OpenAiTtsEngine implements TtsEngine {
 
   @override
   bool get supportsStreaming => true;
+
+  @override
+  double get minSpeed => 0.25;
+
+  @override
+  double get maxSpeed => 4.0;
 
   @override
   Set<AudioCapability> get outAudioCapabilities => {
@@ -312,7 +318,26 @@ class OpenAiTtsEngine implements TtsEngine {
       'input': request.text,
       'voice': request.voice?.voiceId ?? defaultVoiceId,
       'response_format': mapFormat(resolvedFormat.format),
+      ...buildProsodyRequestArgs(request),
     });
+  }
+
+  /// Builds common runtime prosody controls for providers that accept
+  /// OpenAI-compatible payloads.
+  Map<String, Object> buildProsodyRequestArgs(TtsRequest request) {
+    final args = <String, Object>{};
+    final options = request.options;
+
+    if (options?.speed != null && maxSpeed > minSpeed) {
+      args['speed'] = options!.speed!;
+    }
+    if (options?.pitch != null && maxPitch > minPitch) {
+      args['pitch'] = options!.pitch!;
+    }
+    if (options?.volume != null && maxVolume > minVolume) {
+      args['volume'] = options!.volume!;
+    }
+    return args;
   }
 
   /// Override if a provider expects different format tokens.

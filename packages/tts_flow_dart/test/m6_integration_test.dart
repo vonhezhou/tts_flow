@@ -116,7 +116,7 @@ void main() {
   });
 }
 
-final class _FailingEngine implements TtsEngine {
+final class _FailingEngine with TtsEngineDefaults implements TtsEngine {
   @override
   String get engineId => 'failing-engine';
 
