@@ -89,20 +89,7 @@ class _TtsFlowExamplePageState extends State<TtsFlowExamplePage> {
     _outputDirPath = outputDir.path;
     _outputWavPath = outputWavPath;
 
-    final engine = widget.useXiaomiTts
-        ? XiaomiTts.fromClientConfig(
-            config: OpenAiClientConfig(
-              apiKey: _xiaomiApiKey,
-              endpoint: XiaomiTts.xiaomiEndpoint,
-              model: XiaomiTts.xiaomiModel,
-            ),
-          )
-        : SineTtsEngine(
-            engineId: 'flutter-sine-engine',
-            supportsStreaming: true,
-            chunkCount: 6,
-            chunkDelay: const Duration(milliseconds: 20),
-          );
+    final engine = _createEngine();
 
     final service = TtsFlow(
       engine: engine,
@@ -213,6 +200,29 @@ class _TtsFlowExamplePageState extends State<TtsFlowExamplePage> {
         _status = 'Failed to initialize TtsFlow: $error';
       });
     }
+  }
+
+  TtsEngineDefaults _createEngine() {
+    return FileTtsEngine(
+      engineId: "wav-file",
+      provider: WavFileContentProvider.fromWav(
+        "D:/Codes/xiaomi_tts_py/tmp/idn34b_old.wav",
+      ),
+    );
+    return widget.useXiaomiTts
+        ? XiaomiTts.fromClientConfig(
+            config: OpenAiClientConfig(
+              apiKey: _xiaomiApiKey,
+              endpoint: XiaomiTts.xiaomiEndpoint,
+              model: XiaomiTts.xiaomiModel,
+            ),
+          )
+        : SineTtsEngine(
+            engineId: 'flutter-sine-engine',
+            supportsStreaming: true,
+            chunkCount: 6,
+            chunkDelay: const Duration(milliseconds: 20),
+          );
   }
 
   void _onQueueEvent(TtsQueueEvent event) {

@@ -10,6 +10,10 @@ import 'package:tts_flow_dart/src/engine/file/file_content_provider.dart';
 enum _WavProviderInputKind { wavFile, rawPcm }
 
 /// Streams raw PCM chunks from either an existing WAV file or raw PCM file.
+/// 
+/// NOTE: this ONLY handles canonical 44-byte WAV headers 
+/// with "data" chunk fixed at 36 for simplicity, 
+/// and does not support extended headers, metadata, or non-PCM formats.
 final class WavFileContentProvider implements FileContentProvider {
   WavFileContentProvider.fromWav(this.filePath)
       : _kind = _WavProviderInputKind.wavFile,
