@@ -121,6 +121,8 @@ final class FileTtsEngine with TtsEngineDefaults implements TtsEngine {
     var sentBytes = 0;
     Uint8List? pendingChunk;
 
+    final realAudioSpec = provider.audioSpec;
+
     await for (final chunkBytes in provider.readChunks(chunkSizeBytes)) {
       if (control.isCanceled) {
         break;
@@ -145,7 +147,7 @@ final class FileTtsEngine with TtsEngineDefaults implements TtsEngine {
           requestId: request.requestId,
           sequenceNumber: sequence,
           bytes: pendingChunk,
-          audioSpec: resolvedFormat,
+          audioSpec: realAudioSpec,
           isLastChunk: false,
           timestamp: DateTime.now().toUtc(),
         );
@@ -161,7 +163,7 @@ final class FileTtsEngine with TtsEngineDefaults implements TtsEngine {
         requestId: request.requestId,
         sequenceNumber: sequence,
         bytes: pendingChunk,
-        audioSpec: resolvedFormat,
+        audioSpec: realAudioSpec,
         isLastChunk: true,
         timestamp: DateTime.now().toUtc(),
       );
