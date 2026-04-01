@@ -28,11 +28,6 @@ final class _PlaybackSession {
 
   int nextIndex = 0;
 
-  /// the last reported postion.
-  /// just_audio might report postion out of order.
-  /// let us filter it.
-  Duration? lastPosition;
-
   final sourceDurationMap = <int, Duration>{};
 
   void addOrUpdateSourceDuration(int index, Duration duration) {
@@ -54,12 +49,6 @@ final class _PlaybackSession {
   Duration? calcTotalDuration() {
     if (sourceDurationMap.values.isEmpty) {
       return null;
-    }
-
-    if (sourceDurationMap.keys.length != nextIndex) {
-      return sourceDurationMap.values.reduce(
-        (value, element) => value + element,
-      );
     }
 
     return sourceDurationMap.values.reduce((value, element) => value + element);
@@ -142,7 +131,6 @@ class JustAudioBackend implements SpeakerBackend {
   /// The duration is in seconds.
   Stream<JustAudioDurationEvent> get playbackDurationStream =>
       _durationEeventController.stream;
-
 
   /// Stream of TtsChunks that are not audio chunks, such as subtitles.
   /// NOTE: check the TtsEngine implementation
@@ -501,11 +489,15 @@ class JustAudioBackend implements SpeakerBackend {
       '$duration, ${curSource.playbackOffset}',
     );
 
+    // Emit duration on the session timeline so consumers can align SRT/subtitles
+    // against a continuous playback clock.
+    final timelineDuration = prevDuration + duration;
+
     _durationEeventController.add(
       JustAudioDurationEvent(
         playbackId: curSource.playbackId,
         requestId: session.requestId,
-        duration: prevDuration,
+        duration: timelineDuration,
       ),
     );
   }
@@ -513,6 +505,15 @@ class JustAudioBackend implements SpeakerBackend {
   void _onPosChanged(Duration pos) {
     final curSource = _currentSource();
     if (curSource == null || curSource is! ChunkAudioSource) {
+      if (pos == Duration.zero) {
+        _posEeventController.add(
+          JustAudioPosEvent(
+            playbackId: '',
+            requestId: '',
+            position: pos,
+          ),
+        );
+      }
       return;
     }
 
@@ -528,13 +529,7 @@ class JustAudioBackend implements SpeakerBackend {
       );
     }
 
-    var newPos = curSource.playbackOffset + pos;
-
-    if (session.lastPosition != null && session.lastPosition! > newPos) {
-      newPos = session.lastPosition!;
-    }
-    session.lastPosition = newPos;
-
+    final newPos = curSource.playbackOffset + pos;
     _posEeventController.add(
       JustAudioPosEvent(
         playbackId: curSource.playbackId,

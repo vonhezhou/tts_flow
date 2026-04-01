@@ -20,6 +20,8 @@ void main() {
   group('JustAudioBackend', () {
     late _MockAudioPlayer player;
     late StreamController<ProcessingState> processingController;
+    late StreamController<Duration?> durationController;
+    late StreamController<Duration> positionController;
     late List<AudioSource> sources;
     late bool playing;
     late ProcessingState processingState;
@@ -28,6 +30,8 @@ void main() {
     setUp(() {
       player = _MockAudioPlayer();
       processingController = StreamController<ProcessingState>.broadcast();
+      durationController = StreamController<Duration?>.broadcast();
+      positionController = StreamController<Duration>.broadcast();
       sources = <AudioSource>[];
       playing = false;
       processingState = ProcessingState.idle;
@@ -36,6 +40,12 @@ void main() {
       when(
         () => player.processingStateStream,
       ).thenAnswer((_) => processingController.stream);
+      when(
+        () => player.durationStream,
+      ).thenAnswer((_) => durationController.stream);
+      when(
+        () => player.positionStream,
+      ).thenAnswer((_) => positionController.stream);
       when(() => player.audioSources).thenAnswer((_) => sources);
       when(() => player.playing).thenAnswer((_) => playing);
       when(() => player.processingState).thenAnswer((_) => processingState);
@@ -80,6 +90,8 @@ void main() {
 
     tearDown(() async {
       await processingController.close();
+      await durationController.close();
+      await positionController.close();
     });
 
     test(
@@ -324,5 +336,63 @@ void main() {
         verify(() => player.play()).called(greaterThanOrEqualTo(1));
       },
     );
+
+    test('duration stream emits per-session timeline duration', () async {
+      final backend = JustAudioBackend.testing(player: player);
+      addTearDown(backend.dispose);
+
+      final durations = <Duration>[];
+      final sub = backend.playbackDurationStream.listen((event) {
+        durations.add(event.duration);
+      });
+      addTearDown(sub.cancel);
+
+      final playbackId = await backend.startPlayback(
+        requestId: 'r1',
+        audioSpec: const TtsAudioSpec.mp3(),
+      );
+
+      await backend.appendChunk(
+        playbackId: playbackId,
+        chunk: TtsAudioChunk(
+          bytes: Uint8List.fromList([1, 2]),
+          requestId: 'r1',
+          sequenceNumber: 0,
+          isLastChunk: false,
+          timestamp: DateTime.now(),
+          audioSpec: const TtsAudioSpec.mp3(),
+        ),
+      );
+
+      currentIndex = 0;
+      durationController.add(const Duration(milliseconds: 900));
+      await Future<void>.delayed(Duration.zero);
+
+      // Mark first source as started
+      // so next append rolls over to a new segment.
+      final firstSource = sources.first as ChunkAudioSource;
+      await firstSource.request();
+
+      await backend.appendChunk(
+        playbackId: playbackId,
+        chunk: TtsAudioChunk(
+          bytes: Uint8List.fromList([3, 4]),
+          requestId: 'r1',
+          sequenceNumber: 1,
+          isLastChunk: true,
+          timestamp: DateTime.now(),
+          audioSpec: const TtsAudioSpec.mp3(),
+        ),
+      );
+
+      currentIndex = 1;
+      durationController.add(const Duration(milliseconds: 600));
+      await Future<void>.delayed(Duration.zero);
+
+      expect(durations, <Duration>[
+        const Duration(milliseconds: 900),
+        const Duration(milliseconds: 1500),
+      ]);
+    });
   });
 }

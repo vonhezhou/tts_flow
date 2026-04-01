@@ -1,4 +1,4 @@
-/// The duration of a playback.
+/// The duration on a playback session timeline.
 class JustAudioDurationEvent {
   /// constructor
   JustAudioDurationEvent({
@@ -13,7 +13,9 @@ class JustAudioDurationEvent {
   /// The request identifier for the TTS request this segment belongs to.
   final String requestId;
 
-  /// The playback duration of this segment.
+  /// The known playback duration on the session timeline.
+  ///
+  /// This value is cumulative across segments in the same playback session.
   final Duration duration;
 
   @override
@@ -21,7 +23,7 @@ class JustAudioDurationEvent {
       'PlaybackDuration(playbackId: $playbackId, duration: $duration)';
 }
 
-/// The position of spcific playback.
+/// The position of specific playback on session timeline.
 class JustAudioPosEvent {
   /// constructor
   JustAudioPosEvent({
@@ -36,7 +38,7 @@ class JustAudioPosEvent {
   /// The request identifier for the TTS request this segment belongs to.
   final String requestId;
 
-  /// The playback position of this segment.
+  /// The playback position on the session timeline.
   final Duration position;
 
   @override
