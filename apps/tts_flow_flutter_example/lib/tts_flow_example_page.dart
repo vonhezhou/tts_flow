@@ -2,9 +2,12 @@ import 'dart:async';
 
 import 'package:flutter/material.dart';
 import 'package:logging/logging.dart';
+import 'package:path/path.dart' as p;
+import 'package:path_provider/path_provider.dart';
 import 'package:tts_flow_dart/tts_flow_dart.dart';
 import 'package:tts_flow_flutter/tts_flow_flutter.dart';
 import 'package:tts_flow_flutter_example/xiaomi_tts.dart';
+import 'package:url_launcher/url_launcher.dart';
 
 const String _xiaomiApiKey = String.fromEnvironment('XIAOMI_MIMO_API_KEY');
 
@@ -43,6 +46,13 @@ class _TtsFlowExamplePageState extends State<TtsFlowExamplePage> {
   Duration _backendDuration = Duration.zero;
   Duration _playerPos = Duration.zero;
   Duration _playerDuration = Duration.zero;
+  String? _outputDirPath;
+  String? _outputWavPath;
+  List<TtsVoice> _voices = const <TtsVoice>[];
+  String? _selectedVoiceId;
+  double _volume = 1.0;
+  double _speed = 1.0;
+  double _pitch = 1.0;
 
   String get _engineLabel => widget.useXiaomiTts ? 'Xiaomi Mimo' : 'Sine';
 
@@ -68,6 +78,11 @@ class _TtsFlowExamplePageState extends State<TtsFlowExamplePage> {
   }
 
   Future<void> _initService() async {
+    final outputDir = await getTemporaryDirectory();
+    final outputWavPath = p.join(outputDir.path, 'tts_flow_example.wav');
+    _outputDirPath = outputDir.path;
+    _outputWavPath = outputWavPath;
+
     final engine = widget.useXiaomiTts
         ? XiaomiTts.fromClientConfig(
             config: OpenAiClientConfig(
@@ -90,7 +105,7 @@ class _TtsFlowExamplePageState extends State<TtsFlowExamplePage> {
           SpeakerOutput(backend: _backend),
           Decoder(
             outputId: 'decoder',
-            output: WavFileOutput("D:/Codes/flutter_uni_tts/test_out.wav"),
+            output: WavFileOutput(outputWavPath),
             pcmFormat: const PcmDescriptor(
               sampleRateHz: 16000, // 强制 16kHz
               channels: 1, // 强制单声道
@@ -106,6 +121,12 @@ class _TtsFlowExamplePageState extends State<TtsFlowExamplePage> {
       service.preferredFormat = widget.useXiaomiTts
           ? TtsAudioFormat.mp3
           : TtsAudioFormat.pcm;
+      service.volume = _volume;
+      service.speed = _speed;
+      service.pitch = _pitch;
+
+      final voices = await service.getAvailableVoices();
+      final selectedVoiceId = service.voice.voiceId;
 
       _queueSub = service.queueEvents.listen(_onQueueEvent);
       _requestSub = service.requestEvents.listen(_onRequestEvent);
@@ -159,8 +180,10 @@ class _TtsFlowExamplePageState extends State<TtsFlowExamplePage> {
       setState(() {
         _service = service;
         _isReady = true;
+        _voices = voices;
+        _selectedVoiceId = selectedVoiceId;
         _status =
-            'Ready using $_engineLabel engine. Tap "Speak" to play through the device speaker.';
+            'Ready using $_engineLabel engine. Tap "Speak" to play through the device speaker. WAV: $outputWavPath';
       });
     } catch (error, stackTrace) {
       _log.severe('Failed to initialize TtsFlow.', error, stackTrace);
@@ -281,6 +304,84 @@ class _TtsFlowExamplePageState extends State<TtsFlowExamplePage> {
     });
   }
 
+  Future<void> _openTempOutputDir() async {
+    final dirPath = _outputWavPath;
+    if (dirPath == null || dirPath.isEmpty) {
+      setState(() {
+        _status = 'Temporary output directory is not available.';
+      });
+      return;
+    }
+
+    final normalized = dirPath.replaceAll('\\', '/');
+    final uri = Uri.parse('file:///$normalized');
+    final opened = await launchUrl(uri, mode: LaunchMode.externalApplication);
+    if (!mounted) {
+      return;
+    }
+
+    setState(() {
+      _status = opened
+          ? 'Opened temporary output directory.'
+          : 'Unable to open temporary output directory.';
+    });
+  }
+
+  void _onVoiceChanged(String? voiceId) {
+    if (voiceId == null) {
+      return;
+    }
+
+    final service = _service;
+    final selectedVoice = _voices
+        .where((voice) => voice.voiceId == voiceId)
+        .cast<TtsVoice?>()
+        .firstOrNull;
+
+    if (selectedVoice == null) {
+      return;
+    }
+
+    if (service != null) {
+      service.voice = selectedVoice;
+    }
+
+    setState(() {
+      _selectedVoiceId = voiceId;
+      _status =
+          'Selected voice: ${selectedVoice.displayName ?? selectedVoice.voiceId}';
+    });
+  }
+
+  void _onVolumeChanged(double value) {
+    _service?.volume = value;
+    setState(() {
+      _volume = value;
+    });
+  }
+
+  void _onSpeedChanged(double value) {
+    _service?.speed = value;
+    setState(() {
+      _speed = value;
+    });
+  }
+
+  void _onPitchChanged(double value) {
+    _service?.pitch = value;
+    setState(() {
+      _pitch = value;
+    });
+  }
+
+  String _voiceLabel(TtsVoice voice) {
+    final display = voice.displayName?.trim();
+    if (display != null && display.isNotEmpty) {
+      return '$display (${voice.voiceId})';
+    }
+    return voice.voiceId;
+  }
+
   double _progressValue(Duration position, Duration total) {
     final totalMs = total.inMilliseconds;
     if (totalMs <= 0) {
@@ -322,8 +423,8 @@ class _TtsFlowExamplePageState extends State<TtsFlowExamplePage> {
         title: Text('TtsFlow + JustAudioBackend ($_engineLabel)'),
         backgroundColor: Theme.of(context).colorScheme.inversePrimary,
       ),
-      body: Padding(
-        padding: const EdgeInsets.all(16),
+      body: SingleChildScrollView(
+        padding: const EdgeInsets.fromLTRB(16, 16, 16, 24),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
@@ -334,6 +435,69 @@ class _TtsFlowExamplePageState extends State<TtsFlowExamplePage> {
               decoration: const InputDecoration(
                 border: OutlineInputBorder(),
                 labelText: 'Text to synthesize',
+              ),
+            ),
+            const SizedBox(height: 12),
+            Card(
+              child: Padding(
+                padding: const EdgeInsets.all(12),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      'Voice & Audio Controls',
+                      style: Theme.of(context).textTheme.titleSmall,
+                    ),
+                    const SizedBox(height: 8),
+                    DropdownButtonFormField<String>(
+                      initialValue:
+                          _voices.any(
+                            (voice) => voice.voiceId == _selectedVoiceId,
+                          )
+                          ? _selectedVoiceId
+                          : null,
+                      isExpanded: true,
+                      decoration: const InputDecoration(
+                        border: OutlineInputBorder(),
+                        labelText: 'Voice',
+                      ),
+                      items: _voices
+                          .map(
+                            (voice) => DropdownMenuItem<String>(
+                              value: voice.voiceId,
+                              child: Text(_voiceLabel(voice)),
+                            ),
+                          )
+                          .toList(growable: false),
+                      onChanged: _isReady ? _onVoiceChanged : null,
+                    ),
+                    const SizedBox(height: 8),
+                    Text('Volume: ${_volume.toStringAsFixed(2)}'),
+                    Slider(
+                      min: 0,
+                      max: 2,
+                      divisions: 20,
+                      value: _volume,
+                      onChanged: _isReady ? _onVolumeChanged : null,
+                    ),
+                    Text('Speed: ${_speed.toStringAsFixed(2)}'),
+                    Slider(
+                      min: 0.5,
+                      max: 2,
+                      divisions: 15,
+                      value: _speed,
+                      onChanged: _isReady ? _onSpeedChanged : null,
+                    ),
+                    Text('Pitch: ${_pitch.toStringAsFixed(2)}'),
+                    Slider(
+                      min: 0.5,
+                      max: 2,
+                      divisions: 15,
+                      value: _pitch,
+                      onChanged: _isReady ? _onPitchChanged : null,
+                    ),
+                  ],
+                ),
               ),
             ),
             const SizedBox(height: 12),
@@ -358,10 +522,20 @@ class _TtsFlowExamplePageState extends State<TtsFlowExamplePage> {
                   icon: Icon(_isPaused ? Icons.play_arrow : Icons.pause),
                   label: Text(_isPaused ? 'Resume' : 'Pause'),
                 ),
+                OutlinedButton.icon(
+                  onPressed: _outputDirPath == null ? null : _openTempOutputDir,
+                  icon: const Icon(Icons.folder_open),
+                  label: const Text('Open Temp Dir'),
+                ),
               ],
             ),
             const SizedBox(height: 12),
             Text(_status, style: Theme.of(context).textTheme.bodyMedium),
+            const SizedBox(height: 6),
+            SelectableText(
+              'WAV output: ${_outputWavPath ?? 'resolving...'}',
+              style: Theme.of(context).textTheme.bodySmall,
+            ),
             const SizedBox(height: 12),
             Text(
               'Backend playbackPositionStream',
