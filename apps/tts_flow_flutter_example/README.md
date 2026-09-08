@@ -15,6 +15,12 @@ A new Flutter project.
 flutter test integration_test/just_audio_jitter_test.dart -d macos
 ```
 
+在仓库根目录，macOS 可将常规全仓检查和这项原生回归合并为一条命令：
+
+```sh
+dart run melos run check:macos
+```
+
 将 `macos` 替换为 `windows` 或 `flutter devices` 显示的设备 ID。该测试不纳入普通
 unit test CI；它是 Native player/平台配置的显式回归项。
 

@@ -37,8 +37,21 @@ melos:
     test:flutter:
       exec: flutter test
       packageFilters:
-        flutter: true
         dirExists: test
+        scope: tts_flow_flutter
+
+    test:integration:macos:
+      run: cd apps/tts_flow_flutter_example && flutter test integration_test/just_audio_jitter_test.dart -d macos
+      description: Run the macOS JustAudio integration regression.
+
+    check:macos:
+      run: >-
+        dart run melos exec -- dart analyze . &&
+        dart run melos exec --dir-exists=test --no-flutter -- dart test &&
+        dart run melos exec --dir-exists=test --scope=tts_flow_flutter -- flutter test &&
+        cd apps/tts_flow_flutter_example &&
+        flutter test integration_test/just_audio_jitter_test.dart -d macos
+      description: Run all checks plus the macOS JustAudio integration regression.
 
     check:
       run: melos run analyze && melos run test
