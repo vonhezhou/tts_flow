@@ -6,7 +6,7 @@ enum TtsQueueEventType {
   requestEnqueued,
   requestDequeued,
   queueCleared,
-  queueHalted
+  queueHalted,
 }
 
 enum TtsRequestEventType {
@@ -15,6 +15,7 @@ enum TtsRequestEventType {
   requestChunkReceived,
   requestCompleted,
   requestPlaybackCompleted,
+  requestPlaybackFailed,
   requestFailed,
   requestStopped,
   requestCanceled,

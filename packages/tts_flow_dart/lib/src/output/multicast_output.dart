@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:tts_flow_dart/src/core/audio_artifact.dart';
 import 'package:tts_flow_dart/src/core/audio_capability.dart';
 import 'package:tts_flow_dart/src/core/synthesis_control.dart';
@@ -21,12 +23,17 @@ enum MulticastOutputErrorPolicy {
 
 /// A TtsOutput that wraps multiple child outputs
 /// and forwards all calls to them.
-final class MulticastOutput implements TtsOutput {
+final class MulticastOutput
+    implements TtsOutput, PlaybackAwareOutput, PlaybackFailureAwareOutput {
   MulticastOutput({
     required List<TtsOutput> outputs,
     this.outputId = 'multicast-output',
     this.errorPolicy = MulticastOutputErrorPolicy.bestEffort,
-  }) : _outputs = List.unmodifiable(outputs) {
+  }) : _outputs = List.unmodifiable(outputs),
+       _playbackCompletedController =
+           StreamController<TtsOutputPlaybackCompletedEvent>.broadcast(),
+       _playbackFailedController =
+           StreamController<TtsOutputPlaybackFailedEvent>.broadcast() {
     if (_outputs.isEmpty) {
       throw ArgumentError.value(outputs, 'outputs', 'Must not be empty.');
     }
@@ -41,6 +48,23 @@ final class MulticastOutput implements TtsOutput {
         );
       }
     }
+
+    for (final output in _outputs) {
+      if (output case final PlaybackAwareOutput playbackAwareOutput) {
+        _playbackCompletedSubscriptions.add(
+          playbackAwareOutput.playbackCompletedEvents.listen(
+            _playbackCompletedController.add,
+          ),
+        );
+      }
+      if (output case final PlaybackFailureAwareOutput failureAwareOutput) {
+        _playbackFailedSubscriptions.add(
+          failureAwareOutput.playbackFailedEvents.listen(
+            _playbackFailedController.add,
+          ),
+        );
+      }
+    }
   }
 
   final List<TtsOutput> _outputs;
@@ -49,10 +73,28 @@ final class MulticastOutput implements TtsOutput {
   final String outputId;
 
   final MulticastOutputErrorPolicy errorPolicy;
+  final StreamController<TtsOutputPlaybackCompletedEvent>
+  _playbackCompletedController;
+  final StreamController<TtsOutputPlaybackFailedEvent>
+  _playbackFailedController;
+  final List<StreamSubscription<TtsOutputPlaybackCompletedEvent>>
+  _playbackCompletedSubscriptions =
+      <StreamSubscription<TtsOutputPlaybackCompletedEvent>>[];
+  final List<StreamSubscription<TtsOutputPlaybackFailedEvent>>
+  _playbackFailedSubscriptions =
+      <StreamSubscription<TtsOutputPlaybackFailedEvent>>[];
 
   TtsOutputSession? _session;
   final Map<String, TtsOutput> _activeOutputs = <String, TtsOutput>{};
   final Map<String, TtsError> _outputErrors = <String, TtsError>{};
+
+  @override
+  Stream<TtsOutputPlaybackCompletedEvent> get playbackCompletedEvents =>
+      _playbackCompletedController.stream;
+
+  @override
+  Stream<TtsOutputPlaybackFailedEvent> get playbackFailedEvents =>
+      _playbackFailedController.stream;
 
   @override
   Set<AudioCapability> get inAudioCapabilities {
@@ -259,6 +301,14 @@ final class MulticastOutput implements TtsOutput {
       }
     }
     _clearSession();
+    for (final subscription in _playbackCompletedSubscriptions) {
+      await subscription.cancel();
+    }
+    for (final subscription in _playbackFailedSubscriptions) {
+      await subscription.cancel();
+    }
+    await _playbackCompletedController.close();
+    await _playbackFailedController.close();
     if (firstFailure != null &&
         errorPolicy == MulticastOutputErrorPolicy.failFast) {
       throw firstFailure;

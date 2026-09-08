@@ -315,6 +315,9 @@ Semantics:
 - `requestCompleted` means synthesis/output ingestion is finished.
 - `requestPlaybackCompleted` means the speaker backend reported physical
   playback completion.
+- `requestPlaybackFailed` means the physical player failed. It is independent
+  from synthesis completion, so it does not turn an already completed
+  `speak()` stream into an error or halt the synthesis queue.
 
 Implementation checklist:
 
@@ -325,6 +328,9 @@ Implementation checklist:
 - Ensure `stopPlayback` is safe to call after partial writes.
 - Return capabilities from `supportedCapabilities` that match the real device.
 - Emit `playbackCompletedEvents` only for true physical completion.
+- If platform playback can fail asynchronously, implement
+  `SpeakerPlaybackFailureAwareBackend` and emit `SpeakerPlaybackFailedEvent`
+  with `TtsErrorCode.outputPlaybackFailed`.
 
 Reference skeleton:
 

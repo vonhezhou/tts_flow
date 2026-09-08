@@ -3,6 +3,7 @@ import 'package:tts_flow_dart/src/core/audio_capability.dart';
 import 'package:tts_flow_dart/src/core/audio_spec.dart';
 import 'package:tts_flow_dart/src/core/synthesis_control.dart';
 import 'package:tts_flow_dart/src/core/tts_chunk.dart';
+import 'package:tts_flow_dart/src/core/tts_errors.dart';
 import 'package:tts_flow_dart/src/core/tts_output_session.dart';
 
 /// Output contract that consumes synthesized chunks and produces a final audio
@@ -72,6 +73,15 @@ abstract interface class PlaybackAwareOutput {
   Stream<TtsOutputPlaybackCompletedEvent> get playbackCompletedEvents;
 }
 
+/// Optional output capability that emits physical playback failures.
+///
+/// A playback failure is deliberately separate from synthesis/output ingestion
+/// failure: it can arrive after [TtsOutput.finalizeSession] has completed, and
+/// must not retroactively turn a completed synthesis request into a failed one.
+abstract interface class PlaybackFailureAwareOutput {
+  Stream<TtsOutputPlaybackFailedEvent> get playbackFailedEvents;
+}
+
 final class TtsOutputPlaybackCompletedEvent {
   const TtsOutputPlaybackCompletedEvent({
     required this.requestId,
@@ -87,6 +97,22 @@ final class TtsOutputPlaybackCompletedEvent {
   /// Optional speaker-reported elapsed playback duration at physical
   /// completion time.
   final Duration? playedDuration;
+}
+
+final class TtsOutputPlaybackFailedEvent {
+  const TtsOutputPlaybackFailedEvent({
+    required this.requestId,
+    required this.outputId,
+    required this.playbackId,
+    required this.error,
+  });
+
+  final String requestId;
+  final String outputId;
+  final String playbackId;
+
+  /// Failure reported by the physical playback implementation.
+  final TtsError error;
 }
 
 extension TtsOutputCapabilities on TtsOutput {

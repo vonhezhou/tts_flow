@@ -85,7 +85,8 @@ final class _SourceRange {
 }
 
 /// A [SpeakerBackend] implementation using the just_audio package.
-class JustAudioBackend implements SpeakerBackend {
+class JustAudioBackend
+    implements SpeakerBackend, SpeakerPlaybackFailureAwareBackend {
   /// constructor
   JustAudioBackend() : _player = AudioPlayer() {
     _processingStateSubscription = _player.processingStateStream.listen((
@@ -139,6 +140,8 @@ class JustAudioBackend implements SpeakerBackend {
   final StreamController<SpeakerPlaybackCompletedEvent>
   _playbackCompletedController =
       StreamController<SpeakerPlaybackCompletedEvent>.broadcast();
+  final StreamController<SpeakerPlaybackFailedEvent> _playbackFailedController =
+      StreamController<SpeakerPlaybackFailedEvent>.broadcast();
   late final StreamSubscription<ProcessingState> _processingStateSubscription;
 
   final StreamController<JustAudioDurationEvent> _durationEeventController =
@@ -191,6 +194,10 @@ class JustAudioBackend implements SpeakerBackend {
   @override
   Stream<SpeakerPlaybackCompletedEvent> get playbackCompletedEvents =>
       _playbackCompletedController.stream;
+
+  @override
+  Stream<SpeakerPlaybackFailedEvent> get playbackFailedEvents =>
+      _playbackFailedController.stream;
 
   /// Reset the player by stopping playback,
   /// seeking to the beginning, and clearing all audio sources.
@@ -287,6 +294,7 @@ class JustAudioBackend implements SpeakerBackend {
     await _posEeventController.close();
     await _durationEeventController.close();
     await _playbackCompletedController.close();
+    await _playbackFailedController.close();
     await _ttsChunkController.close();
     await _playbackErrorController.close();
   }
@@ -555,6 +563,18 @@ class JustAudioBackend implements SpeakerBackend {
         playbackId: session.playbackId,
         requestId: session.requestId,
         error: error,
+      ),
+    );
+    _playbackFailedController.add(
+      SpeakerPlaybackFailedEvent(
+        requestId: session.requestId,
+        playbackId: session.playbackId,
+        error: TtsError(
+          code: TtsErrorCode.outputPlaybackFailed,
+          message: 'just_audio playback failed: ${error.message ?? error.code}',
+          requestId: session.requestId,
+          cause: error,
+        ),
       ),
     );
     await _stopPlayback(

@@ -26,7 +26,10 @@ platform, and compatibility requirements.
 
 Platform errors that occur after audio has been handed to just_audio are exposed
 through `JustAudioBackend.playbackErrorStream` and terminate the affected
-playback session.
+playback session. The same failure is also propagated through `SpeakerOutput`
+and `TtsFlow.requestEvents` as `requestPlaybackFailed`; this is separate from
+the synthesis request result, so an already completed `speak()` stream is not
+retroactively failed.
 
 ## Installation 💻
 

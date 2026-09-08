@@ -256,6 +256,11 @@ void main() {
       final events = <JustAudioPlaybackErrorEvent>[];
       final sub = backend.playbackErrorStream.listen(events.add);
       addTearDown(sub.cancel);
+      final backendFailureEvents = <SpeakerPlaybackFailedEvent>[];
+      final backendFailureSub = backend.playbackFailedEvents.listen(
+        backendFailureEvents.add,
+      );
+      addTearDown(backendFailureSub.cancel);
 
       final playbackId = await backend.startPlayback(
         requestId: 'r1',
@@ -281,6 +286,12 @@ void main() {
       expect(events.single.playbackId, playbackId);
       expect(events.single.requestId, 'r1');
       expect(events.single.error.message, 'decode failed');
+      expect(backendFailureEvents, hasLength(1));
+      expect(backendFailureEvents.single.requestId, 'r1');
+      expect(
+        backendFailureEvents.single.error.code,
+        TtsErrorCode.outputPlaybackFailed,
+      );
       expect(sources, isEmpty);
     });
 

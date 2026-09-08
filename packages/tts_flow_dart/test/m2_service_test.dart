@@ -466,6 +466,56 @@ void main() {
     );
 
     test(
+      'requestPlaybackFailed is separate from completed synthesis',
+      () async {
+        final output = _PlaybackAwareTestOutput(
+          outputId: 'playback-aware',
+          playbackCompletionDelay: null,
+          playbackFailureDelay: const Duration(milliseconds: 30),
+        );
+        final service = TtsFlow(
+          engine: SineTtsEngine(
+            engineId: 'fake-engine',
+            supportsStreaming: true,
+            chunkCount: 2,
+            chunkDelay: const Duration(milliseconds: 2),
+          ),
+          defaultOutput: output,
+        );
+
+        final events = <TtsRequestEvent>[];
+        final sub = service.requestEvents.listen(events.add);
+
+        await service.init();
+        await service.speak('playback-failed', 'hello').toList();
+        await Future<void>.delayed(const Duration(milliseconds: 60));
+
+        final completedIndex = events.indexWhere(
+          (event) =>
+              event.requestId == 'playback-failed' &&
+              event.type == TtsRequestEventType.requestCompleted,
+        );
+        final playbackFailedIndex = events.indexWhere(
+          (event) =>
+              event.requestId == 'playback-failed' &&
+              event.type == TtsRequestEventType.requestPlaybackFailed,
+        );
+
+        expect(completedIndex, isNonNegative);
+        expect(playbackFailedIndex, greaterThan(completedIndex));
+        final playbackEvent =
+            events[playbackFailedIndex.clamp(0, events.length - 1)];
+        expect(playbackEvent.state, isNull);
+        expect(playbackEvent.outputId, 'playback-aware');
+        expect(playbackEvent.playbackId, 'playback-playback-failed');
+        expect(playbackEvent.error?.code, TtsErrorCode.outputPlaybackFailed);
+
+        await sub.cancel();
+        await service.dispose();
+      },
+    );
+
+    test(
       'speak with output override routes audio only to override output',
       () async {
         final defaultOutput = _TrackingOutput(outputId: 'default');
@@ -886,19 +936,25 @@ final class _ChunkSpecEngine with TtsEngineDefaults implements TtsEngine {
   Future<void> dispose() async {}
 }
 
-final class _PlaybackAwareTestOutput implements TtsOutput, PlaybackAwareOutput {
+final class _PlaybackAwareTestOutput
+    implements TtsOutput, PlaybackAwareOutput, PlaybackFailureAwareOutput {
   _PlaybackAwareTestOutput({
     required this.outputId,
     required this.playbackCompletionDelay,
+    this.playbackFailureDelay,
   });
 
   @override
   final String outputId;
 
-  final Duration playbackCompletionDelay;
+  final Duration? playbackCompletionDelay;
+  final Duration? playbackFailureDelay;
   final StreamController<TtsOutputPlaybackCompletedEvent>
   _playbackCompletedController =
       StreamController<TtsOutputPlaybackCompletedEvent>.broadcast();
+  final StreamController<TtsOutputPlaybackFailedEvent>
+  _playbackFailedController =
+      StreamController<TtsOutputPlaybackFailedEvent>.broadcast();
 
   TtsOutputSession? _session;
   String? _playbackId;
@@ -913,6 +969,10 @@ final class _PlaybackAwareTestOutput implements TtsOutput, PlaybackAwareOutput {
   @override
   Stream<TtsOutputPlaybackCompletedEvent> get playbackCompletedEvents =>
       _playbackCompletedController.stream;
+
+  @override
+  Stream<TtsOutputPlaybackFailedEvent> get playbackFailedEvents =>
+      _playbackFailedController.stream;
 
   @override
   Future<void> init() async {}
@@ -940,19 +1000,42 @@ final class _PlaybackAwareTestOutput implements TtsOutput, PlaybackAwareOutput {
       throw StateError('No active session.');
     }
 
-    Future<void>.delayed(playbackCompletionDelay, () {
-      if (_playbackCompletedController.isClosed) {
-        return;
-      }
-      _playbackCompletedController.add(
-        TtsOutputPlaybackCompletedEvent(
-          requestId: session.requestId,
-          outputId: outputId,
-          playbackId: playbackId,
-          playedDuration: Duration(milliseconds: _bytesCount),
-        ),
-      );
-    });
+    final completionDelay = playbackCompletionDelay;
+    if (completionDelay != null) {
+      Future<void>.delayed(completionDelay, () {
+        if (_playbackCompletedController.isClosed) {
+          return;
+        }
+        _playbackCompletedController.add(
+          TtsOutputPlaybackCompletedEvent(
+            requestId: session.requestId,
+            outputId: outputId,
+            playbackId: playbackId,
+            playedDuration: Duration(milliseconds: _bytesCount),
+          ),
+        );
+      });
+    }
+    final failureDelay = playbackFailureDelay;
+    if (failureDelay != null) {
+      Future<void>.delayed(failureDelay, () {
+        if (_playbackFailedController.isClosed) {
+          return;
+        }
+        _playbackFailedController.add(
+          TtsOutputPlaybackFailedEvent(
+            requestId: session.requestId,
+            outputId: outputId,
+            playbackId: playbackId,
+            error: TtsError(
+              code: TtsErrorCode.outputPlaybackFailed,
+              message: 'Playback failed in test output.',
+              requestId: session.requestId,
+            ),
+          ),
+        );
+      });
+    }
 
     _session = null;
     _playbackId = null;
@@ -974,5 +1057,6 @@ final class _PlaybackAwareTestOutput implements TtsOutput, PlaybackAwareOutput {
     _session = null;
     _playbackId = null;
     await _playbackCompletedController.close();
+    await _playbackFailedController.close();
   }
 }

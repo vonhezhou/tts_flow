@@ -6,7 +6,7 @@
 
 它不是 Dart 层的音频解码器、通用封装格式解析器或媒体处理图。
 
-对调用方而言，它仍是普通的 `SpeakerBackend`：接收有序 `TtsChunk`、提供播放控制，并上报物理播放完成事件。
+对调用方而言，它仍是普通的 `SpeakerBackend`：接收有序 `TtsChunk`、提供播放控制，并上报物理播放完成或失败事件。
 
 ## 核心策略：有限 Source 的渐进播放
 
@@ -108,7 +108,9 @@ finalized
 
 ## 错误、控制与并发
 
-- 后端必须监听 `AudioPlayer.errorStream`，通过 `playbackErrorStream` 将异步平台解码错误关联到活跃 `playbackId` 并终止该 session。
+- 后端必须监听 `AudioPlayer.errorStream`，将异步平台解码错误关联到活跃 `playbackId` 并终止该 session。
+- `JustAudioBackend.playbackErrorStream` 保留 just_audio 的原始 `PlayerException`，供平台诊断；同时它通过可选的 `SpeakerPlaybackFailureAwareBackend` 能力发出标准 `SpeakerPlaybackFailedEvent`。`SpeakerOutput`、`MulticastOutput` 和 `TtsFlow.requestEvents` 会将其继续传递为 `TtsOutputPlaybackFailedEvent` 与 `requestPlaybackFailed`。
+- `requestPlaybackFailed` 是独立的物理播放终态：它不向已经完成的 `speak()` stream 补抛错误，也不追溯修改此前的 `requestCompleted`，更不触发合成队列的 fail-fast 策略。调用方应使用它提示播放失败、记录诊断或自行发起新的播放请求。
 - `addAudioSource`、移除 source、seek、play、stop 与处理 completed 回调必须进入同一个串行操作队列，防止 await 期间互相交错。
 - `pausePlayback`、`resumePlayback`、`stopPlayback` 必须能作用于合成已结束但设备仍在播放的 session；上层需要保留对应 playback handle。
 - 所有内部 `StreamController` 在 dispose 时关闭；非音频块分发的订阅语义应明确。
@@ -132,6 +134,16 @@ finalized
 3. append、stop、播放器 completed 与播放器 error 交错时，session 不泄漏、不误删。
 4. 以真实 Provider 抓取的正常流、网络抖动流和异常流回归测试。
 5. Android、iOS、macOS、Windows、Linux、Web 的 release 运行验证；分别记录首包到播放、停顿和错误表现。
+
+### Provider × 平台回归的最小可行做法
+
+不需要先拥有完整设备农场。回归样本和设备覆盖应分开管理：每份 Provider 样本可以在现有的一台真机或桌面设备上运行，设备矩阵只是逐步累积的验证记录，而不是阻止接入的前置条件。
+
+每个 Provider/格式组合至少准备三段可脱敏、可复放的样本及其元数据：正常连续流、真实网络抖动流，以及已知异常流（例如采样率切换或损坏流）。元数据至少记录格式/容器、采样率、chunk 字节数与到达相对时间；密钥、完整文本和用户音频不得提交到仓库。
+
+在任一可用真机上，使用 release 构建记录以下结果：首个音频 chunk 到开始出声的时间、可听停顿次数、`requestPlaybackFailed`/`playbackErrorStream` 事件，以及是否收到最终 `requestPlaybackCompleted`。对未覆盖平台只记录为“未验证”，不从结果推断跨平台成功。
+
+当 Provider 可用时，优先把它接入示例应用的显式测试入口；凭据通过运行环境或本地未跟踪配置传入。捕获到的时序样本则可作为不依赖网络的回归夹具，用于复现某个平台问题。
 
 ## 当前实现的演进原则
 

@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:typed_data';
 
 import 'package:test/test.dart';
@@ -93,6 +94,61 @@ void main() {
       expect(backend.writtenBytes['playback-spk-a'], [4]);
       expect(backend.writtenBytes['playback-spk-b'], [7, 8]);
     });
+
+    test('forwards an optional backend playback failure', () async {
+      final backend = _FakeSpeakerBackend();
+      final output = SpeakerOutput(backend: backend, outputId: 'speaker');
+      final events = <TtsOutputPlaybackFailedEvent>[];
+      final sub = output.playbackFailedEvents.listen(events.add);
+      addTearDown(sub.cancel);
+
+      backend.playbackFailedController.add(
+        const SpeakerPlaybackFailedEvent(
+          requestId: 'spk-failed',
+          playbackId: 'playback-spk-failed',
+          error: TtsError(
+            code: TtsErrorCode.outputPlaybackFailed,
+            message: 'decoder failed',
+            requestId: 'spk-failed',
+          ),
+        ),
+      );
+      await Future<void>.delayed(Duration.zero);
+
+      expect(events, hasLength(1));
+      expect(events.single.outputId, 'speaker');
+      expect(events.single.playbackId, 'playback-spk-failed');
+      expect(events.single.error.code, TtsErrorCode.outputPlaybackFailed);
+
+      await output.dispose();
+    });
+
+    test('MulticastOutput forwards child playback failures', () async {
+      final backend = _FakeSpeakerBackend();
+      final speaker = SpeakerOutput(backend: backend, outputId: 'speaker');
+      final output = MulticastOutput(outputs: [speaker]);
+      final events = <TtsOutputPlaybackFailedEvent>[];
+      final sub = output.playbackFailedEvents.listen(events.add);
+      addTearDown(sub.cancel);
+
+      backend.playbackFailedController.add(
+        const SpeakerPlaybackFailedEvent(
+          requestId: 'multi-failed',
+          playbackId: 'playback-multi-failed',
+          error: TtsError(
+            code: TtsErrorCode.outputPlaybackFailed,
+            message: 'device failed',
+          ),
+        ),
+      );
+      await Future<void>.delayed(Duration.zero);
+
+      expect(events, hasLength(1));
+      expect(events.single.outputId, 'speaker');
+      expect(events.single.playbackId, 'playback-multi-failed');
+
+      await output.dispose();
+    });
   });
 }
 
@@ -120,14 +176,21 @@ TtsAudioSpec _audioSpecForFormat(TtsAudioFormat format) {
   }
 }
 
-final class _FakeSpeakerBackend implements SpeakerBackend {
+final class _FakeSpeakerBackend
+    implements SpeakerBackend, SpeakerPlaybackFailureAwareBackend {
   final Map<String, List<int>> writtenBytes = <String, List<int>>{};
   final List<String> stoppedPlaybackIds = <String>[];
   final Map<String, String?> stopReasons = <String, String?>{};
+  final playbackFailedController =
+      StreamController<SpeakerPlaybackFailedEvent>.broadcast();
 
   @override
   Stream<SpeakerPlaybackCompletedEvent> get playbackCompletedEvents =>
       const Stream<SpeakerPlaybackCompletedEvent>.empty();
+
+  @override
+  Stream<SpeakerPlaybackFailedEvent> get playbackFailedEvents =>
+      playbackFailedController.stream;
 
   @override
   Set<AudioCapability> get supportedCapabilities => {
@@ -182,5 +245,5 @@ final class _FakeSpeakerBackend implements SpeakerBackend {
   Future<void> resumePlayback({required String playbackId}) async {}
 
   @override
-  Future<void> dispose() async {}
+  Future<void> dispose() => playbackFailedController.close();
 }

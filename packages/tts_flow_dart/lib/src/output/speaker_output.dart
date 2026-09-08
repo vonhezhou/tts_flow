@@ -5,6 +5,7 @@ import 'package:tts_flow_dart/src/core/audio_capability.dart';
 import 'package:tts_flow_dart/src/core/audio_spec.dart';
 import 'package:tts_flow_dart/src/core/synthesis_control.dart';
 import 'package:tts_flow_dart/src/core/tts_chunk.dart';
+import 'package:tts_flow_dart/src/core/tts_errors.dart';
 import 'package:tts_flow_dart/src/core/tts_output.dart';
 import 'package:tts_flow_dart/src/core/tts_output_session.dart';
 import 'package:tts_flow_dart/src/core/tts_policy.dart';
@@ -92,6 +93,14 @@ abstract interface class SpeakerBackend {
   Future<void> dispose();
 }
 
+/// Optional [SpeakerBackend] capability for platform playback failures.
+///
+/// Kept separate from [SpeakerBackend] so existing backends remain source and
+/// binary compatible. A failure can occur after audio ingestion has finalized.
+abstract interface class SpeakerPlaybackFailureAwareBackend {
+  Stream<SpeakerPlaybackFailedEvent> get playbackFailedEvents;
+}
+
 final class SpeakerPlaybackCompletedEvent {
   const SpeakerPlaybackCompletedEvent({
     required this.requestId,
@@ -106,13 +115,28 @@ final class SpeakerPlaybackCompletedEvent {
   final Duration? playedDuration;
 }
 
-final class SpeakerOutput implements TtsOutput, PlaybackAwareOutput {
+final class SpeakerPlaybackFailedEvent {
+  const SpeakerPlaybackFailedEvent({
+    required this.requestId,
+    required this.playbackId,
+    required this.error,
+  });
+
+  final String requestId;
+  final String playbackId;
+  final TtsError error;
+}
+
+final class SpeakerOutput
+    implements TtsOutput, PlaybackAwareOutput, PlaybackFailureAwareOutput {
   SpeakerOutput({
     required SpeakerBackend backend,
     this.outputId = 'speaker-output',
   }) : _backend = backend,
        _playbackCompletedController =
-           StreamController<TtsOutputPlaybackCompletedEvent>.broadcast() {
+           StreamController<TtsOutputPlaybackCompletedEvent>.broadcast(),
+       _playbackFailedController =
+           StreamController<TtsOutputPlaybackFailedEvent>.broadcast() {
     _playbackCompletedSubscription = _backend.playbackCompletedEvents.listen((
       event,
     ) {
@@ -125,13 +149,31 @@ final class SpeakerOutput implements TtsOutput, PlaybackAwareOutput {
         ),
       );
     });
+    if (_backend is SpeakerPlaybackFailureAwareBackend) {
+      final failureAwareBackend =
+          _backend as SpeakerPlaybackFailureAwareBackend;
+      _playbackFailedSubscription = failureAwareBackend.playbackFailedEvents
+          .listen((event) {
+            _playbackFailedController.add(
+              TtsOutputPlaybackFailedEvent(
+                requestId: event.requestId,
+                outputId: outputId,
+                playbackId: event.playbackId,
+                error: event.error,
+              ),
+            );
+          });
+    }
   }
 
   final SpeakerBackend _backend;
   final StreamController<TtsOutputPlaybackCompletedEvent>
   _playbackCompletedController;
+  final StreamController<TtsOutputPlaybackFailedEvent>
+  _playbackFailedController;
   late final StreamSubscription<SpeakerPlaybackCompletedEvent>
   _playbackCompletedSubscription;
+  StreamSubscription<SpeakerPlaybackFailedEvent>? _playbackFailedSubscription;
 
   @override
   final String outputId;
@@ -143,6 +185,10 @@ final class SpeakerOutput implements TtsOutput, PlaybackAwareOutput {
   @override
   Stream<TtsOutputPlaybackCompletedEvent> get playbackCompletedEvents =>
       _playbackCompletedController.stream;
+
+  @override
+  Stream<TtsOutputPlaybackFailedEvent> get playbackFailedEvents =>
+      _playbackFailedController.stream;
 
   TtsOutputSession? _session;
   String? _playbackId;
@@ -210,7 +256,9 @@ final class SpeakerOutput implements TtsOutput, PlaybackAwareOutput {
     final control = SynthesisControl()..cancel(CancelReason.serviceDispose);
     await onCancelSession(control);
     await _playbackCompletedSubscription.cancel();
+    await _playbackFailedSubscription?.cancel();
     await _playbackCompletedController.close();
+    await _playbackFailedController.close();
     await _backend.dispose();
   }
 }

@@ -45,6 +45,9 @@ mixin TtsUtteranceQueueMixin on TtsFlowEventBus {
   final Map<String, StreamSubscription<TtsOutputPlaybackCompletedEvent>>
   _playbackCompletionSubscriptions =
       <String, StreamSubscription<TtsOutputPlaybackCompletedEvent>>{};
+  final Map<String, StreamSubscription<TtsOutputPlaybackFailedEvent>>
+  _playbackFailureSubscriptions =
+      <String, StreamSubscription<TtsOutputPlaybackFailedEvent>>{};
 
   @protected
   Future<void> processQueue() async {
@@ -101,7 +104,7 @@ mixin TtsUtteranceQueueMixin on TtsFlowEventBus {
     final request = item.request;
     final effectiveOutput = request.output ?? defaultOutput!;
 
-    _registerPlaybackCompletionListener(
+    await _registerPlaybackEventListeners(
       requestId: request.requestId,
       output: effectiveOutput,
     );
@@ -206,7 +209,7 @@ mixin TtsUtteranceQueueMixin on TtsFlowEventBus {
         if (outputSessionInitialized) {
           await effectiveOutput.onCancelSession(control);
         }
-        await _cancelPlaybackCompletionListenerForRequest(request.requestId);
+        await _cancelPlaybackEventListenersForRequest(request.requestId);
         emitRequestEvent(
           TtsRequestEventType.requestStopped,
           requestId: request.requestId,
@@ -228,7 +231,7 @@ mixin TtsUtteranceQueueMixin on TtsFlowEventBus {
       return false;
     } catch (error) {
       final failure = _mapRequestFailure(error, request);
-      await _cancelPlaybackCompletionListenerForRequest(request.requestId);
+      await _cancelPlaybackEventListenersForRequest(request.requestId);
       emitRequestEvent(
         TtsRequestEventType.requestFailed,
         requestId: request.requestId,
@@ -328,50 +331,88 @@ mixin TtsUtteranceQueueMixin on TtsFlowEventBus {
 
   @protected
   Future<void> disposePlaybackCompletionListeners() async {
-    final subscriptions = _playbackCompletionSubscriptions.values.toList();
+    final subscriptions = <StreamSubscription<dynamic>>[
+      ..._playbackCompletionSubscriptions.values,
+      ..._playbackFailureSubscriptions.values,
+    ];
     _playbackCompletionSubscriptions.clear();
+    _playbackFailureSubscriptions.clear();
     for (final subscription in subscriptions) {
       await subscription.cancel();
     }
   }
 
-  void _registerPlaybackCompletionListener({
+  Future<void> _registerPlaybackEventListeners({
     required String requestId,
     required TtsOutput output,
-  }) {
-    if (output is! PlaybackAwareOutput) {
-      return;
+  }) async {
+    await _cancelPlaybackEventListenersForRequest(requestId);
+
+    if (output case final PlaybackAwareOutput playbackAwareOutput) {
+      final subscription = playbackAwareOutput.playbackCompletedEvents
+          .where((event) => event.requestId == requestId)
+          .take(1)
+          .listen(
+            (event) {
+              emitRequestEvent(
+                TtsRequestEventType.requestPlaybackCompleted,
+                requestId: event.requestId,
+                state: TtsRequestState.completed,
+                outputId: event.outputId,
+                playbackId: event.playbackId,
+                playedDuration: event.playedDuration,
+              );
+              unawaited(_cancelPlaybackFailureListenerForRequest(requestId));
+            },
+            onDone: () {
+              _playbackCompletionSubscriptions.remove(requestId);
+            },
+          );
+      _playbackCompletionSubscriptions[requestId] = subscription;
     }
-    final playbackAwareOutput = output as PlaybackAwareOutput;
 
-    unawaited(_cancelPlaybackCompletionListenerForRequest(requestId));
+    if (output case final PlaybackFailureAwareOutput failureAwareOutput) {
+      final subscription = failureAwareOutput.playbackFailedEvents
+          .where((event) => event.requestId == requestId)
+          .take(1)
+          .listen(
+            (event) {
+              // Physical playback can fail after requestCompleted has already
+              // been emitted. This is an independent terminal playback event,
+              // not a retroactive synthesis/request state transition.
+              emitRequestEvent(
+                TtsRequestEventType.requestPlaybackFailed,
+                requestId: event.requestId,
+                outputId: event.outputId,
+                playbackId: event.playbackId,
+                error: event.error,
+              );
+              unawaited(_cancelPlaybackCompletionListenerForRequest(requestId));
+            },
+            onDone: () {
+              _playbackFailureSubscriptions.remove(requestId);
+            },
+          );
+      _playbackFailureSubscriptions[requestId] = subscription;
+    }
+  }
 
-    final subscription = playbackAwareOutput.playbackCompletedEvents
-        .where((event) => event.requestId == requestId)
-        .take(1)
-        .listen(
-          (event) {
-            emitRequestEvent(
-              TtsRequestEventType.requestPlaybackCompleted,
-              requestId: event.requestId,
-              state: TtsRequestState.completed,
-              outputId: event.outputId,
-              playbackId: event.playbackId,
-              playedDuration: event.playedDuration,
-            );
-          },
-          onDone: () {
-            _playbackCompletionSubscriptions.remove(requestId);
-          },
-        );
-
-    _playbackCompletionSubscriptions[requestId] = subscription;
+  Future<void> _cancelPlaybackEventListenersForRequest(String requestId) async {
+    await _cancelPlaybackCompletionListenerForRequest(requestId);
+    await _cancelPlaybackFailureListenerForRequest(requestId);
   }
 
   Future<void> _cancelPlaybackCompletionListenerForRequest(
     String requestId,
   ) async {
     final subscription = _playbackCompletionSubscriptions.remove(requestId);
+    await subscription?.cancel();
+  }
+
+  Future<void> _cancelPlaybackFailureListenerForRequest(
+    String requestId,
+  ) async {
+    final subscription = _playbackFailureSubscriptions.remove(requestId);
     await subscription?.cancel();
   }
 }
