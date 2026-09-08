@@ -39,7 +39,6 @@ dependencies:
   logging_appenders: ^2.0.0+1
   tts_flow_dart: ^0.1.0
   tts_flow_flutter: ^0.1.0
-  http: ^1.6.0
   path: ^1.9.1
   path_provider: ^2.1.5
   url_launcher: ^6.3.2
@@ -60,6 +59,9 @@ dev_dependencies:
 
 # The following section is specific to Flutter packages.
 flutter:
+
+  assets:
+    - assets/audio/test_audio_yanfei.wav
 
   # The following line ensures that the Material Icons font is
   # included with your application, so that you can use the icons in

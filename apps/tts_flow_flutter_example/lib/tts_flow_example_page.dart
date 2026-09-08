@@ -1,20 +1,19 @@
 import 'dart:async';
+import 'dart:io';
 
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:logging/logging.dart';
 import 'package:path/path.dart' as p;
 import 'package:path_provider/path_provider.dart';
 import 'package:tts_flow_dart/tts_flow_dart.dart';
 import 'package:tts_flow_flutter/tts_flow_flutter.dart';
-import 'package:tts_flow_flutter_example/xiaomi_tts.dart';
 import 'package:url_launcher/url_launcher.dart';
 
-const String _xiaomiApiKey = String.fromEnvironment('XIAOMI_MIMO_API_KEY');
+const _sampleAudioAsset = 'assets/audio/test_audio_yanfei.wav';
 
 class TtsFlowExamplePage extends StatefulWidget {
-  const TtsFlowExamplePage({required this.useXiaomiTts, super.key});
-
-  final bool useXiaomiTts;
+  const TtsFlowExamplePage({super.key});
 
   @override
   State<TtsFlowExamplePage> createState() => _TtsFlowExamplePageState();
@@ -60,7 +59,7 @@ class _TtsFlowExamplePageState extends State<TtsFlowExamplePage> {
   double _minPitch = 0.0;
   double _maxPitch = 0.0;
 
-  String get _engineLabel => widget.useXiaomiTts ? 'Xiaomi Mimo' : 'Sine';
+  String get _engineLabel => 'Bundled WAV sample';
 
   @override
   void initState() {
@@ -86,10 +85,11 @@ class _TtsFlowExamplePageState extends State<TtsFlowExamplePage> {
   Future<void> _initService() async {
     final outputDir = await getTemporaryDirectory();
     final outputWavPath = p.join(outputDir.path, 'tts_flow_example.wav');
+    final sampleAudioPath = await _copySampleAudioToTemp(outputDir);
     _outputDirPath = outputDir.path;
     _outputWavPath = outputWavPath;
 
-    final engine = _createEngine();
+    final engine = _createEngine(sampleAudioPath);
 
     final service = TtsFlow(
       engine: engine,
@@ -100,9 +100,9 @@ class _TtsFlowExamplePageState extends State<TtsFlowExamplePage> {
             outputId: 'decoder',
             output: WavFileOutput(outputWavPath),
             pcmFormat: const PcmDescriptor(
-              sampleRateHz: 16000, // 强制 16kHz
-              channels: 1, // 强制单声道
-              bitsPerSample: 16, // 强制 16 位
+              sampleRateHz: 32000,
+              channels: 1,
+              bitsPerSample: 16,
             ),
           ),
         ],
@@ -111,9 +111,7 @@ class _TtsFlowExamplePageState extends State<TtsFlowExamplePage> {
 
     try {
       await service.init();
-      service.preferredFormat = widget.useXiaomiTts
-          ? TtsAudioFormat.mp3
-          : TtsAudioFormat.pcm;
+      service.preferredFormat = TtsAudioFormat.pcm;
 
       _minVolume = engine.minVolume;
       _maxVolume = engine.maxVolume;
@@ -188,7 +186,7 @@ class _TtsFlowExamplePageState extends State<TtsFlowExamplePage> {
         _voices = voices;
         _selectedVoiceId = selectedVoiceId;
         _status =
-            'Ready using $_engineLabel engine. Tap "Speak" to play through the device speaker. WAV: $outputWavPath';
+            'Ready using $_engineLabel. Tap "Speak" to play it through the device speaker. Decoded WAV: $outputWavPath';
       });
     } catch (error, stackTrace) {
       _log.severe('Failed to initialize TtsFlow.', error, stackTrace);
@@ -202,27 +200,26 @@ class _TtsFlowExamplePageState extends State<TtsFlowExamplePage> {
     }
   }
 
-  TtsEngineDefaults _createEngine() {
-    return FileTtsEngine(
-      engineId: "wav-file",
-      provider: WavFileContentProvider.fromWav(
-        "D:/Codes/xiaomi_tts_py/tmp/idn34b_old.wav",
+  Future<String> _copySampleAudioToTemp(Directory outputDir) async {
+    final sampleFile = File(p.join(outputDir.path, 'tts_flow_sample.wav'));
+    final assetData = await rootBundle.load(_sampleAudioAsset);
+    await sampleFile.writeAsBytes(
+      assetData.buffer.asUint8List(
+        assetData.offsetInBytes,
+        assetData.lengthInBytes,
       ),
+      flush: true,
     );
-    return widget.useXiaomiTts
-        ? XiaomiTts.fromClientConfig(
-            config: OpenAiClientConfig(
-              apiKey: _xiaomiApiKey,
-              endpoint: XiaomiTts.xiaomiEndpoint,
-              model: XiaomiTts.xiaomiModel,
-            ),
-          )
-        : SineTtsEngine(
-            engineId: 'flutter-sine-engine',
-            supportsStreaming: true,
-            chunkCount: 6,
-            chunkDelay: const Duration(milliseconds: 20),
-          );
+    return sampleFile.path;
+  }
+
+  TtsEngineDefaults _createEngine(String sampleAudioPath) {
+    return FileTtsEngine(
+      engineId: 'bundled-wav-file',
+      provider: WavFileContentProvider.fromWav(sampleAudioPath),
+      chunkSizeBytes: 4096,
+      maxBytesPerSecond: 64000,
+    );
   }
 
   void _onQueueEvent(TtsQueueEvent event) {
