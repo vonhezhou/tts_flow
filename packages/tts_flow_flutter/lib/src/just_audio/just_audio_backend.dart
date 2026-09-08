@@ -29,6 +29,33 @@ final class JustAudioPlaybackErrorEvent {
   final PlayerException error;
 }
 
+/// A non-finalized playback session ran out of queued source data.
+///
+/// This is a diagnostic event for measuring controlled network-jitter cases.
+/// It does not mean the session failed: a later chunk can create a new source
+/// and resume playback.
+final class JustAudioPlaybackWaitingEvent {
+  /// Creates a waiting event for a source-list playback underflow.
+  const JustAudioPlaybackWaitingEvent({
+    required this.playbackId,
+    required this.requestId,
+    required this.sourceIndex,
+    required this.timestamp,
+  });
+
+  /// The backend-owned playback session identifier.
+  final String playbackId;
+
+  /// The TTS request that owns this playback session.
+  final String requestId;
+
+  /// Index of the source that exhausted the currently queued playlist.
+  final int sourceIndex;
+
+  /// Time at which the backend observed the source-list underflow.
+  final DateTime timestamp;
+}
+
 final class _PlaybackSession {
   _PlaybackSession({
     required this.playbackId,
@@ -154,6 +181,9 @@ class JustAudioBackend
 
   final StreamController<JustAudioPlaybackErrorEvent> _playbackErrorController =
       StreamController<JustAudioPlaybackErrorEvent>.broadcast();
+  final StreamController<JustAudioPlaybackWaitingEvent>
+  _playbackWaitingController =
+      StreamController<JustAudioPlaybackWaitingEvent>.broadcast();
   late final StreamSubscription<PlayerException> _errorSubscription;
 
   final StreamController<TtsChunk> _ttsChunkController =
@@ -182,6 +212,13 @@ class JustAudioBackend
   /// Platform playback errors associated with a TTS playback session.
   Stream<JustAudioPlaybackErrorEvent> get playbackErrorStream =>
       _playbackErrorController.stream;
+
+  /// Emits when an unfinished session exhausts its currently queued sources.
+  ///
+  /// Use this for diagnostics and integration-test telemetry; it is not a
+  /// playback failure and a later chunk may resume the session.
+  Stream<JustAudioPlaybackWaitingEvent> get playbackWaitingStream =>
+      _playbackWaitingController.stream;
 
   /// The underlying just_audio player instance.
   AudioPlayer get player => _player;
@@ -297,6 +334,7 @@ class JustAudioBackend
     await _playbackFailedController.close();
     await _ttsChunkController.close();
     await _playbackErrorController.close();
+    await _playbackWaitingController.close();
   }
 
   @override
@@ -501,6 +539,16 @@ class JustAudioBackend
 
     session.completedSourceIndexes.add(source.index);
     if (!session.isFinalized || !identical(source, session.tailSource)) {
+      if (!session.isFinalized && !session.isWaitingForNextSource) {
+        _playbackWaitingController.add(
+          JustAudioPlaybackWaitingEvent(
+            playbackId: session.playbackId,
+            requestId: session.requestId,
+            sourceIndex: source.index,
+            timestamp: DateTime.now().toUtc(),
+          ),
+        );
+      }
       session.isWaitingForNextSource = !session.isFinalized;
       return;
     }

@@ -111,6 +111,7 @@ finalized
 - 后端必须监听 `AudioPlayer.errorStream`，将异步平台解码错误关联到活跃 `playbackId` 并终止该 session。
 - `JustAudioBackend.playbackErrorStream` 保留 just_audio 的原始 `PlayerException`，供平台诊断；同时它通过可选的 `SpeakerPlaybackFailureAwareBackend` 能力发出标准 `SpeakerPlaybackFailedEvent`。`SpeakerOutput`、`MulticastOutput` 和 `TtsFlow.requestEvents` 会将其继续传递为 `TtsOutputPlaybackFailedEvent` 与 `requestPlaybackFailed`。
 - `requestPlaybackFailed` 是独立的物理播放终态：它不向已经完成的 `speak()` stream 补抛错误，也不追溯修改此前的 `requestCompleted`，更不触发合成队列的 fail-fast 策略。调用方应使用它提示播放失败、记录诊断或自行发起新的播放请求。
+- `playbackWaitingStream` 是非终态诊断信号：未 finalized 的 source-list 耗尽时发出，后续 chunk 仍可创建新 source 并恢复。它为模拟器、真机和单元测试提供可自动断言的抖动指标，不等同于解码错误。
 - `addAudioSource`、移除 source、seek、play、stop 与处理 completed 回调必须进入同一个串行操作队列，防止 await 期间互相交错。
 - `pausePlayback`、`resumePlayback`、`stopPlayback` 必须能作用于合成已结束但设备仍在播放的 session；上层需要保留对应 playback handle。
 - 所有内部 `StreamController` 在 dispose 时关闭；非音频块分发的订阅语义应明确。

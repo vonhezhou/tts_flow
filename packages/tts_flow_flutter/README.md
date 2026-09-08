@@ -31,6 +31,10 @@ and `TtsFlow.requestEvents` as `requestPlaybackFailed`; this is separate from
 the synthesis request result, so an already completed `speak()` stream is not
 retroactively failed.
 
+For deterministic jitter regression, `playbackWaitingStream` reports when an
+unfinished source list is exhausted. A later chunk can recover from this state;
+the event is diagnostic rather than a playback failure.
+
 ## Installation 💻
 
 **❗ In order to start using Tts Flow Flutter you must have the [Flutter SDK][flutter_install_link] installed on your machine.**

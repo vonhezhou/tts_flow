@@ -12,6 +12,21 @@ class _MockAudioPlayer extends Mock implements AudioPlayer {}
 
 class _FakeAudioSource extends Fake implements AudioSource {}
 
+TtsAudioChunk _audioChunk({
+  required String requestId,
+  required int sequenceNumber,
+  required List<int> bytes,
+}) {
+  return TtsAudioChunk(
+    bytes: Uint8List.fromList(bytes),
+    requestId: requestId,
+    sequenceNumber: sequenceNumber,
+    isLastChunk: false,
+    timestamp: DateTime.now(),
+    audioSpec: const TtsAudioSpec.mp3(),
+  );
+}
+
 void main() {
   setUpAll(() {
     registerFallbackValue(_FakeAudioSource());
@@ -154,8 +169,7 @@ void main() {
     );
 
     test(
-      'retains a completed source until a non-finalized playback '
-      'receives more data',
+      'recovers after controlled source-list underflow and completes once',
       () async {
         final backend = JustAudioBackend.testing(player: player);
         addTearDown(backend.dispose);
@@ -163,6 +177,11 @@ void main() {
         final events = <SpeakerPlaybackCompletedEvent>[];
         final sub = backend.playbackCompletedEvents.listen(events.add);
         addTearDown(sub.cancel);
+        final waitingEvents = <JustAudioPlaybackWaitingEvent>[];
+        final waitingSub = backend.playbackWaitingStream.listen(
+          waitingEvents.add,
+        );
+        addTearDown(waitingSub.cancel);
 
         final playbackId = await backend.startPlayback(
           requestId: 'r1',
@@ -190,6 +209,9 @@ void main() {
 
         expect(events, isEmpty);
         expect(sources, hasLength(1));
+        expect(waitingEvents, hasLength(1));
+        expect(waitingEvents.single.playbackId, playbackId);
+        expect(waitingEvents.single.sourceIndex, 0);
 
         await backend.appendChunk(
           playbackId: playbackId,
@@ -214,7 +236,65 @@ void main() {
 
         expect(events, hasLength(1));
         expect(events.single.playbackId, playbackId);
+        expect(waitingEvents, hasLength(1));
         expect(sources, isEmpty);
+      },
+    );
+
+    test(
+      'keeps the next segment queued without a waiting event when supply '
+      'remains continuous',
+      () async {
+        final backend = JustAudioBackend.testing(player: player);
+        addTearDown(backend.dispose);
+
+        final waitingEvents = <JustAudioPlaybackWaitingEvent>[];
+        final waitingSub = backend.playbackWaitingStream.listen(
+          waitingEvents.add,
+        );
+        addTearDown(waitingSub.cancel);
+        final completedEvents = <SpeakerPlaybackCompletedEvent>[];
+        final completedSub = backend.playbackCompletedEvents.listen(
+          completedEvents.add,
+        );
+        addTearDown(completedSub.cancel);
+
+        final playbackId = await backend.startPlayback(
+          requestId: 'continuous',
+          audioSpec: const TtsAudioSpec.mp3(),
+        );
+        await backend.appendChunk(
+          playbackId: playbackId,
+          chunk: _audioChunk(
+            requestId: 'continuous',
+            sequenceNumber: 0,
+            bytes: [1, 2],
+          ),
+        );
+        final firstSource = sources.single as ChunkAudioSource;
+        await firstSource.request();
+
+        await backend.appendChunk(
+          playbackId: playbackId,
+          chunk: _audioChunk(
+            requestId: 'continuous',
+            sequenceNumber: 1,
+            bytes: [3, 4],
+          ),
+        );
+        expect(sources, hasLength(2));
+        expect(waitingEvents, isEmpty);
+
+        await backend.finalizePlayback(playbackId: playbackId);
+        currentIndex = 1;
+        processingState = ProcessingState.completed;
+        playing = false;
+        processingController.add(ProcessingState.completed);
+        await Future<void>.delayed(Duration.zero);
+
+        expect(waitingEvents, isEmpty);
+        expect(completedEvents, hasLength(1));
+        expect(completedEvents.single.playbackId, playbackId);
       },
     );
 
