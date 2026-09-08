@@ -22,6 +22,7 @@ void main() {
     late StreamController<ProcessingState> processingController;
     late StreamController<Duration?> durationController;
     late StreamController<Duration> positionController;
+    late StreamController<PlayerException> errorController;
     late List<AudioSource> sources;
     late bool playing;
     late ProcessingState processingState;
@@ -32,6 +33,7 @@ void main() {
       processingController = StreamController<ProcessingState>.broadcast();
       durationController = StreamController<Duration?>.broadcast();
       positionController = StreamController<Duration>.broadcast();
+      errorController = StreamController<PlayerException>.broadcast();
       sources = <AudioSource>[];
       playing = false;
       processingState = ProcessingState.idle;
@@ -46,6 +48,7 @@ void main() {
       when(
         () => player.positionStream,
       ).thenAnswer((_) => positionController.stream);
+      when(() => player.errorStream).thenAnswer((_) => errorController.stream);
       when(() => player.audioSources).thenAnswer((_) => sources);
       when(() => player.playing).thenAnswer((_) => playing);
       when(() => player.processingState).thenAnswer((_) => processingState);
@@ -92,10 +95,11 @@ void main() {
       await processingController.close();
       await durationController.close();
       await positionController.close();
+      await errorController.close();
     });
 
     test(
-      'finalize keeps unstarted tail and next playback uses new source',
+      'source becomes terminal only when playback is finalized',
       () async {
         final backend = JustAudioBackend.testing(player: player);
         addTearDown(backend.dispose);
@@ -120,7 +124,7 @@ void main() {
 
         final firstSource = sources.first as ChunkAudioSource;
         expect(firstSource.playbackId, firstPlaybackId);
-        expect(firstSource.isTerminalSegment, isTrue);
+        expect(firstSource.isTerminalSegment, isFalse);
 
         await backend.finalizePlayback(playbackId: firstPlaybackId);
         expect(firstSource.isTerminalSegment, isTrue);
@@ -146,6 +150,71 @@ void main() {
         expect(identical(firstSource, secondSource), isFalse);
         expect(secondSource.playbackId, secondPlaybackId);
         expect(firstSource.playbackId, firstPlaybackId);
+      },
+    );
+
+    test(
+      'retains a completed source until a non-finalized playback '
+      'receives more data',
+      () async {
+        final backend = JustAudioBackend.testing(player: player);
+        addTearDown(backend.dispose);
+
+        final events = <SpeakerPlaybackCompletedEvent>[];
+        final sub = backend.playbackCompletedEvents.listen(events.add);
+        addTearDown(sub.cancel);
+
+        final playbackId = await backend.startPlayback(
+          requestId: 'r1',
+          audioSpec: const TtsAudioSpec.mp3(),
+        );
+        await backend.appendChunk(
+          playbackId: playbackId,
+          chunk: TtsAudioChunk(
+            bytes: Uint8List.fromList([1, 2]),
+            requestId: 'r1',
+            sequenceNumber: 0,
+            isLastChunk: false,
+            timestamp: DateTime.now(),
+            audioSpec: const TtsAudioSpec.mp3(),
+          ),
+        );
+
+        final firstSource = sources.single as ChunkAudioSource;
+        await firstSource.request();
+        currentIndex = 0;
+        processingState = ProcessingState.completed;
+        playing = false;
+        processingController.add(ProcessingState.completed);
+        await Future<void>.delayed(Duration.zero);
+
+        expect(events, isEmpty);
+        expect(sources, hasLength(1));
+
+        await backend.appendChunk(
+          playbackId: playbackId,
+          chunk: TtsAudioChunk(
+            bytes: Uint8List.fromList([3, 4]),
+            requestId: 'r1',
+            sequenceNumber: 1,
+            isLastChunk: true,
+            timestamp: DateTime.now(),
+            audioSpec: const TtsAudioSpec.mp3(),
+          ),
+        );
+
+        expect(sources, hasLength(2));
+        expect(currentIndex, 1);
+        expect(playing, isTrue);
+
+        await backend.finalizePlayback(playbackId: playbackId);
+        processingState = ProcessingState.completed;
+        processingController.add(ProcessingState.completed);
+        await Future<void>.delayed(Duration.zero);
+
+        expect(events, hasLength(1));
+        expect(events.single.playbackId, playbackId);
+        expect(sources, isEmpty);
       },
     );
 
@@ -179,6 +248,41 @@ void main() {
         );
       },
     );
+
+    test('emits and cleans up an attributed platform playback error', () async {
+      final backend = JustAudioBackend.testing(player: player);
+      addTearDown(backend.dispose);
+
+      final events = <JustAudioPlaybackErrorEvent>[];
+      final sub = backend.playbackErrorStream.listen(events.add);
+      addTearDown(sub.cancel);
+
+      final playbackId = await backend.startPlayback(
+        requestId: 'r1',
+        audioSpec: const TtsAudioSpec.mp3(),
+      );
+      await backend.appendChunk(
+        playbackId: playbackId,
+        chunk: TtsAudioChunk(
+          bytes: Uint8List.fromList([1, 2]),
+          requestId: 'r1',
+          sequenceNumber: 0,
+          isLastChunk: false,
+          timestamp: DateTime.now(),
+          audioSpec: const TtsAudioSpec.mp3(),
+        ),
+      );
+
+      currentIndex = 0;
+      errorController.add(PlayerException(1, 'decode failed', 0));
+      await Future<void>.delayed(Duration.zero);
+
+      expect(events, hasLength(1));
+      expect(events.single.playbackId, playbackId);
+      expect(events.single.requestId, 'r1');
+      expect(events.single.error.message, 'decode failed');
+      expect(sources, isEmpty);
+    });
 
     test('emits playbackCompletedEvents once for terminal segment', () async {
       final backend = JustAudioBackend.testing(player: player);

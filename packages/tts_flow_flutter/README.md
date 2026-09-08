@@ -6,6 +6,28 @@
 
 A Very Good Project created by Very Good CLI.
 
+## JustAudio streaming playback
+
+`JustAudioBackend` plays compatible online TTS streams by appending finite
+`StreamAudioSource` segments to a just_audio source list. It preserves the
+encoded audio path; it does not decode or packetize provider audio in Dart.
+
+The provider must continuously supply audio that is compatible with source-list
+playback on the target platform. Provider-specific stream discontinuities, such
+as an encoding parameter change within one response, must be handled by that
+provider adapter or by an application-level fallback.
+
+Because just_audio implements `StreamAudioSource` using a localhost proxy on
+some native platforms, host applications must configure Android release network
+access and localhost cleartext traffic, iOS/macOS ATS, and macOS sandbox network
+entitlements. The example app includes these settings. See the repository's
+[JustAudioBackend design](../../docs/just_audio_backend.md) for the lifecycle,
+platform, and compatibility requirements.
+
+Platform errors that occur after audio has been handed to just_audio are exposed
+through `JustAudioBackend.playbackErrorStream` and terminate the affected
+playback session.
+
 ## Installation 💻
 
 **❗ In order to start using Tts Flow Flutter you must have the [Flutter SDK][flutter_install_link] installed on your machine.**

@@ -108,7 +108,7 @@ finalized
 
 ## 错误、控制与并发
 
-- 后端必须监听并转发 `AudioPlayer.errorStream`，使异步平台解码错误能关联到活跃 `playbackId`。
+- 后端必须监听 `AudioPlayer.errorStream`，通过 `playbackErrorStream` 将异步平台解码错误关联到活跃 `playbackId` 并终止该 session。
 - `addAudioSource`、移除 source、seek、play、stop 与处理 completed 回调必须进入同一个串行操作队列，防止 await 期间互相交错。
 - `pausePlayback`、`resumePlayback`、`stopPlayback` 必须能作用于合成已结束但设备仍在播放的 session；上层需要保留对应 playback handle。
 - 所有内部 `StreamController` 在 dispose 时关闭；非音频块分发的订阅语义应明确。

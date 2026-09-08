@@ -10,6 +10,25 @@ import 'package:tts_flow_flutter/src/just_audio/playback_pos.dart';
 
 final _logger = Logger('JustAudioPlayer');
 
+/// A platform playback failure associated with one TTS playback session.
+final class JustAudioPlaybackErrorEvent {
+  /// Creates a playback error event.
+  const JustAudioPlaybackErrorEvent({
+    required this.playbackId,
+    required this.requestId,
+    required this.error,
+  });
+
+  /// The backend-owned playback session identifier.
+  final String playbackId;
+
+  /// The TTS request that owns the failed playback session.
+  final String requestId;
+
+  /// The platform error emitted by just_audio.
+  final PlayerException error;
+}
+
 final class _PlaybackSession {
   _PlaybackSession({
     required this.playbackId,
@@ -25,8 +44,11 @@ final class _PlaybackSession {
   int totalBytes = 0;
   bool isFinalized = false;
   bool isStopped = false;
+  bool isWaitingForNextSource = false;
 
   int nextIndex = 0;
+
+  final completedSourceIndexes = <int>{};
 
   final sourceDurationMap = <int, Duration>{};
 
@@ -69,11 +91,16 @@ class JustAudioBackend implements SpeakerBackend {
     _processingStateSubscription = _player.processingStateStream.listen((
       state,
     ) {
-      unawaited(_onProcessingStateChanged(state));
+      unawaited(
+        _enqueuePlayerOperation(() => _onProcessingStateChanged(state)),
+      );
     });
 
     _durationSubscription = _player.durationStream.listen(_onDurationChanged);
     _posSubscription = _player.positionStream.listen(_onPosChanged);
+    _errorSubscription = _player.errorStream.listen((error) {
+      unawaited(_enqueuePlayerOperation(() => _onPlayerError(error)));
+    });
   }
 
   /// Testing constructor that injects a preconfigured player.
@@ -82,10 +109,15 @@ class JustAudioBackend implements SpeakerBackend {
     _processingStateSubscription = _player.processingStateStream.listen((
       state,
     ) {
-      unawaited(_onProcessingStateChanged(state));
+      unawaited(
+        _enqueuePlayerOperation(() => _onProcessingStateChanged(state)),
+      );
     });
     _durationSubscription = _player.durationStream.listen(_onDurationChanged);
     _posSubscription = _player.positionStream.listen(_onPosChanged);
+    _errorSubscription = _player.errorStream.listen((error) {
+      unawaited(_enqueuePlayerOperation(() => _onPlayerError(error)));
+    });
   }
 
   static bool _isInitialized = false;
@@ -117,8 +149,15 @@ class JustAudioBackend implements SpeakerBackend {
       StreamController<JustAudioPosEvent>.broadcast();
   late final StreamSubscription<Duration?> _posSubscription;
 
+  final StreamController<JustAudioPlaybackErrorEvent> _playbackErrorController =
+      StreamController<JustAudioPlaybackErrorEvent>.broadcast();
+  late final StreamSubscription<PlayerException> _errorSubscription;
+
   final StreamController<TtsChunk> _ttsChunkController =
-      StreamController<TtsChunk>();
+      StreamController<TtsChunk>.broadcast();
+
+  Future<void> _playerOperationTail = Future<void>.value();
+  var _disposeRequested = false;
 
   /// Stream of the current position in current playback session.
   /// This stream is updated every time the position changes.
@@ -137,6 +176,10 @@ class JustAudioBackend implements SpeakerBackend {
   ///       to see what kind of non-audio chunks it emits.
   Stream<TtsChunk> get ttsChunkStream => _ttsChunkController.stream;
 
+  /// Platform playback errors associated with a TTS playback session.
+  Stream<JustAudioPlaybackErrorEvent> get playbackErrorStream =>
+      _playbackErrorController.stream;
+
   /// The underlying just_audio player instance.
   AudioPlayer get player => _player;
 
@@ -151,16 +194,23 @@ class JustAudioBackend implements SpeakerBackend {
 
   /// Reset the player by stopping playback,
   /// seeking to the beginning, and clearing all audio sources.
-  Future<void> reset() async {
+  Future<void> reset() => _enqueuePlayerOperation(() async {
     await _player.stop();
     await _player.seek(Duration.zero);
     await _player.clearAudioSources();
     _sessions.clear();
     _completedPlaybackIds.clear();
-  }
+  });
 
   @override
   Future<void> appendChunk({
+    required String playbackId,
+    required TtsChunk chunk,
+  }) => _enqueuePlayerOperation(
+    () => _appendChunk(playbackId: playbackId, chunk: chunk),
+  );
+
+  Future<void> _appendChunk({
     required String playbackId,
     required TtsChunk chunk,
   }) async {
@@ -189,13 +239,18 @@ class JustAudioBackend implements SpeakerBackend {
       }
     }
 
-    session.totalBytes += chunk.bytes.length;
+    session
+      ..totalBytes += chunk.bytes.length
+      ..isWaitingForNextSource = false;
 
     await _ensurePlaybackRunning();
   }
 
   @override
-  Future<void> finalizePlayback({required String playbackId}) async {
+  Future<void> finalizePlayback({required String playbackId}) =>
+      _enqueuePlayerOperation(() => _finalizePlayback(playbackId));
+
+  Future<void> _finalizePlayback(String playbackId) async {
     final session = _requireSession(playbackId);
     if (session.isStopped) {
       throw StateError('Playback is stopped: $playbackId');
@@ -205,40 +260,56 @@ class JustAudioBackend implements SpeakerBackend {
     }
 
     session.isFinalized = true;
+    final tail = session.tailSource;
+    tail?.isTerminalSegment = true;
+    if (tail == null || session.completedSourceIndexes.contains(tail.index)) {
+      await _completePlayback(session);
+    }
   }
 
   @override
   Future<void> dispose() async {
+    if (_disposeRequested) {
+      return;
+    }
+    _disposeRequested = true;
     await _processingStateSubscription.cancel();
     await _durationSubscription.cancel();
     await _posSubscription.cancel();
-    await _player.stop();
-    await _player.clearAudioSources();
-    _sessions.clear();
-    _completedPlaybackIds.clear();
-    await _player.dispose();
+    await _errorSubscription.cancel();
+    await _enqueuePlayerOperation(() async {
+      await _player.stop();
+      await _player.clearAudioSources();
+      _sessions.clear();
+      _completedPlaybackIds.clear();
+      await _player.dispose();
+    });
     await _posEeventController.close();
     await _durationEeventController.close();
     await _playbackCompletedController.close();
+    await _ttsChunkController.close();
+    await _playbackErrorController.close();
   }
 
   @override
-  Future<void> pausePlayback({required String playbackId}) async {
-    _requireSession(playbackId);
-    await _player.pause();
-  }
+  Future<void> pausePlayback({required String playbackId}) =>
+      _enqueuePlayerOperation(() async {
+        _requireSession(playbackId);
+        await _player.pause();
+      });
 
   @override
-  Future<void> resumePlayback({required String playbackId}) async {
-    _requireSession(playbackId);
-    await _ensurePlaybackRunning();
-  }
+  Future<void> resumePlayback({required String playbackId}) =>
+      _enqueuePlayerOperation(() async {
+        _requireSession(playbackId);
+        await _ensurePlaybackRunning();
+      });
 
   @override
   Future<String> startPlayback({
     required String requestId,
     required TtsAudioSpec audioSpec,
-  }) async {
+  }) => _enqueuePlayerOperation(() async {
     var playbackId = requestId;
     var suffix = 1;
     while (_sessions.containsKey(playbackId)) {
@@ -253,10 +324,17 @@ class JustAudioBackend implements SpeakerBackend {
     );
     _completedPlaybackIds.remove(playbackId);
     return playbackId;
-  }
+  });
 
   @override
   Future<void> stopPlayback({
+    required String playbackId,
+    String? reason,
+  }) => _enqueuePlayerOperation(
+    () => _stopPlayback(playbackId: playbackId, reason: reason),
+  );
+
+  Future<void> _stopPlayback({
     required String playbackId,
     String? reason,
   }) async {
@@ -304,17 +382,12 @@ class JustAudioBackend implements SpeakerBackend {
   }
 
   Future<ChunkAudioSource> _createSegment(_PlaybackSession session) async {
-    final previousTail = session.tailSource;
-    if (previousTail != null) {
-      previousTail.markNonTerminal();
-    }
-
     final source = ChunkAudioSource(
       audioSpec: session.audioSpec,
       playbackId: session.playbackId,
       index: session.nextIndex,
       requestId: session.requestId,
-      isTerminalSegment: true,
+      isTerminalSegment: false,
     );
     session.nextIndex++;
 
@@ -412,43 +485,91 @@ class JustAudioBackend implements SpeakerBackend {
         'Unexpected audio source type in playlist: ${source.runtimeType}',
       );
     }
-    if (!source.isTerminalSegment) {
-      return;
-    }
-
     final playbackId = source.playbackId;
-    if (!_completedPlaybackIds.add(playbackId)) {
-      return;
-    }
-
     final session = _sessions[playbackId];
     if (session == null) {
+      return;
+    }
+
+    session.completedSourceIndexes.add(source.index);
+    if (!session.isFinalized || !identical(source, session.tailSource)) {
+      session.isWaitingForNextSource = !session.isFinalized;
+      return;
+    }
+
+    await _completePlayback(session);
+  }
+
+  Future<void> _completePlayback(_PlaybackSession session) async {
+    if (!_completedPlaybackIds.add(session.playbackId)) {
       return;
     }
 
     _playbackCompletedController.add(
       SpeakerPlaybackCompletedEvent(
         requestId: session.requestId,
-        playbackId: playbackId,
+        playbackId: session.playbackId,
         playedDuration: session.calcTotalDuration(),
       ),
     );
 
-    final range = _findRangeForPlayback(playbackId);
+    final range = _findRangeForPlayback(session.playbackId);
     if (range == null) {
-      _sessions.remove(playbackId);
+      _sessions.remove(session.playbackId);
       return;
     }
 
     final currentIndex = _player.currentIndex;
     await _player.removeAudioSourceRange(range.start, range.endExclusive);
-    _sessions.remove(playbackId);
+    _sessions.remove(session.playbackId);
 
     if (currentIndex != null &&
         currentIndex >= range.start &&
         currentIndex < range.endExclusive) {
       await _resumeAfterRemoval(range.start);
     }
+  }
+
+  Future<void> _onPlayerError(PlayerException error) async {
+    final sourceIndex = error.index ?? _player.currentIndex;
+    if (sourceIndex == null ||
+        sourceIndex < 0 ||
+        sourceIndex >= _player.audioSources.length) {
+      _logger.warning('Unattributed just_audio playback error: $error');
+      return;
+    }
+
+    final source = _player.audioSources[sourceIndex];
+    if (source is! ChunkAudioSource) {
+      _logger.warning('Playback error on unexpected source type: $error');
+      return;
+    }
+
+    final session = _sessions[source.playbackId];
+    if (session == null) {
+      return;
+    }
+
+    _playbackErrorController.add(
+      JustAudioPlaybackErrorEvent(
+        playbackId: session.playbackId,
+        requestId: session.requestId,
+        error: error,
+      ),
+    );
+    await _stopPlayback(
+      playbackId: session.playbackId,
+      reason: 'just_audio error ${error.code}: ${error.message ?? ''}',
+    );
+  }
+
+  Future<T> _enqueuePlayerOperation<T>(Future<T> Function() operation) {
+    final result = _playerOperationTail.then((_) => operation());
+    _playerOperationTail = result.then<void>(
+      (_) {},
+      onError: (_, _) {},
+    );
+    return result;
   }
 
   AudioSource? _currentSource() {
