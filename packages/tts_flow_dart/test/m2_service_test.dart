@@ -544,6 +544,97 @@ void main() {
       },
     );
 
+    test('flow initializes and disposes request-level outputs', () async {
+      final defaultOutput = _LifecycleTrackingOutput(outputId: 'default');
+      final overrideOutput = _LifecycleTrackingOutput(outputId: 'override');
+      final service = TtsFlow(
+        engine: SineTtsEngine(
+          engineId: 'fake-engine',
+          supportsStreaming: true,
+          chunkCount: 1,
+        ),
+        defaultOutput: defaultOutput,
+      );
+
+      await service.init();
+      expect(defaultOutput.initCount, 1);
+      expect(overrideOutput.initCount, 0);
+
+      await service
+          .speak('override-lifecycle', 'hello', output: overrideOutput)
+          .drain();
+
+      expect(overrideOutput.initCount, 1);
+      expect(overrideOutput.initSessionCount, 1);
+      expect(defaultOutput.initSessionCount, 0);
+
+      await service.dispose();
+
+      expect(defaultOutput.disposeCount, 1);
+      expect(overrideOutput.disposeCount, 1);
+    });
+
+    test('flow initializes a reused output only once', () async {
+      final output = _LifecycleTrackingOutput(outputId: 'reused');
+      final service = TtsFlow(
+        engine: SineTtsEngine(
+          engineId: 'fake-engine',
+          supportsStreaming: true,
+          chunkCount: 1,
+        ),
+      );
+
+      await service.init();
+      await service.speak('reused-1', 'first', output: output).drain();
+      await service.speak('reused-2', 'second', output: output).drain();
+
+      expect(output.initCount, 1);
+      expect(output.initSessionCount, 2);
+
+      await service.dispose();
+      expect(output.disposeCount, 1);
+    });
+
+    test(
+      'request-level output initialization failure follows queue policy',
+      () async {
+        final failingOutput = _LifecycleTrackingOutput(
+          outputId: 'failing',
+          throwOnInit: true,
+        );
+        final succeedingOutput = _LifecycleTrackingOutput(
+          outputId: 'succeeding',
+        );
+        final service = TtsFlow(
+          engine: SineTtsEngine(
+            engineId: 'fake-engine',
+            supportsStreaming: true,
+            chunkCount: 1,
+          ),
+          config: const TtsFlowConfig(
+            queueFailurePolicy: TtsQueueFailurePolicy.continueOnError,
+          ),
+        );
+
+        await service.init();
+
+        await expectLater(
+          service.speak('init-fails', 'first', output: failingOutput).drain(),
+          throwsA(isA<TtsError>()),
+        );
+        await service
+            .speak('init-succeeds', 'second', output: succeedingOutput)
+            .drain();
+
+        expect(failingOutput.initCount, 1);
+        expect(succeedingOutput.initSessionCount, 1);
+
+        await service.dispose();
+        expect(failingOutput.disposeCount, 1);
+        expect(succeedingOutput.disposeCount, 1);
+      },
+    );
+
     test('no default output and no override fails request', () async {
       final service = TtsFlow(
         engine: SineTtsEngine(
@@ -872,6 +963,71 @@ final class _TrackingOutput implements TtsOutput {
   Future<void> dispose() async {
     _session = null;
     lastInitAudioSpec = null;
+  }
+}
+
+final class _LifecycleTrackingOutput implements TtsOutput {
+  _LifecycleTrackingOutput({required this.outputId, this.throwOnInit = false});
+
+  @override
+  final String outputId;
+
+  final bool throwOnInit;
+
+  var initCount = 0;
+  var initSessionCount = 0;
+  var disposeCount = 0;
+  var _initialized = false;
+  TtsOutputSession? _session;
+
+  @override
+  Set<AudioCapability> get inAudioCapabilities => {PcmCapability.wav()};
+
+  @override
+  Future<void> init() async {
+    initCount++;
+    if (throwOnInit) {
+      throw StateError('Injected initialization failure.');
+    }
+    _initialized = true;
+  }
+
+  @override
+  Future<void> initSession(TtsOutputSession session) async {
+    if (!_initialized) {
+      throw StateError('Output was not initialized.');
+    }
+    initSessionCount++;
+    _session = session;
+  }
+
+  @override
+  Future<void> consumeChunk(TtsChunk chunk) async {}
+
+  @override
+  Future<AudioArtifact> finalizeSession() async {
+    final session = _session;
+    if (session == null) {
+      throw StateError('No active output session.');
+    }
+    _session = null;
+    return InMemoryAudioArtifact(
+      requestId: session.requestId,
+      audioSpec: session.audioSpec,
+      audioBytes: Uint8List(0),
+      totalBytes: 0,
+    );
+  }
+
+  @override
+  Future<void> onCancelSession(SynthesisControl control) async {
+    _session = null;
+  }
+
+  @override
+  Future<void> dispose() async {
+    disposeCount++;
+    _session = null;
   }
 }
 

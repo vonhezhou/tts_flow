@@ -42,6 +42,12 @@
 - `TtsOutput`：音频消费边界。它可以是扬声器、文件、内存、网络或应用实现的自定义 sink。
 - `MulticastOutput`：将同一份音频流扇出到多个输出；它不承担通用媒体图的职责。
 
+### Output 生命周期
+
+传给 `TtsFlow` 的默认 Output 与请求级 Output 都由该 Flow 管理：Flow 会在某个 Output 首次开始 session 前初始化它，并在 Flow 销毁时释放它。一个 Output 实例不应同时交给多个 Flow 使用。
+
+请求级 Output 的惰性初始化使调用方可以按请求选择单路或多路输出，而不用手动拼接 Output 的初始化时机。
+
 ## 低延迟原则
 
 低延迟的默认路径应当是：

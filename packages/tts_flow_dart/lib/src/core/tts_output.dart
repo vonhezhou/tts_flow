@@ -16,6 +16,11 @@ import 'package:tts_flow_dart/src/core/tts_output_session.dart';
 /// 4. Complete with [finalizeSession] or abort via [onCancelSession].
 /// 5. [dispose] releases output resources at shutdown.
 ///
+/// When an output is passed to [TtsFlow] as its default output or as a
+/// request-level override, that flow owns the output lifecycle. It initializes
+/// the output before its first session and disposes it when the flow is
+/// disposed. Do not share the same output instance between flows.
+///
 /// Implementer expectations:
 /// - Validate that each consumed chunk belongs to the active session.
 /// - Preserve chunk order when writing bytes to a sink.

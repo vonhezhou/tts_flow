@@ -34,6 +34,9 @@ mixin TtsUtteranceQueueMixin on TtsFlowEventBus {
   TtsFlowConfig get config;
 
   @protected
+  Future<void> ensureOutputInitialized(TtsOutput output);
+
+  @protected
   final formatNegotiator = const TtsFormatNegotiator();
 
   @protected
@@ -106,11 +109,6 @@ mixin TtsUtteranceQueueMixin on TtsFlowEventBus {
     final request = item.request;
     final effectiveOutput = request.output ?? defaultOutput!;
 
-    await _registerPlaybackEventListeners(
-      requestId: request.requestId,
-      output: effectiveOutput,
-    );
-
     final control = SynthesisControl();
     state.activeControl = control;
 
@@ -126,6 +124,12 @@ mixin TtsUtteranceQueueMixin on TtsFlowEventBus {
     );
 
     try {
+      await ensureOutputInitialized(effectiveOutput);
+      await _registerPlaybackEventListeners(
+        requestId: request.requestId,
+        output: effectiveOutput,
+      );
+
       final audioSpec = resolveAudioSpec(request, effectiveOutput);
       if (!engine.supportsSpec(audioSpec)) {
         throw TtsError(
