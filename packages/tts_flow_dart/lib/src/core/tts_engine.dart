@@ -18,6 +18,10 @@ import 'package:tts_flow_dart/src/core/tts_voice.dart';
 /// - [outAudioCapabilities] must reflect real format support.
 /// - [synthesize] should emit ordered chunks with the same request id as
 ///   [TtsRequest.requestId].
+/// - Providers with reliable sentence timing may emit [TtsSentenceCueChunk]
+///   alongside audio. Its offsets are relative to [TtsRequest.text], and its
+///   timing is relative to the request audio timeline. Providers without
+///   reliable timing must omit these chunks rather than estimate them.
 /// - [supportsStreaming] should indicate whether chunks can arrive incrementally
 ///   before synthesis completes.
 abstract interface class TtsEngine {

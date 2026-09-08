@@ -88,7 +88,9 @@ mixin TtsUtteranceQueueMixin on TtsFlowEventBus {
       if (control.isCanceled) {
         break;
       }
-      await effectiveOutput.consumeChunk(chunk);
+      if (chunk is TtsAudioChunk) {
+        await effectiveOutput.consumeChunk(chunk);
+      }
       item.controller.add(chunk);
       emitRequestEvent(
         TtsRequestEventType.requestChunkReceived,
@@ -269,6 +271,20 @@ mixin TtsUtteranceQueueMixin on TtsFlowEventBus {
     TtsChunk chunk,
     TtsOutput effectiveOutput,
   ) async {
+    // Semantic chunks (for example sentence timing) belong to the request
+    // stream, not to an audio sink. This also lets an engine publish timing
+    // before the first audio chunk has initialized an output session.
+    if (chunk is! TtsAudioChunk) {
+      item.controller.add(chunk);
+      emitRequestEvent(
+        TtsRequestEventType.requestChunkReceived,
+        requestId: request.requestId,
+        state: TtsRequestState.running,
+        chunk: chunk,
+      );
+      return;
+    }
+
     // Flush buffered chunks before handling fresh chunks after resume.
     if (state.pauseBuffer.isNotEmpty && !state.isPaused) {
       await flushPauseBufferImpl(item, request, control, effectiveOutput);
@@ -280,17 +296,15 @@ mixin TtsUtteranceQueueMixin on TtsFlowEventBus {
     if (state.isPaused &&
         config.pauseBufferPolicy == TtsPauseBufferPolicy.buffered) {
       state.pauseBuffer.add(chunk);
-      if (chunk is TtsAudioChunk) {
-        final newBytes = state.pauseBufferBytes + chunk.bytes.length;
-        if (state.pauseBufferBytes <= config.pauseBufferMaxBytes &&
-            newBytes > config.pauseBufferMaxBytes) {
-          _log.warning(
-            'TTS pause buffer exceeded ${config.pauseBufferMaxBytes} '
-            'bytes (current: $newBytes); chunks continue to accumulate.',
-          );
-        }
-        state.pauseBufferBytes = newBytes;
+      final newBytes = state.pauseBufferBytes + chunk.bytes.length;
+      if (state.pauseBufferBytes <= config.pauseBufferMaxBytes &&
+          newBytes > config.pauseBufferMaxBytes) {
+        _log.warning(
+          'TTS pause buffer exceeded ${config.pauseBufferMaxBytes} '
+          'bytes (current: $newBytes); chunks continue to accumulate.',
+        );
       }
+      state.pauseBufferBytes = newBytes;
       return;
     }
 

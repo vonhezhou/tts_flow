@@ -30,8 +30,7 @@ class _TtsFlowExamplePageState extends State<TtsFlowExamplePage> {
   TtsFlow? _service;
   StreamSubscription<TtsQueueEvent>? _queueSub;
   StreamSubscription<TtsRequestEvent>? _requestSub;
-  StreamSubscription<JustAudioPosEvent>? _playbackPosSub;
-  StreamSubscription<JustAudioDurationEvent>? _playbackDurationSub;
+  StreamSubscription<TtsPlaybackPositionEvent>? _playbackPosSub;
   StreamSubscription<Duration>? _playerPosSub;
   StreamSubscription<Duration?>? _playerDurationSub;
 
@@ -42,7 +41,6 @@ class _TtsFlowExamplePageState extends State<TtsFlowExamplePage> {
   var _status = 'Initializing TtsFlow...';
 
   Duration _backendPos = Duration.zero;
-  Duration _backendDuration = Duration.zero;
   Duration _playerPos = Duration.zero;
   Duration _playerDuration = Duration.zero;
   String? _outputDirPath;
@@ -74,7 +72,6 @@ class _TtsFlowExamplePageState extends State<TtsFlowExamplePage> {
     unawaited(_queueSub?.cancel());
     unawaited(_requestSub?.cancel());
     unawaited(_playbackPosSub?.cancel());
-    unawaited(_playbackDurationSub?.cancel());
     unawaited(_playerPosSub?.cancel());
     unawaited(_playerDurationSub?.cancel());
     unawaited(_service?.dispose());
@@ -133,25 +130,12 @@ class _TtsFlowExamplePageState extends State<TtsFlowExamplePage> {
 
       _queueSub = service.queueEvents.listen(_onQueueEvent);
       _requestSub = service.requestEvents.listen(_onRequestEvent);
-      _playbackPosSub = _backend.playbackPositionStream.listen((event) {
+      _playbackPosSub = _backend.playbackPositionEvents.listen((event) {
         if (!mounted) {
           return;
         }
         setState(() {
           _backendPos = event.position;
-          if (_backendDuration < event.position) {
-            _backendDuration = event.position;
-          }
-        });
-      });
-      _playbackDurationSub = _backend.playbackDurationStream.listen((event) {
-        if (!mounted) {
-          return;
-        }
-        setState(() {
-          if (event.duration > _backendDuration) {
-            _backendDuration = event.duration;
-          }
         });
       });
       _playerPosSub = _backend.player.positionStream.listen((event) {
@@ -629,15 +613,15 @@ class _TtsFlowExamplePageState extends State<TtsFlowExamplePage> {
             ),
             const SizedBox(height: 12),
             Text(
-              'Backend playbackPositionStream',
+              'PlaybackTimelineReporter',
               style: Theme.of(context).textTheme.titleSmall,
             ),
             LinearProgressIndicator(
-              value: _progressValue(_backendPos, _backendDuration),
+              value: _progressValue(_backendPos, _playerDuration),
             ),
             const SizedBox(height: 4),
             Text(
-              '${_formatDuration(_backendPos)} / ${_formatDuration(_backendDuration)}',
+              '${_formatDuration(_backendPos)} / ${_formatDuration(_playerDuration)}',
               style: Theme.of(context).textTheme.bodySmall,
             ),
             const SizedBox(height: 12),

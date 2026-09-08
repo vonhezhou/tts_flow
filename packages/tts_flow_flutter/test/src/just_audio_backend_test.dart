@@ -575,14 +575,12 @@ void main() {
       },
     );
 
-    test('duration stream emits per-session timeline duration', () async {
+    test('timeline reporter emits request-scoped positions', () async {
       final backend = JustAudioBackend.testing(player: player);
       addTearDown(backend.dispose);
 
-      final durations = <Duration>[];
-      final sub = backend.playbackDurationStream.listen((event) {
-        durations.add(event.duration);
-      });
+      final positions = <TtsPlaybackPositionEvent>[];
+      final sub = backend.playbackPositionEvents.listen(positions.add);
       addTearDown(sub.cancel);
 
       final playbackId = await backend.startPlayback(
@@ -605,6 +603,8 @@ void main() {
       currentIndex = 0;
       durationController.add(const Duration(milliseconds: 900));
       await Future<void>.delayed(Duration.zero);
+      positionController.add(const Duration(milliseconds: 200));
+      await Future<void>.delayed(Duration.zero);
 
       // Mark first source as started
       // so next append rolls over to a new segment.
@@ -626,10 +626,32 @@ void main() {
       currentIndex = 1;
       durationController.add(const Duration(milliseconds: 600));
       await Future<void>.delayed(Duration.zero);
+      positionController.add(const Duration(milliseconds: 100));
+      await Future<void>.delayed(Duration.zero);
 
-      expect(durations, <Duration>[
-        const Duration(milliseconds: 900),
-        const Duration(milliseconds: 1500),
+      expect(positions, [
+        isA<TtsPlaybackPositionEvent>()
+            .having(
+              (event) => event.requestId,
+              'requestId',
+              'r1',
+            )
+            .having(
+              (event) => event.position,
+              'position',
+              const Duration(milliseconds: 200),
+            ),
+        isA<TtsPlaybackPositionEvent>()
+            .having(
+              (event) => event.requestId,
+              'requestId',
+              'r1',
+            )
+            .having(
+              (event) => event.position,
+              'position',
+              const Duration(milliseconds: 1000),
+            ),
       ]);
     });
   });

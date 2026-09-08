@@ -3,6 +3,7 @@ import 'dart:async';
 import 'package:tts_flow_dart/src/core/audio_artifact.dart';
 import 'package:tts_flow_dart/src/core/audio_capability.dart';
 import 'package:tts_flow_dart/src/core/audio_spec.dart';
+import 'package:tts_flow_dart/src/core/playback_timeline.dart';
 import 'package:tts_flow_dart/src/core/synthesis_control.dart';
 import 'package:tts_flow_dart/src/core/tts_chunk.dart';
 import 'package:tts_flow_dart/src/core/tts_errors.dart';
@@ -192,6 +193,17 @@ final class SpeakerOutput
 
   TtsOutputSession? _session;
   String? _playbackId;
+
+  /// Optional physical playback timeline supplied by the underlying backend.
+  ///
+  /// Consumers can use this capability with [TtsSentenceCueChunk] without
+  /// depending on a specific Flutter playback implementation.
+  PlaybackTimelineReporter? get timelineReporter {
+    final backend = _backend;
+    return backend is PlaybackTimelineReporter
+        ? backend as PlaybackTimelineReporter
+        : null;
+  }
 
   @override
   Future<void> init() async {

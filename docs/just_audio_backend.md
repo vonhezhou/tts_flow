@@ -119,7 +119,9 @@ finalized
 - Linux/Windows 使用默认的 `just_audio_media_kit` 时，必须在构造第一个 `AudioPlayer` 前调用 `JustAudioMediaKit.ensureInitialized()`。`JustAudioBackend` 自己保证此顺序；只在 `init()` 内调用已经太晚。macOS 默认仍使用 just_audio 原生实现；若应用显式配置 media_kit 接管 macOS，则应在创建 backend 前完成那项全局配置。
 - `addAudioSource`、移除 source、seek、play、stop 与处理 completed 回调必须进入同一个串行操作队列，防止 await 期间互相交错。
 - `pausePlayback`、`resumePlayback`、`stopPlayback` 必须能作用于合成已结束但设备仍在播放的 session；上层需要保留对应 playback handle。
-- 所有内部 `StreamController` 在 dispose 时关闭；非音频块分发的订阅语义应明确。
+- 所有内部 `StreamController` 在 dispose 时关闭。句子时间等语义 chunk
+  由 `TtsFlow.speak()` 的返回流交给阅读层，不经播放器后端转发；后端只
+  通过可选的 `PlaybackTimelineReporter` 提供物理播放位置。
 
 ## 非目标
 

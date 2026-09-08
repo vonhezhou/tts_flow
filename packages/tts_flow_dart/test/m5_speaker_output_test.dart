@@ -149,6 +149,34 @@ void main() {
 
       await output.dispose();
     });
+
+    test(
+      'exposes an optional backend playback timeline without wrapping it',
+      () async {
+        final backend = _FakeSpeakerBackend();
+        final output = SpeakerOutput(backend: backend);
+
+        final reporter = output.timelineReporter;
+        expect(reporter, same(backend));
+
+        final events = <TtsPlaybackPositionEvent>[];
+        final sub = reporter!.playbackPositionEvents.listen(events.add);
+        addTearDown(sub.cancel);
+        backend.playbackPositionController.add(
+          const TtsPlaybackPositionEvent(
+            requestId: 'spk-timeline',
+            playbackId: 'playback-spk-timeline',
+            position: Duration(milliseconds: 420),
+          ),
+        );
+        await Future<void>.delayed(Duration.zero);
+
+        expect(events, hasLength(1));
+        expect(events.single.position, const Duration(milliseconds: 420));
+
+        await output.dispose();
+      },
+    );
   });
 }
 
@@ -177,12 +205,17 @@ TtsAudioSpec _audioSpecForFormat(TtsAudioFormat format) {
 }
 
 final class _FakeSpeakerBackend
-    implements SpeakerBackend, SpeakerPlaybackFailureAwareBackend {
+    implements
+        SpeakerBackend,
+        SpeakerPlaybackFailureAwareBackend,
+        PlaybackTimelineReporter {
   final Map<String, List<int>> writtenBytes = <String, List<int>>{};
   final List<String> stoppedPlaybackIds = <String>[];
   final Map<String, String?> stopReasons = <String, String?>{};
   final playbackFailedController =
       StreamController<SpeakerPlaybackFailedEvent>.broadcast();
+  final playbackPositionController =
+      StreamController<TtsPlaybackPositionEvent>.broadcast();
 
   @override
   Stream<SpeakerPlaybackCompletedEvent> get playbackCompletedEvents =>
@@ -191,6 +224,10 @@ final class _FakeSpeakerBackend
   @override
   Stream<SpeakerPlaybackFailedEvent> get playbackFailedEvents =>
       playbackFailedController.stream;
+
+  @override
+  Stream<TtsPlaybackPositionEvent> get playbackPositionEvents =>
+      playbackPositionController.stream;
 
   @override
   Set<AudioCapability> get supportedCapabilities => {
@@ -245,5 +282,8 @@ final class _FakeSpeakerBackend
   Future<void> resumePlayback({required String playbackId}) async {}
 
   @override
-  Future<void> dispose() => playbackFailedController.close();
+  Future<void> dispose() async {
+    await playbackFailedController.close();
+    await playbackPositionController.close();
+  }
 }

@@ -6,7 +6,6 @@ import 'package:just_audio_media_kit/just_audio_media_kit.dart';
 import 'package:logging/logging.dart';
 import 'package:tts_flow_dart/tts_flow_dart.dart';
 import 'package:tts_flow_flutter/src/just_audio/chunk_audio_source.dart';
-import 'package:tts_flow_flutter/src/just_audio/playback_pos.dart';
 
 final _logger = Logger('JustAudioPlayer');
 
@@ -139,7 +138,10 @@ final class _SourceRange {
 
 /// A [SpeakerBackend] implementation using the just_audio package.
 class JustAudioBackend
-    implements SpeakerBackend, SpeakerPlaybackFailureAwareBackend {
+    implements
+        SpeakerBackend,
+        SpeakerPlaybackFailureAwareBackend,
+        PlaybackTimelineReporter {
   /// constructor
   JustAudioBackend() : _player = _createPlayer() {
     _processingStateSubscription = _player.processingStateStream.listen((
@@ -202,12 +204,10 @@ class JustAudioBackend
       StreamController<SpeakerPlaybackFailedEvent>.broadcast();
   late final StreamSubscription<ProcessingState> _processingStateSubscription;
 
-  final StreamController<JustAudioDurationEvent> _durationEeventController =
-      StreamController<JustAudioDurationEvent>.broadcast();
   late final StreamSubscription<Duration?> _durationSubscription;
 
-  final StreamController<JustAudioPosEvent> _posEeventController =
-      StreamController<JustAudioPosEvent>.broadcast();
+  final StreamController<TtsPlaybackPositionEvent> _playbackPositionController =
+      StreamController<TtsPlaybackPositionEvent>.broadcast();
   late final StreamSubscription<Duration?> _posSubscription;
 
   final StreamController<JustAudioPlaybackErrorEvent> _playbackErrorController =
@@ -220,28 +220,12 @@ class JustAudioBackend
       StreamController<JustAudioPlaybackSourceStartedEvent>.broadcast();
   late final StreamSubscription<PlayerException> _errorSubscription;
 
-  final StreamController<TtsChunk> _ttsChunkController =
-      StreamController<TtsChunk>.broadcast();
-
   Future<void> _playerOperationTail = Future<void>.value();
   var _disposeRequested = false;
 
-  /// Stream of the current position in current playback session.
-  /// This stream is updated every time the position changes.
-  /// The position is in seconds.
-  Stream<JustAudioPosEvent> get playbackPositionStream =>
-      _posEeventController.stream;
-
-  /// Stream of duration change of the current playback session.
-  /// This stream is updated every time the duration changes.
-  /// The duration is in seconds.
-  Stream<JustAudioDurationEvent> get playbackDurationStream =>
-      _durationEeventController.stream;
-
-  /// Stream of TtsChunks that are not audio chunks, such as subtitles.
-  /// NOTE: check the TtsEngine implementation
-  ///       to see what kind of non-audio chunks it emits.
-  Stream<TtsChunk> get ttsChunkStream => _ttsChunkController.stream;
+  @override
+  Stream<TtsPlaybackPositionEvent> get playbackPositionEvents =>
+      _playbackPositionController.stream;
 
   /// Platform playback errors associated with a TTS playback session.
   Stream<JustAudioPlaybackErrorEvent> get playbackErrorStream =>
@@ -297,7 +281,6 @@ class JustAudioBackend
     required TtsChunk chunk,
   }) async {
     if (chunk is! TtsAudioChunk) {
-      _ttsChunkController.add(chunk);
       return;
     }
 
@@ -366,11 +349,9 @@ class JustAudioBackend
       _completedPlaybackIds.clear();
       await _player.dispose();
     });
-    await _posEeventController.close();
-    await _durationEeventController.close();
+    await _playbackPositionController.close();
     await _playbackCompletedController.close();
     await _playbackFailedController.close();
-    await _ttsChunkController.close();
     await _playbackErrorController.close();
     await _playbackWaitingController.close();
     await _playbackSourceStartedController.close();
@@ -751,32 +732,11 @@ class JustAudioBackend
       '${curSource.requestId},${curSource.index} '
       '$duration, ${curSource.playbackOffset}',
     );
-
-    // Emit duration on the session timeline so consumers can align SRT/subtitles
-    // against a continuous playback clock.
-    final timelineDuration = prevDuration + duration;
-
-    _durationEeventController.add(
-      JustAudioDurationEvent(
-        playbackId: curSource.playbackId,
-        requestId: session.requestId,
-        duration: timelineDuration,
-      ),
-    );
   }
 
   void _onPosChanged(Duration pos) {
     final curSource = _currentSource();
     if (curSource == null || curSource is! ChunkAudioSource) {
-      if (pos == Duration.zero) {
-        _posEeventController.add(
-          JustAudioPosEvent(
-            playbackId: '',
-            requestId: '',
-            position: pos,
-          ),
-        );
-      }
       return;
     }
 
@@ -793,8 +753,8 @@ class JustAudioBackend
     }
 
     final newPos = curSource.playbackOffset + pos;
-    _posEeventController.add(
-      JustAudioPosEvent(
+    _playbackPositionController.add(
+      TtsPlaybackPositionEvent(
         playbackId: curSource.playbackId,
         requestId: curSource.requestId,
         position: newPos,
