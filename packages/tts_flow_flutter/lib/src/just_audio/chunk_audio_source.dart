@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'dart:typed_data';
 
 import 'package:just_audio/just_audio.dart';
 import 'package:tts_flow_dart/tts_flow_dart.dart';
@@ -13,6 +14,7 @@ class ChunkAudioSource extends StreamAudioSource {
     required this.requestId,
     required this.index,
     required this.isTerminalSegment,
+    this.onStarted,
   });
 
   final List<int> _buffer = [];
@@ -38,6 +40,9 @@ class ChunkAudioSource extends StreamAudioSource {
   /// True when this source is currently considered the final segment
   /// for its playback.
   bool isTerminalSegment;
+
+  /// Invoked once when the platform first requests this source's bytes.
+  final void Function()? onStarted;
 
   bool _hasStarted = false;
 
@@ -69,34 +74,39 @@ class ChunkAudioSource extends StreamAudioSource {
   // other source did not work.
   // ignore: experimental_member_use
   Future<StreamAudioResponse> request([int? start, int? end]) async {
-    _hasStarted = true;
+    if (!_hasStarted) {
+      _hasStarted = true;
+      onStarted?.call();
+    }
 
-    final List<List<int>> chunks;
+    final Uint8List bytes;
     final String contentType;
-    final int totalLength;
 
     if (audioSpec.format == TtsAudioFormat.pcm) {
       final header = WavHeader.fromPcmDescriptor(
         audioSpec.requirePcm,
         dataLengthBytes: _buffer.length,
       ).toBytes();
-      chunks = [header, _buffer];
+      bytes = Uint8List(header.length + _buffer.length)
+        ..setAll(0, header)
+        ..setAll(header.length, _buffer);
       contentType = 'audio/wav';
-      totalLength = header.length + _buffer.length;
     } else {
-      chunks = [_buffer];
+      bytes = Uint8List.fromList(_buffer);
       contentType = audioSpec.format.mimeType;
-      totalLength = _buffer.length;
     }
+
+    final requestStart = (start ?? 0).clamp(0, bytes.length);
+    final requestEnd = (end ?? bytes.length)
+        .clamp(requestStart, bytes.length);
 
     // other source did not work.
     // ignore: experimental_member_use
     return StreamAudioResponse(
-      sourceLength: totalLength,
-      contentLength: totalLength,
-      offset: 0,
-      rangeRequestsSupported: false,
-      stream: Stream.fromIterable(chunks),
+      sourceLength: bytes.length,
+      contentLength: requestEnd - requestStart,
+      offset: requestStart,
+      stream: Stream.value(bytes.sublist(requestStart, requestEnd)),
       contentType: contentType,
     );
   }

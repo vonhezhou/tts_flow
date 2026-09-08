@@ -35,6 +35,15 @@ For deterministic jitter regression, `playbackWaitingStream` reports when an
 unfinished source list is exhausted. A later chunk can recover from this state;
 the event is diagnostic rather than a playback failure.
 
+`playbackSourceStartedStream` reports the exact point at which a native player
+requests a source and the source becomes immutable. It can gate deterministic
+test timing without inferring readiness from platform-specific player states.
+
+On Linux and Windows, `JustAudioBackend` initializes `just_audio_media_kit`
+before constructing its player. macOS continues to use just_audio's native
+implementation by default. Applications may still call
+`JustAudioBackend.ensureInitialized()` from `main()`; doing so is idempotent.
+
 ## Installation 💻
 
 **❗ In order to start using Tts Flow Flutter you must have the [Flutter SDK][flutter_install_link] installed on your machine.**

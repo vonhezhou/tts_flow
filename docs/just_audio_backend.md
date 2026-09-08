@@ -112,6 +112,11 @@ finalized
 - `JustAudioBackend.playbackErrorStream` 保留 just_audio 的原始 `PlayerException`，供平台诊断；同时它通过可选的 `SpeakerPlaybackFailureAwareBackend` 能力发出标准 `SpeakerPlaybackFailedEvent`。`SpeakerOutput`、`MulticastOutput` 和 `TtsFlow.requestEvents` 会将其继续传递为 `TtsOutputPlaybackFailedEvent` 与 `requestPlaybackFailed`。
 - `requestPlaybackFailed` 是独立的物理播放终态：它不向已经完成的 `speak()` stream 补抛错误，也不追溯修改此前的 `requestCompleted`，更不触发合成队列的 fail-fast 策略。调用方应使用它提示播放失败、记录诊断或自行发起新的播放请求。
 - `playbackWaitingStream` 是非终态诊断信号：未 finalized 的 source-list 耗尽时发出，后续 chunk 仍可创建新 source 并恢复。它为模拟器、真机和单元测试提供可自动断言的抖动指标，不等同于解码错误。
+- `playbackSourceStartedStream` 在原生播放器第一次请求某个 source 时发出。它对应 `ChunkAudioSource.hasStarted` 从 false 变为 true 的精确边界，可用于受控回归的供给时序门控；不要用各平台语义不同的 `ProcessingState.ready` 推断这个边界。
+- 每个被冻结的 `ChunkAudioSource` 都是一个有限的、支持 HTTP byte-range 的 source。播放器若重试或按 range 读取，backend 必须返回与声明的 `sourceLength`、`contentLength`、`offset` 一致的快照，不能无视 `request(start, end)` 后仍返回完整流；这对 macOS AVFoundation 尤其重要。
+- `AudioPlayer.play()` 的 Future 在播放结束、暂停或停止后才完成，不能在 source-list 的串行操作队列中 await；启动播放必须后台跟踪，以便后续 chunk 能在当前 source 播尽前继续追加。
+- `stopPlayback()` 是清理操作，必须容忍播放器错误已经异步移除了同一 session；否则服务 dispose 会以二次停止错误遮蔽原始播放失败。
+- Linux/Windows 使用默认的 `just_audio_media_kit` 时，必须在构造第一个 `AudioPlayer` 前调用 `JustAudioMediaKit.ensureInitialized()`。`JustAudioBackend` 自己保证此顺序；只在 `init()` 内调用已经太晚。macOS 默认仍使用 just_audio 原生实现；若应用显式配置 media_kit 接管 macOS，则应在创建 backend 前完成那项全局配置。
 - `addAudioSource`、移除 source、seek、play、stop 与处理 completed 回调必须进入同一个串行操作队列，防止 await 期间互相交错。
 - `pausePlayback`、`resumePlayback`、`stopPlayback` 必须能作用于合成已结束但设备仍在播放的 session；上层需要保留对应 playback handle。
 - 所有内部 `StreamController` 在 dispose 时关闭；非音频块分发的订阅语义应明确。

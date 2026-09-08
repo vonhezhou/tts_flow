@@ -6,7 +6,8 @@ A new Flutter project.
 
 该 integration test 使用内置 PCM/WAV 样本，而非真实 Provider 或网络。它会等待
 原生播放器加载第一段 source，再分别验证持续供给不触发 waiting，以及人为延迟
-第二段时能触发 waiting、恢复并只完成一次。测试会将播放器音量设为 0，不依赖人工听音。
+第二段时能触发 waiting、恢复并只完成一次。测试不依赖人工听音；运行时可能短暂播放
+内置样本。
 
 在 macOS 或 Windows 的真实桌面平台运行：
 

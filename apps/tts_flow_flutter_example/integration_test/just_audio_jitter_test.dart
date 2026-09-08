@@ -3,6 +3,7 @@ import 'dart:async';
 import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:integration_test/integration_test.dart';
+import 'package:just_audio/just_audio.dart';
 import 'package:tts_flow_dart/tts_flow_dart.dart';
 import 'package:tts_flow_flutter/tts_flow_flutter.dart';
 
@@ -13,9 +14,34 @@ void main() {
   IntegrationTestWidgetsFlutterBinding.ensureInitialized();
 
   group('JustAudioBackend controlled jitter', () {
-    testWidgets('continuous supply completes without source-list underflow', (
-      tester,
-    ) async {
+    test('the PCM/WAV fixture plays through AssetAudioSource', () async {
+      final player = AudioPlayer();
+      addTearDown(player.dispose);
+      final errors = <PlayerException>[];
+      final errorSub = player.errorStream.listen(errors.add);
+      addTearDown(errorSub.cancel);
+
+      await player.setAsset(_sampleAudioAsset);
+      await player.play().timeout(const Duration(seconds: 15));
+
+      expect(errors, isEmpty);
+      expect(player.processingState, ProcessingState.completed);
+    }, timeout: const Timeout(Duration(seconds: 30)));
+
+    test('a complete PCM/WAV source plays to completion', () async {
+      final sample = await _loadSample();
+      final result = await _runReplay(
+        sample: sample,
+        firstChunkBytes: sample.audioBytes.length,
+        delayAfterReady: Duration.zero,
+      );
+
+      expect(result.waitingEvents, isEmpty);
+      expect(result.playbackFailedEvents, isEmpty);
+      expect(result.playbackCompletedEvents, hasLength(1));
+    }, timeout: const Timeout(Duration(seconds: 30)));
+
+    test('continuous supply completes without source-list underflow', () async {
       final sample = await _loadSample();
       final result = await _runReplay(
         sample: sample,
@@ -28,9 +54,9 @@ void main() {
       expect(result.playbackCompletedEvents, hasLength(1));
     }, timeout: const Timeout(Duration(seconds: 30)));
 
-    testWidgets(
+    test(
       'controlled source-list underflow recovers and completes once',
-      (tester) async {
+      () async {
         final sample = await _loadSample();
         final result = await _runReplay(
           sample: sample,
@@ -54,17 +80,25 @@ Future<_ReplayResult> _runReplay({
   required Duration delayAfterReady,
 }) async {
   final backend = JustAudioBackend();
-  final playerReady = Completer<void>();
+  final firstSourceStarted = Completer<void>();
   final waitingEvents = <JustAudioPlaybackWaitingEvent>[];
   final playbackCompletedEvents = <TtsRequestEvent>[];
   final playbackFailedEvents = <TtsRequestEvent>[];
+  final playerStates = <String>[];
+  final backendErrors = <JustAudioPlaybackErrorEvent>[];
 
-  final readySub = backend.player.processingStateStream.listen((state) {
-    if (state.name == 'ready' && !playerReady.isCompleted) {
-      playerReady.complete();
+  final sourceStartedSub = backend.playbackSourceStartedStream.listen((event) {
+    if (event.requestId == _requestId &&
+        event.sourceIndex == 0 &&
+        !firstSourceStarted.isCompleted) {
+      firstSourceStarted.complete();
     }
   });
   final waitingSub = backend.playbackWaitingStream.listen(waitingEvents.add);
+  final playerStateSub = backend.player.processingStateStream.listen((state) {
+    playerStates.add(state.name);
+  });
+  final backendErrorSub = backend.playbackErrorStream.listen(backendErrors.add);
 
   final service = TtsFlow(
     engine: _GatedReplayEngine(
@@ -72,7 +106,7 @@ Future<_ReplayResult> _runReplay({
       audioSpec: sample.audioSpec,
       firstChunkBytes: firstChunkBytes,
       delayAfterReady: delayAfterReady,
-      playerReady: playerReady.future,
+      firstSourceStarted: firstSourceStarted.future,
     ),
     defaultOutput: SpeakerOutput(backend: backend),
   );
@@ -91,14 +125,19 @@ Future<_ReplayResult> _runReplay({
   });
 
   try {
-    // Preserve the native playback pipeline while keeping the regression run
-    // silent; assertions use player telemetry rather than human listening.
-    await backend.player.setVolume(0);
     await service.init();
-    await service
-        .speak(_requestId, 'controlled local audio replay')
-        .drain<void>()
-        .timeout(const Duration(seconds: 15));
+    try {
+      await service
+          .speak(_requestId, 'controlled local audio replay')
+          .drain<void>()
+          .timeout(const Duration(seconds: 15));
+    } catch (error) {
+      throw StateError(
+        'Replay ingestion failed: $error; '
+        'states=$playerStates, errors=${_describeBackendErrors(backendErrors)}, '
+        'requestFailures=${_describeRequestFailures(playbackFailedEvents)}',
+      );
+    }
 
     await _waitForPlaybackTerminalEvent(
       playbackCompletedEvents: playbackCompletedEvents,
@@ -113,9 +152,31 @@ Future<_ReplayResult> _runReplay({
   } finally {
     await requestSub.cancel();
     await waitingSub.cancel();
-    await readySub.cancel();
+    await sourceStartedSub.cancel();
+    await playerStateSub.cancel();
+    await backendErrorSub.cancel();
     await service.dispose();
   }
+}
+
+List<String> _describeBackendErrors(List<JustAudioPlaybackErrorEvent> events) {
+  return events
+      .map(
+        (event) =>
+            '${event.error.code}:${event.error.message ?? '-'}:'
+            'index=${event.error.index ?? '-'}',
+      )
+      .toList(growable: false);
+}
+
+List<String> _describeRequestFailures(List<TtsRequestEvent> events) {
+  return events
+      .map(
+        (event) =>
+            '${event.error?.code}:${event.error?.message ?? '-'}:'
+            'cause=${event.error?.cause ?? '-'}',
+      )
+      .toList(growable: false);
 }
 
 Future<void> _waitForPlaybackTerminalEvent({
@@ -171,14 +232,14 @@ final class _GatedReplayEngine with TtsEngineDefaults implements TtsEngine {
     required this.audioSpec,
     required this.firstChunkBytes,
     required this.delayAfterReady,
-    required this.playerReady,
+    required this.firstSourceStarted,
   }) : _audioBytes = Uint8List.fromList(audioBytes);
 
   final Uint8List _audioBytes;
   final TtsAudioSpec audioSpec;
   final int firstChunkBytes;
   final Duration delayAfterReady;
-  final Future<void> playerReady;
+  final Future<void> firstSourceStarted;
 
   @override
   String get engineId => 'controlled-local-replay';
@@ -227,17 +288,21 @@ final class _GatedReplayEngine with TtsEngineDefaults implements TtsEngine {
     if (audioSpec != resolvedFormat) {
       throw StateError('The replay engine received an unexpected audio spec.');
     }
-    final split = firstChunkBytes.clamp(1, _audioBytes.length - 1).toInt();
+    final split = firstChunkBytes.clamp(1, _audioBytes.length).toInt();
     yield TtsAudioChunk(
       requestId: request.requestId,
       sequenceNumber: 0,
       bytes: Uint8List.fromList(_audioBytes.sublist(0, split)),
       audioSpec: audioSpec,
-      isLastChunk: false,
+      isLastChunk: split == _audioBytes.length,
       timestamp: DateTime.now().toUtc(),
     );
 
-    await playerReady;
+    if (split == _audioBytes.length) {
+      return;
+    }
+
+    await firstSourceStarted;
     if (control.isCanceled) {
       return;
     }

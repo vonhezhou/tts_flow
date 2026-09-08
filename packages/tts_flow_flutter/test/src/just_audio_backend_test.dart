@@ -168,6 +168,41 @@ void main() {
       },
     );
 
+    test('does not block chunk ingestion on the play Future', () async {
+      final playCompleter = Completer<void>();
+      when(() => player.play()).thenAnswer((_) => playCompleter.future);
+      final backend = JustAudioBackend.testing(player: player);
+      addTearDown(() async {
+        playCompleter.complete();
+        await backend.dispose();
+      });
+
+      final playbackId = await backend.startPlayback(
+        requestId: 'non-blocking-play',
+        audioSpec: const TtsAudioSpec.mp3(),
+      );
+      await backend
+          .appendChunk(
+            playbackId: playbackId,
+            chunk: _audioChunk(
+              requestId: 'non-blocking-play',
+              sequenceNumber: 0,
+              bytes: [1, 2],
+            ),
+          )
+          .timeout(const Duration(milliseconds: 100));
+
+      expect(sources, hasLength(1));
+      verify(() => player.play()).called(1);
+    });
+
+    test('stopPlayback is idempotent after an asynchronous cleanup', () async {
+      final backend = JustAudioBackend.testing(player: player);
+      addTearDown(backend.dispose);
+
+      await backend.stopPlayback(playbackId: 'already-removed');
+    });
+
     test(
       'recovers after controlled source-list underflow and completes once',
       () async {
@@ -182,6 +217,11 @@ void main() {
           waitingEvents.add,
         );
         addTearDown(waitingSub.cancel);
+        final sourceStartedEvents = <JustAudioPlaybackSourceStartedEvent>[];
+        final sourceStartedSub = backend.playbackSourceStartedStream.listen(
+          sourceStartedEvents.add,
+        );
+        addTearDown(sourceStartedSub.cancel);
 
         final playbackId = await backend.startPlayback(
           requestId: 'r1',
@@ -201,6 +241,9 @@ void main() {
 
         final firstSource = sources.single as ChunkAudioSource;
         await firstSource.request();
+        expect(sourceStartedEvents, hasLength(1));
+        expect(sourceStartedEvents.single.playbackId, playbackId);
+        expect(sourceStartedEvents.single.sourceIndex, 0);
         currentIndex = 0;
         processingState = ProcessingState.completed;
         playing = false;

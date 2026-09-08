@@ -56,6 +56,32 @@ final class JustAudioPlaybackWaitingEvent {
   final DateTime timestamp;
 }
 
+/// A source has started being read by the native player.
+///
+/// This is emitted from [ChunkAudioSource.request], which is the precise point
+/// after which that source becomes immutable.
+final class JustAudioPlaybackSourceStartedEvent {
+  /// Creates a source-start event.
+  const JustAudioPlaybackSourceStartedEvent({
+    required this.playbackId,
+    required this.requestId,
+    required this.sourceIndex,
+    required this.timestamp,
+  });
+
+  /// The backend-owned playback session identifier.
+  final String playbackId;
+
+  /// The TTS request that owns this playback session.
+  final String requestId;
+
+  /// Index of the source the native player began reading.
+  final int sourceIndex;
+
+  /// Time at which the source became immutable.
+  final DateTime timestamp;
+}
+
 final class _PlaybackSession {
   _PlaybackSession({
     required this.playbackId,
@@ -115,7 +141,7 @@ final class _SourceRange {
 class JustAudioBackend
     implements SpeakerBackend, SpeakerPlaybackFailureAwareBackend {
   /// constructor
-  JustAudioBackend() : _player = AudioPlayer() {
+  JustAudioBackend() : _player = _createPlayer() {
     _processingStateSubscription = _player.processingStateStream.listen((
       state,
     ) {
@@ -149,6 +175,11 @@ class JustAudioBackend
   }
 
   static bool _isInitialized = false;
+
+  static AudioPlayer _createPlayer() {
+    ensureInitialized();
+    return AudioPlayer();
+  }
 
   /// Ensure that just_audio media kit is initialized.
   /// It is recommended to call this in main.dart once
@@ -184,6 +215,9 @@ class JustAudioBackend
   final StreamController<JustAudioPlaybackWaitingEvent>
   _playbackWaitingController =
       StreamController<JustAudioPlaybackWaitingEvent>.broadcast();
+  final StreamController<JustAudioPlaybackSourceStartedEvent>
+  _playbackSourceStartedController =
+      StreamController<JustAudioPlaybackSourceStartedEvent>.broadcast();
   late final StreamSubscription<PlayerException> _errorSubscription;
 
   final StreamController<TtsChunk> _ttsChunkController =
@@ -219,6 +253,10 @@ class JustAudioBackend
   /// playback failure and a later chunk may resume the session.
   Stream<JustAudioPlaybackWaitingEvent> get playbackWaitingStream =>
       _playbackWaitingController.stream;
+
+  /// Emits when a platform first requests a source's immutable byte snapshot.
+  Stream<JustAudioPlaybackSourceStartedEvent> get playbackSourceStartedStream =>
+      _playbackSourceStartedController.stream;
 
   /// The underlying just_audio player instance.
   AudioPlayer get player => _player;
@@ -335,6 +373,7 @@ class JustAudioBackend
     await _ttsChunkController.close();
     await _playbackErrorController.close();
     await _playbackWaitingController.close();
+    await _playbackSourceStartedController.close();
   }
 
   @override
@@ -384,9 +423,10 @@ class JustAudioBackend
     required String playbackId,
     String? reason,
   }) async {
-    final session = _requireSession(playbackId);
-    // lint would want to remove the _requireSession()
-    // ignore: cascade_invocations
+    final session = _sessions[playbackId];
+    if (session == null) {
+      return;
+    }
     session.isStopped = true;
 
     final range = _findRangeForPlayback(playbackId);
@@ -428,12 +468,26 @@ class JustAudioBackend
   }
 
   Future<ChunkAudioSource> _createSegment(_PlaybackSession session) async {
+    final sourceIndex = session.nextIndex;
     final source = ChunkAudioSource(
       audioSpec: session.audioSpec,
       playbackId: session.playbackId,
-      index: session.nextIndex,
+      index: sourceIndex,
       requestId: session.requestId,
       isTerminalSegment: false,
+      onStarted: () {
+        if (_disposeRequested) {
+          return;
+        }
+        _playbackSourceStartedController.add(
+          JustAudioPlaybackSourceStartedEvent(
+            playbackId: session.playbackId,
+            requestId: session.requestId,
+            sourceIndex: sourceIndex,
+            timestamp: DateTime.now().toUtc(),
+          ),
+        );
+      },
     );
     session.nextIndex++;
 
@@ -456,7 +510,7 @@ class JustAudioBackend
       } else if (_player.currentIndex == null) {
         await _player.seek(Duration.zero, index: 0);
       }
-      await _player.play();
+      _startPlayerInBackground();
       return;
     }
 
@@ -464,7 +518,7 @@ class JustAudioBackend
         _player.currentIndex != null &&
         _player.currentIndex! < _player.audioSources.length - 1) {
       await _player.seekToNext();
-      await _player.play();
+      _startPlayerInBackground();
     }
   }
 
@@ -512,7 +566,27 @@ class JustAudioBackend
         : removedStart;
     await _player.stop();
     await _player.seek(Duration.zero, index: nextIndex);
-    await _player.play();
+    _startPlayerInBackground();
+  }
+
+  /// Starts just_audio without blocking source-list mutations.
+  ///
+  /// [AudioPlayer.play] completes only when playback ends, pauses, or stops.
+  /// Awaiting it in the serialized operation queue would prevent subsequent
+  /// chunks from being appended while the first source is playing.
+  void _startPlayerInBackground() {
+    unawaited(_awaitPlayerStart());
+  }
+
+  Future<void> _awaitPlayerStart() async {
+    try {
+      await _player.play();
+    } on Object catch (error, stackTrace) {
+      // Native decode errors are correlated to a session by errorStream. This
+      // branch prevents an unhandled play Future from escaping the queue while
+      // retaining a diagnostic for errors that do not reach that stream.
+      _logger.warning('just_audio play invocation failed.', error, stackTrace);
+    }
   }
 
   Future<void> _onProcessingStateChanged(ProcessingState state) async {
