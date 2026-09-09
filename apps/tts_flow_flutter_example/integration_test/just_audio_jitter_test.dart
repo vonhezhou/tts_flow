@@ -133,7 +133,7 @@ Future<_ReplayResult> _runReplay({
         utteranceId: _utteranceId,
       );
       requestKey = request.requestKey;
-      await request.drain<void>().timeout(const Duration(seconds: 15));
+      await request.chunks.drain<void>().timeout(const Duration(seconds: 15));
     } catch (error) {
       throw StateError(
         'Replay ingestion failed: $error; '

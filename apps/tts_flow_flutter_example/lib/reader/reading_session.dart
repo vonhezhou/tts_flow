@@ -68,7 +68,7 @@ final class ReadingSession {
       );
       _requestHandles.add(handle);
       _requests[handle.requestKey] = request;
-      final subscription = handle.listen((chunk) {
+      final subscription = handle.chunks.listen((chunk) {
         if (chunk is TtsSentenceCueChunk) {
           _storeCues(chunk);
         }

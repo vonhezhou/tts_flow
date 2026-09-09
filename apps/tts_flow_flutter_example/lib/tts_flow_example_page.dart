@@ -247,7 +247,7 @@ class _TtsFlowExamplePageState extends State<TtsFlowExamplePage> {
     );
 
     try {
-      final chunks = await request.toList();
+      final chunks = await request.chunks.toList();
       if (!mounted) {
         return;
       }

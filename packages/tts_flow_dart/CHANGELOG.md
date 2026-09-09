@@ -11,6 +11,8 @@
 
 ## Unreleased
 
+- Breaking: `TtsRequestHandle` no longer extends `Stream<TtsChunk>`.
+  Consume its sole audio handoff through `handle.chunks`.
 - Added `PrioritizedOutput` and `TtsAuxiliaryOutput` for playback-first
   fanout. Only the primary output participates in backpressure and format
   negotiation; auxiliary observers are synchronous notifications that own any

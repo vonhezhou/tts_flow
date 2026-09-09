@@ -29,8 +29,8 @@ void main() {
       final streamA = service.speak('first request payload', utteranceId: 'a');
       final streamB = service.speak('second request payload', utteranceId: 'b');
 
-      await streamA.toList();
-      await streamB.toList();
+      await streamA.chunks.toList();
+      await streamB.chunks.toList();
       await Future<void>.delayed(const Duration(milliseconds: 20));
 
       expect(started, ['a', 'b']);
@@ -54,8 +54,8 @@ void main() {
       final first = service.speak('first output write');
       final second = service.speak('second output write');
 
-      await first.toList();
-      await second.toList();
+      await first.chunks.toList();
+      await second.chunks.toList();
 
       expect(output.overlappingSessionAttempted, isFalse);
       expect(output.lifecycle, [
@@ -163,8 +163,8 @@ void main() {
       expect(first.requestKey, isNot(second.requestKey));
       expect(first.utteranceId, 'shared-label');
       expect(second.utteranceId, 'shared-label');
-      await first.toList();
-      await second.toList();
+      await first.chunks.toList();
+      await second.chunks.toList();
       final firstEvents = await firstHandleEvents;
 
       expect(started, hasLength(2));
@@ -210,9 +210,9 @@ void main() {
       await service.init();
       final handle = service.speak('single stream consumer');
 
-      expect(handle.isBroadcast, isFalse);
+      expect(handle, isNot(isA<Stream<TtsChunk>>()));
       expect(handle.chunks.isBroadcast, isFalse);
-      final chunks = await handle.toList();
+      final chunks = await handle.chunks.toList();
       expect(chunks, isNotEmpty);
       expect(() => handle.chunks.listen((_) {}), throwsA(isA<StateError>()));
 
@@ -237,7 +237,7 @@ void main() {
           'artifact result',
           utteranceId: 'artifact',
         );
-        await handle.toList();
+        await handle.chunks.toList();
         final result = await handle.synthesisResult;
 
         expect(result, isA<TtsSynthesisCompletedResult>());
@@ -274,8 +274,8 @@ void main() {
       final clearedCount = await service.clearQueue();
 
       expect(clearedCount, 1);
-      expect(await active.toList(), isNotEmpty);
-      expect(await pending.toList(), isEmpty);
+      expect(await active.chunks.toList(), isNotEmpty);
+      expect(await pending.chunks.toList(), isEmpty);
       expect(
         await pending.synthesisResult,
         isA<TtsSynthesisStoppedResult>().having(
@@ -315,8 +315,8 @@ void main() {
         await Future<void>.delayed(const Duration(milliseconds: 12));
         await service.stopActiveSynthesis();
 
-        await longStream.toList();
-        await nextStream.toList();
+        await longStream.chunks.toList();
+        await nextStream.chunks.toList();
 
         expect(
           await longStream.synthesisResult,
@@ -381,7 +381,7 @@ void main() {
           utteranceId: 'output-fail',
         );
 
-        await expectLater(stream.toList(), throwsA(isA<TtsError>()));
+        await expectLater(stream.chunks.toList(), throwsA(isA<TtsError>()));
         expect(
           await stream.synthesisResult,
           isA<TtsSynthesisFailedResult>().having(
@@ -417,6 +417,7 @@ void main() {
 
       final chunks = await service
           .speak('hello', utteranceId: 'chunk-spec-init')
+          .chunks
           .toList();
 
       expect(chunks, hasLength(1));
@@ -458,7 +459,7 @@ void main() {
         );
 
         await expectLater(
-          stream.toList(),
+          stream.chunks.toList(),
           throwsA(
             isA<TtsError>().having(
               (error) => error.code,
@@ -500,8 +501,8 @@ void main() {
         utteranceId: 'second',
       );
 
-      await expectLater(first.toList(), throwsA(isA<TtsError>()));
-      final secondChunks = await second.toList();
+      await expectLater(first.chunks.toList(), throwsA(isA<TtsError>()));
+      final secondChunks = await second.chunks.toList();
 
       expect(secondChunks, isNotEmpty);
       expect(
@@ -549,8 +550,8 @@ void main() {
       await service.resumeQueue();
       expect(service.isQueuePaused, isFalse);
 
-      await first.toList();
-      await second.toList();
+      await first.chunks.toList();
+      await second.chunks.toList();
 
       expect(started, ['paused-1', 'paused-2']);
 
@@ -581,13 +582,13 @@ void main() {
       await service.pauseQueue();
 
       expect(
-        await active.toList().timeout(const Duration(milliseconds: 200)),
+        await active.chunks.toList().timeout(const Duration(milliseconds: 200)),
         isNotEmpty,
       );
       expect(started, ['active']);
 
       await service.resumeQueue();
-      expect(await pending.toList(), isNotEmpty);
+      expect(await pending.chunks.toList(), isNotEmpty);
 
       await subscription.cancel();
       await service.dispose();
@@ -614,7 +615,7 @@ void main() {
 
       await Future<void>.delayed(const Duration(milliseconds: 12));
       await service.stopActiveSynthesis();
-      await longStream.toList();
+      await longStream.chunks.toList();
 
       expect(output.lastCancelReason, CancelReason.stopCurrent);
       await service.dispose();
@@ -646,7 +647,7 @@ void main() {
         await Future<void>.delayed(const Duration(milliseconds: 12));
         await service.dispose();
 
-        final chunks = await stream.toList();
+        final chunks = await stream.chunks.toList();
         expect(chunks, isNotNull);
         expect(output.lastCancelReason, CancelReason.serviceDispose);
       },
@@ -687,6 +688,7 @@ void main() {
             utteranceId: 'defaults-applied',
             params: const {'style': 'news', 'emotion': 'calm'},
           )
+          .chunks
           .toList();
       expect(streamedChunks, isNotEmpty);
 
@@ -729,7 +731,7 @@ void main() {
 
         await service.init();
         final request = service.speak('hello', utteranceId: 'playback-split');
-        await request.toList();
+        await request.chunks.toList();
 
         await Future<void>.delayed(const Duration(milliseconds: 60));
 
@@ -782,7 +784,7 @@ void main() {
 
         await service.init();
         final request = service.speak('hello', utteranceId: 'playback-failed');
-        await request.toList();
+        await request.chunks.toList();
         await Future<void>.delayed(const Duration(milliseconds: 60));
 
         final completedIndex = events.indexWhere(
@@ -827,7 +829,7 @@ void main() {
 
         await service.init();
         final request = service.speak('hello', utteranceId: 'playback-control');
-        await request.drain();
+        await request.chunks.drain();
 
         expect(request.hasActivePlayback, isTrue);
         await request.pausePlayback();
@@ -876,6 +878,7 @@ void main() {
               utteranceId: 'override-1',
               output: overrideOutput,
             )
+            .chunks
             .toList();
 
         expect(chunks, isNotEmpty);
@@ -908,6 +911,7 @@ void main() {
             utteranceId: 'override-lifecycle',
             output: overrideOutput,
           )
+          .chunks
           .drain();
 
       expect(overrideOutput.initCount, 1);
@@ -933,9 +937,11 @@ void main() {
       await service.init();
       await service
           .speak('first', utteranceId: 'reused-1', output: output)
+          .chunks
           .drain();
       await service
           .speak('second', utteranceId: 'reused-2', output: output)
+          .chunks
           .drain();
 
       expect(output.initCount, 1);
@@ -971,6 +977,7 @@ void main() {
         await expectLater(
           service
               .speak('first', utteranceId: 'init-fails', output: failingOutput)
+              .chunks
               .drain(),
           throwsA(isA<TtsError>()),
         );
@@ -980,6 +987,7 @@ void main() {
               utteranceId: 'init-succeeds',
               output: succeedingOutput,
             )
+            .chunks
             .drain();
 
         expect(failingOutput.initCount, 1);
@@ -1040,6 +1048,7 @@ void main() {
               utteranceId: 'no-default-override',
               output: overrideOutput,
             )
+            .chunks
             .toList();
 
         expect(chunks, isNotEmpty);

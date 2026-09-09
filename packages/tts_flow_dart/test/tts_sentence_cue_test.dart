@@ -15,6 +15,7 @@ void main() {
 
       final chunks = await flow
           .speak('First sentence.', utteranceId: 'chapter-1')
+          .chunks
           .toList();
 
       expect(chunks.first, isA<TtsSentenceCueChunk>());

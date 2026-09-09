@@ -55,8 +55,8 @@ Future<void> main() async {
     utteranceId: 'example-2',
   );
 
-  final firstChunks = await first.toList();
-  final secondChunks = await second.toList();
+  final firstChunks = await first.chunks.toList();
+  final secondChunks = await second.chunks.toList();
 
   print('first chunks: ${firstChunks.length}');
   print('second chunks: ${secondChunks.length}');

@@ -24,6 +24,7 @@ void main() {
 
         final chunks = await service
             .speak('integration sample text', utteranceId: 'i-1')
+            .chunks
             .toList();
 
         expect(chunks, isNotEmpty);
@@ -59,8 +60,8 @@ void main() {
       final first = service.speak('this request fails', utteranceId: 'fail-1');
       final second = service.speak('should be canceled', utteranceId: 'fail-2');
 
-      await expectLater(first.toList(), throwsA(isA<TtsError>()));
-      expect(await second.toList(), isEmpty);
+      await expectLater(first.chunks.toList(), throwsA(isA<TtsError>()));
+      expect(await second.chunks.toList(), isEmpty);
 
       await Future<void>.delayed(const Duration(milliseconds: 20));
       expect(canceledIds, contains('fail-2'));
@@ -97,6 +98,7 @@ void main() {
 
           final chunks = await service
               .speak('fanout integration request', utteranceId: 'fanout-m6-1')
+              .chunks
               .toList();
 
           expect(chunks, isNotEmpty);

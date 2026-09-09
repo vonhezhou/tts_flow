@@ -1,5 +1,3 @@
-import 'dart:async';
-
 import 'package:tts_flow_dart/src/core/tts_chunk.dart';
 import 'package:tts_flow_dart/src/core/tts_synthesis_result.dart';
 import 'package:tts_flow_dart/src/service/tts_events.dart';
@@ -8,8 +6,9 @@ import 'package:tts_flow_dart/src/service/tts_events.dart';
 ///
 /// The handle owns the framework-generated [requestKey]. The caller-provided
 /// [utteranceId] is retained for application correlation and is included in
-/// every request event.
-final class TtsRequestHandle extends StreamView<TtsChunk> {
+/// every request event. It is a request-control and result object, not an
+/// audio stream; use [chunks] for the request's audio handoff.
+final class TtsRequestHandle {
   TtsRequestHandle({
     required this.requestKey,
     required this.utteranceId,
@@ -25,8 +24,7 @@ final class TtsRequestHandle extends StreamView<TtsChunk> {
        _pausePlayback = pausePlayback,
        _resumePlayback = resumePlayback,
        _stopPlayback = stopPlayback,
-       _hasActivePlayback = hasActivePlayback,
-       super(chunks);
+       _hasActivePlayback = hasActivePlayback;
 
   /// Opaque, flow-local identifier for this request instance.
   final String requestKey;
@@ -36,10 +34,10 @@ final class TtsRequestHandle extends StreamView<TtsChunk> {
 
   /// Chunks produced by synthesis for this request.
   ///
-  /// This is a single-subscription stream. The handle itself is a view of the
-  /// same stream, so listen through either this property or the handle, never
-  /// both. Attach one listener promptly after [TtsFlow.speak] when handing the
-  /// request to an application-owned realtime processing system.
+  /// This is a single-subscription stream. It is the only audio-stream entry
+  /// on this request handle. Attach one listener promptly after
+  /// [TtsFlow.speak] when handing the request to an application-owned realtime
+  /// processing system.
   ///
   /// This stream deliberately is not an application-level fanout API. Use
   /// [MulticastOutput] for backpressure-coupled outputs, [PrioritizedOutput]

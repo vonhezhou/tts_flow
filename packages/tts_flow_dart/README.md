@@ -126,7 +126,7 @@ Future<void> main() async {
    'Hello from flutter uni tts',
    utteranceId: 'hello-1',
  );
- final chunks = await request.toList();
+ final chunks = await request.chunks.toList();
 
  print('Received ${chunks.length} chunks.');
  await service.dispose();
@@ -349,11 +349,9 @@ package into a media graph.
 
 ## TtsRequestHandle.chunks (Application Processing Handoff)
 
-`TtsRequestHandle.chunks` is a single-subscription stream. The request handle
-itself is a view of that same stream, so use either `handle.listen(...)` or
-`handle.chunks.listen(...)`, not both. Attach the one consumer immediately
-after `speak()` when transferring a request to an application-owned realtime
-processing system.
+`TtsRequestHandle.chunks` is the request handle's only single-subscription
+audio stream. Attach its one consumer immediately after `speak()` when
+transferring a request to an application-owned realtime processing system.
 
 This is intentionally not a broadcast or implicit fanout API. If that system
 needs multiple downstream consumers, it owns their buffering, ordering, drop,
