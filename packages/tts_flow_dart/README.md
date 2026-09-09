@@ -16,6 +16,24 @@ request starts writing only after the previous write finishes or is canceled.
 Physical speaker playback may still be observable after a write finishes, but
 this does not imply concurrent mixing or concurrent output writes.
 
+By default, synthesis is eager: after A's output write finishes, B can begin
+synthesis while A is still physically playing. For a queued playback backend,
+limit the amount of synthesized-but-not-yet-terminal audio with:
+
+```dart
+const TtsFlowConfig(
+  synthesisAdmissionPolicy: TtsBoundedPlaybackBacklogPolicy(
+    maxOutstandingPlaybackRequests: 2,
+  ),
+)
+```
+
+This allows A to play while B is synthesized, then waits before C until one of
+those playback requests reaches a physical terminal state. The limit applies
+only to outputs that retain controllable playback associations; unsynthesized
+text remains in the normal FIFO queue. Custom policies receive a snapshot and
+can call `flow.refreshSynthesisAdmission()` after their own state changes.
+
 ## Audio Negotiation
 
 Audio negotiation is capability-based and request-scoped.

@@ -219,6 +219,16 @@ final class TtsFlow
     unawaited(processQueue());
   }
 
+  /// Re-evaluates whether the configured synthesis admission policy permits
+  /// another pending request to begin.
+  ///
+  /// A custom policy can call this after its own external state changes. This
+  /// does not resume a queue paused through [pauseQueue].
+  Future<void> refreshSynthesisAdmission() async {
+    _ensureReady();
+    await processQueue();
+  }
+
   /// Cancels the synthesis request currently being produced by the engine.
   ///
   /// This does not control audio that has already been finalized for physical
@@ -290,6 +300,7 @@ final class TtsFlow
       outputId: output.outputId,
     );
     releaseRequestIdentity(requestKey);
+    unawaited(processQueue());
   }
 
   Future<int> clearQueue() => _clearQueue(TtsSynthesisStopReason.queueCleared);
@@ -337,7 +348,10 @@ final class TtsFlow
     _playbackOutputs.clear();
     _utteranceIdsByRequestKey.clear();
     for (final controller in _requestEventControllers.values) {
-      await controller.close();
+      // A request event stream is single-subscription. Its close future waits
+      // for a listener that may never have been attached, so disposal must not
+      // wait for it after output resources are already released.
+      unawaited(controller.close());
     }
     _requestEventControllers.clear();
     state.markDisposed();
@@ -389,6 +403,10 @@ final class TtsFlow
   @protected
   bool hasPlaybackControl(String requestKey) =>
       _playbackOutputs.containsKey(requestKey);
+
+  @override
+  @protected
+  int get outstandingPlaybackRequestCount => _playbackOutputs.length;
 
   @override
   @protected

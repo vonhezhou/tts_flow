@@ -53,6 +53,42 @@
 
 这不等同于“设备上没有任何旧音频仍在播放”。`SpeakerOutput` 等播放 Output 可以在写入结束后保留某个 request 的物理播放控制与事件关联；该能力只用于观测和控制已交给设备的音频，不承诺多个请求混播。
 
+### 合成前瞻与播放积压
+
+默认的 `TtsEagerSynthesisAdmissionPolicy` 保持低延迟预合成：A 的
+`finishWrite()` 完成后，Flow 即可开始合成 B，而 A 仍可能在设备上播放。
+对于 `JustAudioBackend` 这类按顺序接收多个播放 session 的后端，B 的音频会排在
+A 后面；现代流式 TTS 通常比音频实际播放更快，这能显著降低朗读场景的段落间等待。
+
+`TtsOutput` 的串行写入约束不改变上述行为。它只保证 Flow 不会在 A 的写入尚未
+`finishWrite()`/`cancelWrite()` 时开始 B 的写入；它不会等待 A 的物理播放结束。
+
+应用若需要限制已经合成但尚未播完的音频量，可配置
+`TtsBoundedPlaybackBacklogPolicy`：
+
+```dart
+final flow = TtsFlow(
+  engine: engine,
+  defaultOutput: SpeakerOutput(backend: backend),
+  config: const TtsFlowConfig(
+    synthesisAdmissionPolicy: TtsBoundedPlaybackBacklogPolicy(
+      maxOutstandingPlaybackRequests: 2,
+    ),
+  ),
+);
+```
+
+上例允许 A 正在播放时预合成 B；B 写入结束后，C 会等待 A 或 B 进入物理播放终态。
+该数量统计的是仍由 `PlaybackControllableOutput` 保留关联的音频请求，包含正在播放
+和已排队播放的项；尚未合成的文本请求仍留在轻量 FIFO 队列，不占此额度。播放完成、
+播放失败或调用 `stopPlayback()` 都会触发重新评估。
+
+自定义 `TtsSynthesisAdmissionPolicy` 只根据快照决定是否启动下一条合成，不能改变
+Engine、Output 或播放队列的所有权。若策略依赖外部状态，状态变化后调用
+`flow.refreshSynthesisAdmission()`；它不会恢复被 `pauseQueue()` 暂停的队列。该策略
+不会把不支持队列的播放器变成串行播放器，因此有界前瞻应与能有序接收播放 session 的
+Output/Backend 一起使用。
+
 ## 低延迟原则
 
 低延迟的默认路径应当是：

@@ -12,6 +12,7 @@ import 'package:tts_flow_dart/src/core/tts_output_write_context.dart';
 import 'package:tts_flow_dart/src/core/tts_policy.dart';
 import 'package:tts_flow_dart/src/core/tts_request.dart';
 import 'package:tts_flow_dart/src/core/tts_synthesis_result.dart';
+import 'package:tts_flow_dart/src/core/tts_synthesis_admission_policy.dart';
 import 'package:tts_flow_dart/src/service/format_negotiator.dart';
 import 'package:tts_flow_dart/src/service/queue_scheduler.dart';
 import 'package:tts_flow_dart/src/service/tts_events.dart';
@@ -55,6 +56,9 @@ mixin TtsUtteranceQueueMixin on TtsFlowEventBus {
   bool hasPlaybackControl(String requestKey);
 
   @protected
+  int get outstandingPlaybackRequestCount;
+
+  @protected
   void releaseRequestIdentity(String requestKey);
 
   @protected
@@ -72,10 +76,15 @@ mixin TtsUtteranceQueueMixin on TtsFlowEventBus {
   final Map<String, StreamSubscription<TtsOutputPlaybackFailedEvent>>
   _playbackFailureSubscriptions =
       <String, StreamSubscription<TtsOutputPlaybackFailedEvent>>{};
+  var _queueProcessingRequested = false;
 
   @protected
   Future<void> processQueue() async {
     if (!state.tryEnterProcessing()) {
+      // A playback terminal event or a custom admission-policy refresh can
+      // arrive while the current request is still unwinding. Remember it so
+      // the next admission check is not lost when this processing turn exits.
+      _queueProcessingRequested = true;
       return;
     }
 
@@ -87,6 +96,16 @@ mixin TtsUtteranceQueueMixin on TtsFlowEventBus {
           break;
         }
 
+        final admissionSnapshot = TtsSynthesisAdmissionSnapshot(
+          pendingRequestCount: scheduler.length,
+          outstandingPlaybackRequestCount: outstandingPlaybackRequestCount,
+        );
+        if (!config.synthesisAdmissionPolicy.allowsNextSynthesis(
+          admissionSnapshot,
+        )) {
+          break;
+        }
+
         final item = scheduler.dequeue();
         final shouldStopQueue = await processQueuedRequest(item);
         if (shouldStopQueue || state.isHalted) {
@@ -95,6 +114,11 @@ mixin TtsUtteranceQueueMixin on TtsFlowEventBus {
       }
     } finally {
       state.exitProcessing();
+      final shouldProcessAgain = _queueProcessingRequested;
+      _queueProcessingRequested = false;
+      if (shouldProcessAgain && !scheduler.isEmpty && !state.isDisposed) {
+        unawaited(processQueue());
+      }
     }
   }
 
@@ -455,8 +479,12 @@ mixin TtsUtteranceQueueMixin on TtsFlowEventBus {
       _playbackFailureSubscriptions.containsKey(requestKey);
 
   Future<void> _finishPhysicalPlayback(String requestKey) async {
+    // This method is invoked from a playback stream listener. Yield once so a
+    // subscription is never awaited while its own callback is still running.
+    await Future<void>.microtask(() {});
     await _cancelPlaybackEventListenersForRequest(requestKey);
     releaseRequestIdentity(requestKey);
+    unawaited(processQueue());
   }
 
   Future<void> _cancelPlaybackCompletionListenerForRequest(

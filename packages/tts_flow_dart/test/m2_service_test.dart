@@ -68,6 +68,79 @@ void main() {
       await service.dispose();
     });
 
+    test(
+      'bounded playback backlog keeps one request synthesized ahead of playback',
+      () async {
+        final output = _PlaybackControllableTestOutput(outputId: 'speaker');
+        final service = TtsFlow(
+          engine: SineTtsEngine(
+            engineId: 'fake-engine',
+            supportsStreaming: true,
+            chunkCount: 1,
+          ),
+          defaultOutput: output,
+          config: const TtsFlowConfig(
+            synthesisAdmissionPolicy: TtsBoundedPlaybackBacklogPolicy(
+              maxOutstandingPlaybackRequests: 2,
+            ),
+          ),
+        );
+
+        await service.init();
+        final first = service.speak('first');
+        final second = service.speak('second');
+        final third = service.speak('third');
+
+        await first.synthesisResult;
+        await second.synthesisResult;
+
+        expect(output.startedRequestKeys, [
+          first.requestKey,
+          second.requestKey,
+        ]);
+
+        output.completePlayback(first.requestKey);
+        await third.synthesisResult;
+
+        expect(output.startedRequestKeys, [
+          first.requestKey,
+          second.requestKey,
+          third.requestKey,
+        ]);
+
+        await service.dispose();
+      },
+    );
+
+    test('custom synthesis admission policy can be refreshed', () async {
+      final policy = _ToggleSynthesisAdmissionPolicy(isOpen: false);
+      final output = _TrackingOutput(outputId: 'output');
+      final service = TtsFlow(
+        engine: SineTtsEngine(
+          engineId: 'fake-engine',
+          supportsStreaming: true,
+          chunkCount: 1,
+        ),
+        defaultOutput: output,
+        config: TtsFlowConfig(synthesisAdmissionPolicy: policy),
+      );
+
+      await service.init();
+      final request = service.speak('wait for admission');
+      await Future<void>.delayed(Duration.zero);
+
+      expect(output.consumedChunks, isEmpty);
+      expect(policy.lastSnapshot?.pendingRequestCount, 1);
+      expect(policy.lastSnapshot?.outstandingPlaybackRequestCount, 0);
+
+      policy.isOpen = true;
+      await service.refreshSynthesisAdmission();
+      await request.synthesisResult;
+
+      expect(output.consumedChunks, isNotEmpty);
+      await service.dispose();
+    });
+
     test('reused utterance IDs retain distinct request handles', () async {
       final service = TtsFlow(
         engine: SineTtsEngine(
@@ -1522,6 +1595,7 @@ final class _PlaybackControllableTestOutput
       StreamController<TtsOutputPlaybackCompletedEvent>.broadcast();
   final _failed = StreamController<TtsOutputPlaybackFailedEvent>.broadcast();
   final Set<String> _activeRequestKeys = <String>{};
+  final List<String> startedRequestKeys = <String>[];
   TtsOutputWriteContext? _session;
   var pauseCount = 0;
   var resumeCount = 0;
@@ -1545,6 +1619,7 @@ final class _PlaybackControllableTestOutput
   Future<void> startWrite(TtsOutputWriteContext session) async {
     _session = session;
     _activeRequestKeys.add(session.requestKey);
+    startedRequestKeys.add(session.requestKey);
   }
 
   @override
@@ -1602,10 +1677,37 @@ final class _PlaybackControllableTestOutput
     _activeRequestKeys.remove(requestKey);
   }
 
+  void completePlayback(String requestKey) {
+    if (!_activeRequestKeys.remove(requestKey)) {
+      throw StateError('No active playback.');
+    }
+    _completed.add(
+      TtsOutputPlaybackCompletedEvent(
+        requestKey: requestKey,
+        outputId: outputId,
+        playbackId: 'playback-$requestKey',
+      ),
+    );
+  }
+
   @override
   Future<void> dispose() async {
     _activeRequestKeys.clear();
     await _completed.close();
     await _failed.close();
+  }
+}
+
+final class _ToggleSynthesisAdmissionPolicy
+    implements TtsSynthesisAdmissionPolicy {
+  _ToggleSynthesisAdmissionPolicy({required this.isOpen});
+
+  bool isOpen;
+  TtsSynthesisAdmissionSnapshot? lastSnapshot;
+
+  @override
+  bool allowsNextSynthesis(TtsSynthesisAdmissionSnapshot snapshot) {
+    lastSnapshot = snapshot;
+    return isOpen;
   }
 }
