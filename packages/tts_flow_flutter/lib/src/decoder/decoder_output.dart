@@ -3,12 +3,65 @@ import 'dart:typed_data';
 import 'package:audio_decoder/audio_decoder.dart';
 import 'package:tts_flow_dart/tts_flow_dart.dart';
 
+/// Converts a complete encoded audio payload into raw PCM bytes.
+///
+/// This is deliberately a whole-payload operation. The bundled
+/// `audio_decoder` API accepts audio-file bytes, not an incremental codec
+/// stream, so decoding arbitrary network chunks independently would corrupt
+/// frames split across chunk boundaries.
+/// Converts one complete encoded-audio payload to raw PCM bytes.
+typedef AudioPcmConverter =
+    Future<Uint8List> Function({
+      required Uint8List input,
+      required TtsAudioSpec inputSpec,
+      required PcmDescriptor outputPcm,
+    });
+
+Future<Uint8List> _convertWithPlatformAudioDecoder({
+  required Uint8List input,
+  required TtsAudioSpec inputSpec,
+  required PcmDescriptor outputPcm,
+}) {
+  final String formatHint;
+  final Uint8List sourceBytes;
+
+  if (inputSpec.format == TtsAudioFormat.pcm) {
+    final inputPcm = inputSpec.requirePcm;
+    final header = WavHeader.fromPcmDescriptor(
+      inputPcm,
+      dataLengthBytes: input.length,
+    ).toBytes();
+    final wavBytes = BytesBuilder(copy: false)
+      ..add(header)
+      ..add(input);
+    sourceBytes = wavBytes.takeBytes();
+    formatHint = 'wav';
+  } else {
+    sourceBytes = input;
+    formatHint = inputSpec.format.name;
+  }
+
+  return AudioDecoder.convertToWavBytes(
+    sourceBytes,
+    formatHint: formatHint,
+    sampleRate: outputPcm.sampleRateHz,
+    channels: outputPcm.channels,
+    bitDepth: outputPcm.bitsPerSample,
+    includeHeader: false,
+  );
+}
+
 /// A [TtsOutput] implementation that decodes compressed audio formats
 /// (MP3, AAC, Opus) to PCM using the audio_decoder package.
 ///
 /// This output accepts any supported audio format and decodes it to
-/// a PCM format negotiated with [output] or specified by [pcmFormat],
-/// then forwards the decoded chunks to [output].
+/// a PCM format negotiated with [output] or specified by [pcmFormat].
+///
+/// Compressed input is accumulated for one output write and converted when
+/// that write finishes. This preserves codec frames split across arbitrary
+/// network chunks. It is therefore an explicit complete-payload conversion
+/// branch, not a low-latency streaming decoder; keep latency-critical playback
+/// on a direct compressed-audio output.
 final class Decoder implements TtsOutput {
   /// Creates a new [Decoder] instance.
   ///
@@ -23,7 +76,8 @@ final class Decoder implements TtsOutput {
     required this.output,
     this.pcmFormat,
     this.defaultPcmFormat = const PcmDescriptor.s16Mono24KHz(),
-  });
+    AudioPcmConverter converter = _convertWithPlatformAudioDecoder,
+  }) : _converter = converter;
 
   @override
   final String outputId;
@@ -38,6 +92,8 @@ final class Decoder implements TtsOutput {
   /// The default PCM format to use if [Decoder] and [Decoder.output]
   /// are open-ended and can not agree on a fixed format.
   final PcmDescriptor defaultPcmFormat;
+
+  final AudioPcmConverter _converter;
 
   final _formatNegotiator = const TtsFormatNegotiator();
 
@@ -69,6 +125,9 @@ final class Decoder implements TtsOutput {
   TtsOutputWriteContext? _writeContext;
   BytesBuilder? _buffer;
   TtsAudioSpec? _negotiatedSpec;
+  bool _buffersWholeInput = false;
+  int? _lastBufferedSequenceNumber;
+  DateTime? _lastBufferedTimestamp;
 
   @override
   Future<void> init() async {
@@ -78,9 +137,12 @@ final class Decoder implements TtsOutput {
   @override
   Future<void> startWrite(TtsOutputWriteContext writeContext) async {
     _writeContext = writeContext;
-    _buffer = BytesBuilder(copy: false);
-
     _negotiatedSpec = _resolveAudioSpec(requestKey: writeContext.requestKey);
+    _buffersWholeInput = _requiresWholeInputConversion(
+      input: writeContext.audioSpec,
+      output: _negotiatedSpec!,
+    );
+    _buffer = _buffersWholeInput ? BytesBuilder(copy: false) : null;
 
     final downstreamWriteContext = writeContext.copyWith(
       audioSpec: _negotiatedSpec,
@@ -94,8 +156,7 @@ final class Decoder implements TtsOutput {
   @override
   Future<void> writeChunk(TtsChunk chunk) async {
     final writeContext = _writeContext;
-    final buffer = _buffer;
-    if (writeContext == null || buffer == null) {
+    if (writeContext == null) {
       throw StateError('Decoder write has not started.');
     }
     if (chunk.requestKey != writeContext.requestKey) {
@@ -112,43 +173,21 @@ final class Decoder implements TtsOutput {
       throw StateError('Negotiated spec not available.');
     }
 
-    Uint8List decodedPcmBytes;
-    if (writeContext.audioSpec.format == TtsAudioFormat.pcm) {
-      final inputPcm = writeContext.audioSpec.requirePcm;
-      final targetPcm = negotiatedSpec.requirePcm;
-      final needsConversion =
-          inputPcm.sampleRateHz != targetPcm.sampleRateHz ||
-          inputPcm.channels != targetPcm.channels ||
-          inputPcm.bitsPerSample != targetPcm.bitsPerSample;
-
-      if (needsConversion) {
-        decodedPcmBytes = await AudioDecoder.convertToWavBytes(
-          chunk.bytes,
-          formatHint: 'pcm',
-          sampleRate: targetPcm.sampleRateHz,
-          channels: targetPcm.channels,
-          bitDepth: targetPcm.bitsPerSample,
-          includeHeader: false,
-        );
-      } else {
-        decodedPcmBytes = chunk.bytes;
+    if (_buffersWholeInput) {
+      final buffer = _buffer;
+      if (buffer == null) {
+        throw StateError('Decoder conversion buffer is not initialized.');
       }
-    } else {
-      final formatHint = writeContext.audioSpec.format.name;
-      decodedPcmBytes = await AudioDecoder.convertToWavBytes(
-        chunk.bytes,
-        formatHint: formatHint,
-        sampleRate: negotiatedSpec.requirePcm.sampleRateHz,
-        channels: negotiatedSpec.requirePcm.channels,
-        bitDepth: negotiatedSpec.requirePcm.bitsPerSample,
-        includeHeader: false,
-      );
+      buffer.add(chunk.bytes);
+      _lastBufferedSequenceNumber = chunk.sequenceNumber;
+      _lastBufferedTimestamp = chunk.timestamp;
+      return;
     }
 
     final decodedChunk = TtsAudioChunk(
       requestKey: writeContext.requestKey,
       sequenceNumber: _chunkSequenceNumber++,
-      bytes: decodedPcmBytes,
+      bytes: chunk.bytes,
       audioSpec: negotiatedSpec,
       isLastChunk: chunk.isLastChunk,
       timestamp: DateTime.now(),
@@ -159,30 +198,47 @@ final class Decoder implements TtsOutput {
 
   @override
   Future<AudioArtifact> finishWrite() async {
-    _writeContext = null;
-    _buffer = null;
-    _negotiatedSpec = null;
-    _chunkSequenceNumber = 0;
+    final writeContext = _writeContext;
+    final negotiatedSpec = _negotiatedSpec;
+    if (writeContext == null || negotiatedSpec == null) {
+      throw StateError('Decoder write has not started.');
+    }
 
-    return output.finishWrite();
+    try {
+      final buffer = _buffer;
+      if (_buffersWholeInput && buffer != null && buffer.length > 0) {
+        final decodedPcmBytes = await _converter(
+          input: buffer.takeBytes(),
+          inputSpec: writeContext.audioSpec,
+          outputPcm: negotiatedSpec.requirePcm,
+        );
+        await output.writeChunk(
+          TtsAudioChunk(
+            requestKey: writeContext.requestKey,
+            sequenceNumber: _lastBufferedSequenceNumber ?? 0,
+            bytes: decodedPcmBytes,
+            audioSpec: negotiatedSpec,
+            isLastChunk: true,
+            timestamp: _lastBufferedTimestamp ?? DateTime.now(),
+          ),
+        );
+      }
+      return await output.finishWrite();
+    } finally {
+      _clearWriteState();
+    }
   }
 
   @override
   Future<void> cancelWrite(SynthesisControl control) async {
     await output.cancelWrite(control);
-    _writeContext = null;
-    _buffer = null;
-    _negotiatedSpec = null;
-    _chunkSequenceNumber = 0;
+    _clearWriteState();
   }
 
   @override
   Future<void> dispose() async {
     await output.dispose();
-    _writeContext = null;
-    _buffer = null;
-    _negotiatedSpec = null;
-    _chunkSequenceNumber = 0;
+    _clearWriteState();
   }
 
   /// for test only
@@ -204,5 +260,25 @@ final class Decoder implements TtsOutput {
     }
 
     return spec;
+  }
+
+  bool _requiresWholeInputConversion({
+    required TtsAudioSpec input,
+    required TtsAudioSpec output,
+  }) {
+    if (input.format != TtsAudioFormat.pcm) {
+      return true;
+    }
+    return input.requirePcm != output.requirePcm;
+  }
+
+  void _clearWriteState() {
+    _writeContext = null;
+    _buffer = null;
+    _negotiatedSpec = null;
+    _buffersWholeInput = false;
+    _lastBufferedSequenceNumber = null;
+    _lastBufferedTimestamp = null;
+    _chunkSequenceNumber = 0;
   }
 }

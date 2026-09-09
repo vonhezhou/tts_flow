@@ -1,10 +1,13 @@
-# Tts Flow Flutter
+# tts_flow_flutter
 
 [![style: very good analysis][very_good_analysis_badge]][very_good_analysis_link]
 [![Powered by Mason](https://img.shields.io/endpoint?url=https%3A%2F%2Ftinyurl.com%2Fmason-badge)](https://github.com/felangel/mason)
 [![License: MIT][license_badge]][license_link]
 
-A Very Good Project created by Very Good CLI.
+Flutter playback and optional conversion adapters for `tts_flow_dart`.
+It keeps compatible online TTS audio in its encoded form for direct
+`just_audio` playback; `Decoder` is an explicit complete-payload conversion
+output for branches that need PCM.
 
 ## JustAudio streaming playback
 

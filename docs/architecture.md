@@ -110,6 +110,10 @@ Output/Backend 一起使用。
   └─ Decoder → WavFileOutput：仅这个分支解码为 PCM/WAV
 ```
 
+`Decoder` 使用完整编码 payload 转换为 PCM，以保证任意网络 chunk 边界不会
+截断编码帧。因此它是显式的完整载荷转换分支，不是低延迟流式解码器；关键播放
+路径应继续使用原格式直通的 Output。
+
 `MulticastOutput` 会等待每个分支处理当前 chunk。因此，扬声器与需要解码、写盘或进行耗时处理的分支不应直接放在同一个 `MulticastOutput` 中，除非调用方明确接受该分支反向增加播放延迟。
 
 播放优先、附带可降级观察者时，使用 `PrioritizedOutput`：

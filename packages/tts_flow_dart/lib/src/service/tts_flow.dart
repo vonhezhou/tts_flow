@@ -1,6 +1,7 @@
 import 'dart:async';
 import 'dart:collection';
 
+import 'package:characters/characters.dart';
 import 'package:meta/meta.dart';
 import 'package:tts_flow_dart/src/core/audio_spec.dart';
 import 'package:tts_flow_dart/src/core/tts_chunk.dart';
@@ -142,10 +143,12 @@ final class TtsFlow
     final requestKey = 'request-${++_nextRequestKey}';
     final resolvedUtteranceId = utteranceId ?? requestKey;
 
-    if (engine.maxInputByteSize > 0 && text.length > engine.maxInputByteSize) {
+    final inputCharacterCount = text.characters.length;
+    if (engine.maxInputCharacterCount > 0 &&
+        inputCharacterCount > engine.maxInputCharacterCount) {
       throw TtsError(
-        code: TtsErrorCode.maxInputByteSizeExceeded,
-        message: 'Text length exceeds maximum allowed byte size.',
+        code: TtsErrorCode.maxInputCharacterCountExceeded,
+        message: 'Text exceeds the maximum allowed character count.',
         requestKey: requestKey,
       );
     }
@@ -457,10 +460,11 @@ final class TtsFlow
 
   Future<void> _awaitActiveRequestShutdown() async {
     const pollInterval = Duration(milliseconds: 10);
-    const timeout = Duration(milliseconds: 500);
-    final deadline = DateTime.now().add(timeout);
+    final timeout = config.activeSynthesisShutdownTimeout;
+    final deadline = timeout == null ? null : DateTime.now().add(timeout);
 
-    while (state.activeControl != null && DateTime.now().isBefore(deadline)) {
+    while (state.activeControl != null &&
+        (deadline == null || DateTime.now().isBefore(deadline))) {
       await Future<void>.delayed(pollInterval);
     }
   }

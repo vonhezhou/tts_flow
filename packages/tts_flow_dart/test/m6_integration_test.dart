@@ -123,7 +123,7 @@ final class _FailingEngine with TtsEngineDefaults implements TtsEngine {
   String get engineId => 'failing-engine';
 
   @override
-  int get maxInputByteSize => 0;
+  int get maxInputCharacterCount => 0;
 
   @override
   bool get supportsStreaming => true;

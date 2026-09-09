@@ -10,9 +10,34 @@ class _MockTtsOutput extends Mock implements TtsOutput {}
 
 class _FakeTtsChunk extends Fake implements TtsChunk {}
 
+final class _RecordingConverter {
+  Uint8List? receivedInput;
+  TtsAudioSpec? receivedInputSpec;
+  PcmDescriptor? receivedOutputPcm;
+
+  Future<Uint8List> convertToPcm({
+    required Uint8List input,
+    required TtsAudioSpec inputSpec,
+    required PcmDescriptor outputPcm,
+  }) async {
+    receivedInput = input;
+    receivedInputSpec = inputSpec;
+    receivedOutputPcm = outputPcm;
+    return Uint8List.fromList([9, 8, 7, 6]);
+  }
+}
+
 void main() {
   setUpAll(() {
     registerFallbackValue(_FakeTtsChunk());
+    registerFallbackValue(
+      const TtsOutputWriteContext(
+        requestKey: 'fallback-request',
+        audioSpec: TtsAudioSpec.mp3(),
+        voice: null,
+        options: null,
+      ),
+    );
     WidgetsFlutterBinding.ensureInitialized();
   });
 
@@ -120,6 +145,84 @@ void main() {
           throwsStateError,
         );
       });
+
+      test(
+        'buffers encoded chunks and converts their complete payload once',
+        () async {
+          final converter = _RecordingConverter();
+          decoder = Decoder(
+            outputId: 'decoder',
+            output: mockOutput,
+            converter: converter.convertToPcm,
+          );
+          const outputPcm = PcmDescriptor(
+            sampleRateHz: 24000,
+            bitsPerSample: 16,
+            channels: 1,
+          );
+          when(() => mockOutput.inAudioCapabilities).thenReturn({
+            PcmCapability(
+              sampleRatesHz: {outputPcm.sampleRateHz},
+              bitsPerSample: {outputPcm.bitsPerSample},
+              channels: {outputPcm.channels},
+              encodings: {outputPcm.encoding},
+            ),
+          });
+          when(() => mockOutput.startWrite(any())).thenAnswer((_) async {});
+          when(() => mockOutput.writeChunk(any())).thenAnswer((_) async {});
+          when(() => mockOutput.finishWrite()).thenAnswer(
+            (_) async => InMemoryAudioArtifact(
+              requestKey: 'request-1',
+              audioSpec: const TtsAudioSpec.pcm(outputPcm),
+              audioBytes: Uint8List(0),
+              totalBytes: 0,
+            ),
+          );
+
+          await decoder.startWrite(
+            const TtsOutputWriteContext(
+              requestKey: 'request-1',
+              audioSpec: TtsAudioSpec.mp3(),
+              voice: null,
+              options: null,
+            ),
+          );
+          await decoder.writeChunk(
+            TtsAudioChunk(
+              requestKey: 'request-1',
+              sequenceNumber: 0,
+              bytes: Uint8List.fromList([1, 2]),
+              audioSpec: const TtsAudioSpec.mp3(),
+              isLastChunk: false,
+              timestamp: DateTime(2026),
+            ),
+          );
+          await decoder.writeChunk(
+            TtsAudioChunk(
+              requestKey: 'request-1',
+              sequenceNumber: 1,
+              bytes: Uint8List.fromList([3, 4]),
+              audioSpec: const TtsAudioSpec.mp3(),
+              isLastChunk: true,
+              timestamp: DateTime(2026, 1, 1, 0, 0, 1),
+            ),
+          );
+
+          verifyNever(() => mockOutput.writeChunk(any()));
+          await decoder.finishWrite();
+
+          expect(converter.receivedInput, Uint8List.fromList([1, 2, 3, 4]));
+          expect(converter.receivedInputSpec, const TtsAudioSpec.mp3());
+          expect(converter.receivedOutputPcm, outputPcm);
+          final written =
+              verify(() => mockOutput.writeChunk(captureAny())).captured.single
+                  as TtsAudioChunk;
+          expect(written.bytes, Uint8List.fromList([9, 8, 7, 6]));
+          expect(written.audioSpec, const TtsAudioSpec.pcm(outputPcm));
+          expect(written.sequenceNumber, 1);
+          expect(written.isLastChunk, isTrue);
+        },
+      );
     });
 
     group('cancelWrite', () {

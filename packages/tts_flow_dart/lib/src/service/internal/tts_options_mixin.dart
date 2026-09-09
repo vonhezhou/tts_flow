@@ -20,31 +20,45 @@ mixin TtsOptionsMixin {
   double? get speed => options.speed;
 
   set speed(double? value) {
-    options = options.copyWith(speed: value);
+    options = TtsOptions(
+      speed: value,
+      pitch: options.pitch,
+      volume: options.volume,
+      sampleRateHz: options.sampleRateHz,
+    );
   }
 
   double? get pitch => options.pitch;
 
   set pitch(double? value) {
-    options = options.copyWith(pitch: value);
+    options = TtsOptions(
+      speed: options.speed,
+      pitch: value,
+      volume: options.volume,
+      sampleRateHz: options.sampleRateHz,
+    );
   }
 
   double? get volume => options.volume;
 
   set volume(double? value) {
-    options = options.copyWith(volume: value);
+    options = TtsOptions(
+      speed: options.speed,
+      pitch: options.pitch,
+      volume: value,
+      sampleRateHz: options.sampleRateHz,
+    );
   }
 
   int? get sampleRateHz => options.sampleRateHz;
 
   set sampleRateHz(int? value) {
-    options = options.copyWith(sampleRateHz: value);
-  }
-
-  Duration? get timeout => options.timeout;
-
-  set timeout(Duration? value) {
-    options = options.copyWith(timeout: value);
+    options = TtsOptions(
+      speed: options.speed,
+      pitch: options.pitch,
+      volume: options.volume,
+      sampleRateHz: value,
+    );
   }
 
   @protected

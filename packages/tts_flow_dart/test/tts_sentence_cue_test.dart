@@ -37,7 +37,7 @@ final class _CueFirstEngine with TtsEngineDefaults implements TtsEngine {
   bool get supportsStreaming => true;
 
   @override
-  int get maxInputByteSize => 0;
+  int get maxInputCharacterCount => 0;
 
   @override
   Set<AudioCapability> get outAudioCapabilities => {const Mp3Capability()};

@@ -13,6 +13,12 @@
 
 - Breaking: `TtsRequestHandle` no longer extends `Stream<TtsChunk>`.
   Consume its sole audio handoff through `handle.chunks`.
+- Breaking: `TtsEngine.maxInputByteSize` is now
+  `maxInputCharacterCount`. Limits are measured in user-perceived characters,
+  not UTF-16 code units or bytes.
+- Breaking: removed the unused request-level `TtsOptions.timeout` and
+  `TtsFlow.timeout`. Online transport timeouts are configured explicitly by
+  the corresponding engine client configuration.
 - Added `PrioritizedOutput` and `TtsAuxiliaryOutput` for playback-first
   fanout. Only the primary output participates in backpressure and format
   negotiation; auxiliary observers are synchronous notifications that own any

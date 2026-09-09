@@ -48,7 +48,7 @@ final class FileTtsEngine with TtsEngineDefaults implements TtsEngine {
   final String engineId;
 
   @override
-  final int maxInputByteSize = 0;
+  final int maxInputCharacterCount = 0;
 
   final FileContentProvider provider;
 

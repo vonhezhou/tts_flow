@@ -34,13 +34,13 @@ abstract interface class TtsEngine {
   /// after full synthesis is available.
   bool get supportsStreaming;
 
-  /// The maximum byte size of each chunk of text that can be synthesized.
+  /// The maximum number of user-perceived characters accepted per request.
   ///
   /// If the input text exceeds this size,
-  /// an [TtsError.maxInputByteSizeExceeded] will be thrown.
+  /// an [TtsError.maxInputCharacterCountExceeded] will be thrown.
   /// 0 means no limit.
   /// See also [ttsSplitText].
-  int get maxInputByteSize;
+  int get maxInputCharacterCount;
 
   /// Audio capabilities that this engine can synthesize.
   ///

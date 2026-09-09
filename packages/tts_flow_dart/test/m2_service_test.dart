@@ -69,6 +69,36 @@ void main() {
     });
 
     test(
+      'enforces engine input limits using user-perceived characters',
+      () async {
+        final service = TtsFlow(
+          engine: _ChunkSpecEngine(
+            negotiatedCapabilities: {const Mp3Capability()},
+            emittedSpec: const TtsAudioSpec.mp3(),
+            maxInputCharacterCount: 1,
+          ),
+          defaultOutput: NullOutput(),
+        );
+        await service.init();
+
+        // The combining mark forms one grapheme cluster with the preceding e.
+        expect(() => service.speak('e\u0301'), returnsNormally);
+        expect(
+          () => service.speak('ab'),
+          throwsA(
+            isA<TtsError>().having(
+              (error) => error.code,
+              'code',
+              TtsErrorCode.maxInputCharacterCountExceeded,
+            ),
+          ),
+        );
+
+        await service.dispose();
+      },
+    );
+
+    test(
       'bounded playback backlog keeps one request synthesized ahead of playback',
       () async {
         final output = _PlaybackControllableTestOutput(outputId: 'speaker');
@@ -709,13 +739,11 @@ void main() {
       service.pitch = 0.9;
       service.volume = 0.8;
       service.sampleRateHz = 24000;
-      service.timeout = const Duration(seconds: 10);
       service.preferredFormat = TtsAudioFormat.pcm;
       expect(service.speed, 1.1);
       expect(service.pitch, 0.9);
       expect(service.volume, 0.8);
       expect(service.sampleRateHz, 24000);
-      expect(service.timeout, const Duration(seconds: 10));
 
       final streamedChunks = await service
           .speak(
@@ -1446,6 +1474,7 @@ final class _ChunkSpecEngine with TtsEngineDefaults implements TtsEngine {
   _ChunkSpecEngine({
     required Set<AudioCapability> negotiatedCapabilities,
     required this.emittedSpec,
+    this.maxInputCharacterCount = 0,
   }) : _negotiatedCapabilities = Set<AudioCapability>.from(
          negotiatedCapabilities,
        );
@@ -1457,7 +1486,7 @@ final class _ChunkSpecEngine with TtsEngineDefaults implements TtsEngine {
   String get engineId => 'chunk-spec-engine';
 
   @override
-  int get maxInputByteSize => 0;
+  final int maxInputCharacterCount;
 
   @override
   bool get supportsStreaming => true;

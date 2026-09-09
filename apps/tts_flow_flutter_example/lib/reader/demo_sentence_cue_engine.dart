@@ -26,7 +26,7 @@ final class DemoSentenceCueEngine with TtsEngineDefaults implements TtsEngine {
   bool get supportsStreaming => _delegate.supportsStreaming;
 
   @override
-  int get maxInputByteSize => _delegate.maxInputByteSize;
+  int get maxInputCharacterCount => _delegate.maxInputCharacterCount;
 
   @override
   Set<AudioCapability> get outAudioCapabilities =>

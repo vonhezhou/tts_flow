@@ -27,16 +27,16 @@ unit test CI；它是 Native player/平台配置的显式回归项。
 当前 Flutter 工具会将此示例的 macOS target 迁移到 macOS 12.0，并使用 Swift Package
 Manager 管理 Flutter 插件；因此 macOS 回归基线为 12.0 及以上。
 
-## Getting Started
+## Purpose
 
-This project is a starting point for a Flutter application.
+This app is a deterministic playback and output-lifecycle demonstration for
+`tts_flow_flutter`. It uses a bundled WAV fixture through `FileTtsEngine`, so
+it can run without an online TTS account or API key.
 
-A few resources to get you started if this is your first Flutter project:
+It demonstrates speaker playback, physical playback events, output writing,
+and decoded WAV export. It intentionally does not embed an online-provider
+credential flow; provider credentials remain application-owned.
 
-- [Learn Flutter](https://docs.flutter.dev/get-started/learn-flutter)
-- [Write your first Flutter app](https://docs.flutter.dev/get-started/codelab)
-- [Flutter learning resources](https://docs.flutter.dev/reference/learning-resources)
-
-For help getting started with Flutter development, view the
-[online documentation](https://docs.flutter.dev/), which offers tutorials,
-samples, guidance on mobile development, and a full API reference.
+See the repository [architecture](../../docs/architecture.md) and the
+[JustAudio backend notes](../../docs/just_audio_backend.md) for scope and
+platform requirements.

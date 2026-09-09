@@ -37,6 +37,12 @@ only to outputs that retain controllable playback associations; unsynthesized
 text remains in the normal FIFO queue. Custom policies receive a snapshot and
 can call `flow.refreshSynthesisAdmission()` after their own state changes.
 
+When disposing a flow, active synthesis is first cancelled and the flow waits
+up to five seconds for the engine stream to end before releasing engine and
+output resources. Configure `TtsFlowConfig.activeSynthesisShutdownTimeout`
+to use a different grace period, or `null` to wait indefinitely for a
+cooperative engine.
+
 ## Audio Negotiation
 
 Audio negotiation is capability-based and request-scoped.
@@ -118,11 +124,11 @@ Future<void> main() async {
    supportsStreaming: true,
    chunkCount: 3,
   ),
-  output: NullOutput(),
+  defaultOutput: NullOutput(),
  );
  
  await service.init();
- service.preferredFormat = TtsAudioFormat.wav;
+ service.preferredFormat = TtsAudioFormat.pcm;
  service.sampleRateHz = 24000;
 
  final request = service.speak(
@@ -288,7 +294,7 @@ Future<void> main() async {
   final output = MulticastOutput(
     outputs: [
       NullOutput(outputId: 'null'),
-      WaveFileOutput(outputId: 'file', outputDirectory: tempDir),
+      WavFileOutput('${tempDir.path}/speech.wav', outputId: 'file'),
     ],
     errorPolicy: MulticastOutputErrorPolicy.bestEffort,
   );
@@ -299,15 +305,14 @@ Future<void> main() async {
       supportsStreaming: true,
       chunkCount: 3,
     ),
-    output: output,
+    defaultOutput: output,
   );
 
   await service.init();
-  service.preferredFormat = TtsAudioFormat.wav;
+  service.preferredFormat = TtsAudioFormat.pcm;
 
-  await service
-      .speak('hello fanout', utteranceId: 'fanout-1')
-      .drain();
+  final request = service.speak('hello fanout', utteranceId: 'fanout-1');
+  await request.synthesisResult;
 
   await service.dispose();
 }

@@ -23,7 +23,7 @@ final class SineTtsEngine with TtsEngineDefaults implements TtsEngine {
   final String engineId;
 
   @override
-  final int maxInputByteSize = 0;
+  final int maxInputCharacterCount = 0;
 
   @override
   final bool supportsStreaming;

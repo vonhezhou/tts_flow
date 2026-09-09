@@ -17,15 +17,15 @@ dev_dependencies:
 melos:
   scripts:
     analyze:
-      run: melos exec -- dart analyze .
+      run: dart run melos exec -- dart analyze .
       description: Analyze all packages.
 
     format:
-      run: melos exec -- dart format .
+      run: dart run melos exec -- dart format .
       description: Format all packages.
 
     test:
-      run: melos run test:dart && melos run test:flutter
+      run: dart run melos run test:dart && dart run melos run test:flutter
       description: Run all tests.
 
     test:dart:
@@ -54,5 +54,5 @@ melos:
       description: Run all checks plus the macOS JustAudio integration regression.
 
     check:
-      run: melos run analyze && melos run test
+      run: dart run melos run analyze && dart run melos run test
       description: Analyze and test all packages.
