@@ -174,6 +174,11 @@ mixin TtsUtteranceQueueMixin on TtsFlowEventBus {
           );
         }
 
+        // Register before opening the output write. A playback-oriented output
+        // can report a synchronous terminal event while startWrite is still
+        // awaiting its backend; registering afterward would reintroduce a
+        // stale association after that event has already released it.
+        registerPlaybackControl(request.requestKey, effectiveOutput);
         await effectiveOutput.startWrite(
           TtsOutputWriteContext(
             requestKey: request.requestKey,
@@ -183,7 +188,6 @@ mixin TtsUtteranceQueueMixin on TtsFlowEventBus {
             params: request.params,
           ),
         );
-        registerPlaybackControl(request.requestKey, effectiveOutput);
         activeAudioSpec = spec;
         outputWriteStarted = true;
       }
@@ -423,11 +427,13 @@ mixin TtsUtteranceQueueMixin on TtsFlowEventBus {
                 playbackId: event.playbackId,
                 playedDuration: event.playedDuration,
               );
-              if (controllableOutput == null ||
-                  !controllableOutput.hasActivePlayback(requestKey)) {
-                unregisterPlaybackControl(requestKey);
-                unawaited(_finishPhysicalPlayback(requestKey));
-              }
+              // A matching event is the output's authoritative physical
+              // terminal signal. Do not require its active-state map to have
+              // been updated first: implementations may emit before clearing
+              // that map, and the admission policy must not retain stale
+              // playback backlog in either ordering.
+              unregisterPlaybackControl(requestKey);
+              unawaited(_finishPhysicalPlayback(requestKey));
             },
             onDone: () {
               _playbackCompletionSubscriptions.remove(requestKey);
@@ -453,11 +459,8 @@ mixin TtsUtteranceQueueMixin on TtsFlowEventBus {
                 playbackId: event.playbackId,
                 error: event.error,
               );
-              if (controllableOutput == null ||
-                  !controllableOutput.hasActivePlayback(requestKey)) {
-                unregisterPlaybackControl(requestKey);
-                unawaited(_finishPhysicalPlayback(requestKey));
-              }
+              unregisterPlaybackControl(requestKey);
+              unawaited(_finishPhysicalPlayback(requestKey));
             },
             onDone: () {
               _playbackFailureSubscriptions.remove(requestKey);

@@ -4,11 +4,14 @@ tts_flow_dart is a clean, extensible TTS framework for Dart.
 
 Core design choices in this repository:
 
-- Fixed service wiring: each TtsFlow instance uses one engine and one output.
+- Fixed engine wiring: each TtsFlow instance uses one engine. It may have a
+  default output, while individual requests may provide their own single or
+  composite output.
 - Service-scoped defaults: voice/options/format are configured once per service.
-- Unified API: `speak(text, utteranceId: ...)` returns a `TtsRequestHandle`,
-  which is also a stream of `TtsChunk` and exposes a terminal
-  `synthesisResult`.
+- Unified API: `speak(text, utteranceId: ...)` returns a `TtsRequestHandle`.
+  Its explicit, single-subscription `chunks` stream is the application-owned
+  custom-consumer handoff; `synthesisResult` reports the terminal synthesis
+  outcome.
 - FIFO queue semantics with halt-on-failure behavior.
 
 For one `TtsFlow`, a `TtsOutput` has exactly one active write. The next

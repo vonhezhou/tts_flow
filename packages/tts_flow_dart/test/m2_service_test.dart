@@ -112,6 +112,41 @@ void main() {
       },
     );
 
+    test(
+      'bounded playback backlog releases a synchronous terminal write event',
+      () async {
+        final output = _PlaybackControllableTestOutput(
+          outputId: 'speaker',
+          completePlaybackWhenWriteStarts: true,
+        );
+        final service = TtsFlow(
+          engine: SineTtsEngine(
+            engineId: 'fake-engine',
+            supportsStreaming: true,
+            chunkCount: 1,
+          ),
+          defaultOutput: output,
+          config: const TtsFlowConfig(
+            synthesisAdmissionPolicy: TtsBoundedPlaybackBacklogPolicy(
+              maxOutstandingPlaybackRequests: 1,
+            ),
+          ),
+        );
+
+        await service.init();
+        final first = service.speak('first');
+        final second = service.speak('second');
+
+        await Future.wait([first.synthesisResult, second.synthesisResult]);
+
+        expect(output.startedRequestKeys, [
+          first.requestKey,
+          second.requestKey,
+        ]);
+        await service.dispose();
+      },
+    );
+
     test('custom synthesis admission policy can be refreshed', () async {
       final policy = _ToggleSynthesisAdmissionPolicy(isOpen: false);
       final output = _TrackingOutput(outputId: 'output');
@@ -1595,14 +1630,23 @@ final class _PlaybackAwareTestOutput
 
 final class _PlaybackControllableTestOutput
     implements TtsOutput, PlaybackControllableOutput {
-  _PlaybackControllableTestOutput({required this.outputId});
+  _PlaybackControllableTestOutput({
+    required this.outputId,
+    this.completePlaybackWhenWriteStarts = false,
+  }) : _completed = StreamController<TtsOutputPlaybackCompletedEvent>.broadcast(
+         sync: completePlaybackWhenWriteStarts,
+       ),
+       _failed = StreamController<TtsOutputPlaybackFailedEvent>.broadcast(
+         sync: completePlaybackWhenWriteStarts,
+       );
 
   @override
   final String outputId;
 
-  final _completed =
-      StreamController<TtsOutputPlaybackCompletedEvent>.broadcast();
-  final _failed = StreamController<TtsOutputPlaybackFailedEvent>.broadcast();
+  final bool completePlaybackWhenWriteStarts;
+
+  final StreamController<TtsOutputPlaybackCompletedEvent> _completed;
+  final StreamController<TtsOutputPlaybackFailedEvent> _failed;
   final Set<String> _activeRequestKeys = <String>{};
   final List<String> startedRequestKeys = <String>[];
   TtsOutputWriteContext? _session;
@@ -1629,6 +1673,9 @@ final class _PlaybackControllableTestOutput
     _session = session;
     _activeRequestKeys.add(session.requestKey);
     startedRequestKeys.add(session.requestKey);
+    if (completePlaybackWhenWriteStarts) {
+      completePlayback(session.requestKey);
+    }
   }
 
   @override
