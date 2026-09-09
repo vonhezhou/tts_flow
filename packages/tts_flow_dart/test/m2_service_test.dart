@@ -373,6 +373,41 @@ void main() {
       await service.dispose();
     });
 
+    test('pausing the queue does not delay active synthesis output', () async {
+      final service = TtsFlow(
+        engine: SineTtsEngine(
+          engineId: 'fake-engine',
+          supportsStreaming: true,
+          chunkCount: 4,
+          chunkDelay: const Duration(milliseconds: 5),
+        ),
+        defaultOutput: NullOutput(),
+      );
+      final started = <String>[];
+      final subscription = service.requestEvents
+          .where((event) => event.type == TtsRequestEventType.requestStarted)
+          .listen((event) => started.add(event.utteranceId));
+
+      await service.init();
+      final active = service.speak('active request', utteranceId: 'active');
+      final pending = service.speak('pending request', utteranceId: 'pending');
+
+      await Future<void>.delayed(const Duration(milliseconds: 8));
+      await service.pauseQueue();
+
+      expect(
+        await active.toList().timeout(const Duration(milliseconds: 200)),
+        isNotEmpty,
+      );
+      expect(started, ['active']);
+
+      await service.resumeQueue();
+      expect(await pending.toList(), isNotEmpty);
+
+      await subscription.cancel();
+      await service.dispose();
+    });
+
     test('stopCurrent forwards stopCurrent cancel reason to output', () async {
       final output = _CaptureCancelOutput();
       final service = TtsFlow(

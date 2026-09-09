@@ -1,6 +1,5 @@
 import 'dart:async';
 
-import 'package:logging/logging.dart';
 import 'package:meta/meta.dart';
 import 'package:tts_flow_dart/src/core/audio_spec.dart';
 import 'package:tts_flow_dart/src/core/synthesis_control.dart';
@@ -18,8 +17,6 @@ import 'package:tts_flow_dart/src/service/tts_events.dart';
 
 import 'tts_flow_event_mixin.dart';
 import 'tts_flow_state.dart';
-
-final _log = Logger('tts_flow_dart');
 
 final class QueuedRequest {
   const QueuedRequest({required this.request, required this.controller});
@@ -72,8 +69,8 @@ mixin TtsUtteranceQueueMixin on TtsFlowEventBus {
 
     try {
       while (!scheduler.isEmpty && !state.isDisposed) {
-        // Pause gates starting the next request. Active request handling
-        // continues in-loop using buffering/passthrough policy.
+        // Pause gates only the start of the next request. An already-active
+        // request continues its low-latency output path unchanged.
         if (state.isPaused) {
           break;
         }
@@ -86,33 +83,6 @@ mixin TtsUtteranceQueueMixin on TtsFlowEventBus {
       }
     } finally {
       state.exitProcessing();
-    }
-  }
-
-  @protected
-  Future<void> flushPauseBufferImpl(
-    QueuedRequest item,
-    TtsRequest request,
-    SynthesisControl control,
-    TtsOutput effectiveOutput,
-  ) async {
-    final toFlush = List<TtsChunk>.of(state.pauseBuffer);
-    state.clearPauseBuffer();
-
-    for (final chunk in toFlush) {
-      if (control.isCanceled) {
-        break;
-      }
-      if (chunk is TtsAudioChunk) {
-        await effectiveOutput.consumeChunk(chunk);
-      }
-      item.controller.add(chunk);
-      emitRequestEvent(
-        TtsRequestEventType.requestChunkReceived,
-        requestKey: request.requestKey,
-        state: TtsRequestState.running,
-        chunk: chunk,
-      );
     }
   }
 
@@ -216,15 +186,6 @@ mixin TtsUtteranceQueueMixin on TtsFlowEventBus {
         }
       }
 
-      if (!control.isCanceled && state.pauseBuffer.isNotEmpty) {
-        while (state.isPaused && !state.isDisposed && !control.isCanceled) {
-          await Future<void>.delayed(const Duration(milliseconds: 20));
-        }
-        if (!control.isCanceled) {
-          await flushPauseBufferImpl(item, request, control, effectiveOutput);
-        }
-      }
-
       if (control.isCanceled) {
         if (outputSessionInitialized) {
           await effectiveOutput.onCancelSession(control);
@@ -286,7 +247,6 @@ mixin TtsUtteranceQueueMixin on TtsFlowEventBus {
     } finally {
       state.activeControl = null;
       state.activeRequestKey = null;
-      state.clearPauseBuffer();
     }
   }
 
@@ -309,29 +269,6 @@ mixin TtsUtteranceQueueMixin on TtsFlowEventBus {
         state: TtsRequestState.running,
         chunk: chunk,
       );
-      return;
-    }
-
-    // Flush buffered chunks before handling fresh chunks after resume.
-    if (state.pauseBuffer.isNotEmpty && !state.isPaused) {
-      await flushPauseBufferImpl(item, request, control, effectiveOutput);
-      if (control.isCanceled) {
-        return;
-      }
-    }
-
-    if (state.isPaused &&
-        config.pauseBufferPolicy == TtsPauseBufferPolicy.buffered) {
-      state.pauseBuffer.add(chunk);
-      final newBytes = state.pauseBufferBytes + chunk.bytes.length;
-      if (state.pauseBufferBytes <= config.pauseBufferMaxBytes &&
-          newBytes > config.pauseBufferMaxBytes) {
-        _log.warning(
-          'TTS pause buffer exceeded ${config.pauseBufferMaxBytes} '
-          'bytes (current: $newBytes); chunks continue to accumulate.',
-        );
-      }
-      state.pauseBufferBytes = newBytes;
       return;
     }
 

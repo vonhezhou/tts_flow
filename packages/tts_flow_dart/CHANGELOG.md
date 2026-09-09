@@ -17,6 +17,9 @@
   and may be reused safely.
 - Breaking: request-specific synthesis and playback controls are available only
   from `TtsRequestHandle`; `TtsFlow` retains queue-level controls only.
+- Breaking: `TtsPauseBufferPolicy` and the pause-buffer settings were removed.
+  `pauseQueue()` now only prevents the next request from starting; active audio
+  is never buffered by the flow.
 
 - Breaking: `TtsAudioFormat.wav` has been removed from the enum. Engines that
   previously advertised `wav` output now advertise `pcm` and strip the WAV

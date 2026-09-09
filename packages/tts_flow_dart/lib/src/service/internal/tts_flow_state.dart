@@ -1,5 +1,4 @@
 import 'package:tts_flow_dart/src/core/synthesis_control.dart';
-import 'package:tts_flow_dart/src/core/tts_chunk.dart';
 
 enum ServiceLifecycle { created, initialized, disposed }
 
@@ -21,25 +20,17 @@ final class TtsFlowState {
   QueueMode queueMode = QueueMode.running;
   SynthesisControl? activeControl;
   String? activeRequestKey;
-  final List<TtsChunk> pauseBuffer = <TtsChunk>[];
-  int pauseBufferBytes = 0;
 
   bool get isInitialized => lifecycle == ServiceLifecycle.initialized;
   bool get isDisposed => lifecycle == ServiceLifecycle.disposed;
   bool get isPaused => queueMode == QueueMode.paused;
   bool get isHalted => queueMode == QueueMode.halted;
 
-  void clearPauseBuffer() {
-    pauseBuffer.clear();
-    pauseBufferBytes = 0;
-  }
-
   void markInitialized() {
     lifecycle = ServiceLifecycle.initialized;
   }
 
   void markDisposed() {
-    clearPauseBuffer();
     activeControl = null;
     activeRequestKey = null;
     queueActivity = QueueActivity.idle;
