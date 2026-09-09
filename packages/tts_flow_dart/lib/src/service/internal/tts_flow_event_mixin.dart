@@ -10,15 +10,24 @@ mixin TtsFlowEventBus {
   @protected
   StreamController<TtsFlowEvent> get eventBus;
 
+  @protected
+  String? utteranceIdForRequestKey(String requestKey);
+
+  @protected
+  void onRequestEventEmitted(TtsRequestEvent event);
+
   void emitQueueEvent(
     TtsQueueEventType type, {
     required int queueLength,
-    String? requestId,
+    String? requestKey,
   }) {
     eventBus.add(
       TtsQueueEvent(
         type: type,
-        requestId: requestId,
+        requestKey: requestKey,
+        utteranceId: requestKey == null
+            ? null
+            : utteranceIdForRequestKey(requestKey),
         timestamp: DateTime.now().toUtc(),
         queueLength: queueLength,
       ),
@@ -27,7 +36,7 @@ mixin TtsFlowEventBus {
 
   void emitRequestEvent(
     TtsRequestEventType type, {
-    required String requestId,
+    required String requestKey,
     TtsRequestState? state,
     TtsChunk? chunk,
     TtsError? error,
@@ -36,19 +45,20 @@ mixin TtsFlowEventBus {
     String? playbackId,
     Duration? playedDuration,
   }) {
-    eventBus.add(
-      TtsRequestEvent(
-        type: type,
-        requestId: requestId,
-        timestamp: DateTime.now().toUtc(),
-        state: state,
-        chunk: chunk,
-        error: error,
-        outputId: outputId,
-        outputError: outputError,
-        playbackId: playbackId,
-        playedDuration: playedDuration,
-      ),
+    final event = TtsRequestEvent(
+      type: type,
+      requestKey: requestKey,
+      utteranceId: utteranceIdForRequestKey(requestKey) ?? requestKey,
+      timestamp: DateTime.now().toUtc(),
+      state: state,
+      chunk: chunk,
+      error: error,
+      outputId: outputId,
+      outputError: outputError,
+      playbackId: playbackId,
+      playedDuration: playedDuration,
     );
+    eventBus.add(event);
+    onRequestEventEmitted(event);
   }
 }

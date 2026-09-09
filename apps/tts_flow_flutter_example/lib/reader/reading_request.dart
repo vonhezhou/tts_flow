@@ -3,13 +3,14 @@ import 'package:tts_flow_flutter_example/reader/sentence_splitter.dart';
 /// A group of book sentences synthesized as one TTS request.
 final class ReadingRequest {
   const ReadingRequest({
-    required this.requestId,
+    required this.utteranceId,
     required this.text,
     required this.documentStartOffset,
     required this.sentences,
   });
 
-  final String requestId;
+  /// Business correlation label for this planned portion of text.
+  final String utteranceId;
   final String text;
   final int documentStartOffset;
   final List<ReaderSentence> sentences;
@@ -18,7 +19,7 @@ final class ReadingRequest {
 /// Creates modest request-sized groups while preserving book-text offsets.
 List<ReadingRequest> planReadingRequests({
   required String text,
-  required String requestIdPrefix,
+  required String utteranceIdPrefix,
   int maxCharactersPerRequest = 160,
 }) {
   if (maxCharactersPerRequest <= 0) {
@@ -51,7 +52,7 @@ List<ReadingRequest> planReadingRequests({
         .toList(growable: false);
     requests.add(
       ReadingRequest(
-        requestId: '$requestIdPrefix-$requestIndex',
+        utteranceId: '$utteranceIdPrefix-$requestIndex',
         text: requestText,
         documentStartOffset: groupStart,
         sentences: localSentences,

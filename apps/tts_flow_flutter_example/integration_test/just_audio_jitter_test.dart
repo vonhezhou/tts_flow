@@ -8,7 +8,7 @@ import 'package:tts_flow_dart/tts_flow_dart.dart';
 import 'package:tts_flow_flutter/tts_flow_flutter.dart';
 
 const _sampleAudioAsset = 'assets/audio/test_audio_yanfei.wav';
-const _requestId = 'just-audio-jitter-regression';
+const _utteranceId = 'just-audio-jitter-regression';
 
 void main() {
   IntegrationTestWidgetsFlutterBinding.ensureInitialized();
@@ -65,7 +65,7 @@ void main() {
         );
 
         expect(result.waitingEvents, hasLength(1));
-        expect(result.waitingEvents.single.requestId, _requestId);
+        expect(result.waitingEvents.single.requestKey, result.requestKey);
         expect(result.playbackFailedEvents, isEmpty);
         expect(result.playbackCompletedEvents, hasLength(1));
       },
@@ -86,9 +86,10 @@ Future<_ReplayResult> _runReplay({
   final playbackFailedEvents = <TtsRequestEvent>[];
   final playerStates = <String>[];
   final backendErrors = <JustAudioPlaybackErrorEvent>[];
+  String? requestKey;
 
   final sourceStartedSub = backend.playbackSourceStartedStream.listen((event) {
-    if (event.requestId == _requestId &&
+    if (event.requestKey == requestKey &&
         event.sourceIndex == 0 &&
         !firstSourceStarted.isCompleted) {
       firstSourceStarted.complete();
@@ -111,7 +112,7 @@ Future<_ReplayResult> _runReplay({
     defaultOutput: SpeakerOutput(backend: backend),
   );
   final requestSub = service.requestEvents.listen((event) {
-    if (event.requestId != _requestId) {
+    if (event.utteranceId != _utteranceId) {
       return;
     }
     switch (event.type) {
@@ -127,10 +128,12 @@ Future<_ReplayResult> _runReplay({
   try {
     await service.init();
     try {
-      await service
-          .speak(_requestId, 'controlled local audio replay')
-          .drain<void>()
-          .timeout(const Duration(seconds: 15));
+      final request = service.speak(
+        'controlled local audio replay',
+        utteranceId: _utteranceId,
+      );
+      requestKey = request.requestKey;
+      await request.drain<void>().timeout(const Duration(seconds: 15));
     } catch (error) {
       throw StateError(
         'Replay ingestion failed: $error; '
@@ -145,6 +148,7 @@ Future<_ReplayResult> _runReplay({
     );
 
     return _ReplayResult(
+      requestKey: requestKey,
       waitingEvents: List.unmodifiable(waitingEvents),
       playbackCompletedEvents: List.unmodifiable(playbackCompletedEvents),
       playbackFailedEvents: List.unmodifiable(playbackFailedEvents),
@@ -216,11 +220,13 @@ final class _PcmSample {
 
 final class _ReplayResult {
   const _ReplayResult({
+    required this.requestKey,
     required this.waitingEvents,
     required this.playbackCompletedEvents,
     required this.playbackFailedEvents,
   });
 
+  final String requestKey;
   final List<JustAudioPlaybackWaitingEvent> waitingEvents;
   final List<TtsRequestEvent> playbackCompletedEvents;
   final List<TtsRequestEvent> playbackFailedEvents;
@@ -290,7 +296,7 @@ final class _GatedReplayEngine with TtsEngineDefaults implements TtsEngine {
     }
     final split = firstChunkBytes.clamp(1, _audioBytes.length).toInt();
     yield TtsAudioChunk(
-      requestId: request.requestId,
+      requestKey: request.requestKey,
       sequenceNumber: 0,
       bytes: Uint8List.fromList(_audioBytes.sublist(0, split)),
       audioSpec: audioSpec,
@@ -312,7 +318,7 @@ final class _GatedReplayEngine with TtsEngineDefaults implements TtsEngine {
     }
 
     yield TtsAudioChunk(
-      requestId: request.requestId,
+      requestKey: request.requestKey,
       sequenceNumber: 1,
       bytes: Uint8List.fromList(_audioBytes.sublist(split)),
       audioSpec: audioSpec,

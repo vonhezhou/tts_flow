@@ -17,18 +17,18 @@ final class TtsError implements Exception {
   const TtsError({
     required this.code,
     required this.message,
-    this.requestId,
+    this.requestKey,
     this.cause,
   });
 
   final TtsErrorCode code;
   final String message;
-  final String? requestId;
+  final String? requestKey;
   final Object? cause;
 
   @override
   String toString() =>
-      'TtsError(code: $code, message: $message, requestId: $requestId)';
+      'TtsError(code: $code, message: $message, requestKey: $requestKey)';
 }
 
 final class TtsOutputFailure implements Exception {
@@ -42,14 +42,14 @@ final class TtsOutputFailure implements Exception {
       'TtsOutputFailure(outputId: $outputId, error: ${error.toString()})';
 }
 
-Never throwAsTtsError(Object error, {String? requestId}) {
+Never throwAsTtsError(Object error, {String? requestKey}) {
   if (error is TtsError) {
     throw error;
   }
   throw TtsError(
     code: TtsErrorCode.internalError,
     message: 'Unexpected error during TTS operation.',
-    requestId: requestId,
+    requestKey: requestKey,
     cause: error,
   );
 }

@@ -10,6 +10,7 @@ import 'package:tts_flow_dart/src/core/tts_flow_config.dart';
 import 'package:tts_flow_dart/src/core/tts_output.dart';
 import 'package:tts_flow_dart/src/core/tts_policy.dart';
 import 'package:tts_flow_dart/src/core/tts_request.dart';
+import 'package:tts_flow_dart/src/core/tts_request_handle.dart';
 import 'package:tts_flow_dart/src/core/tts_voice.dart';
 import 'package:tts_flow_dart/src/service/internal/tts_utterance_queue_mixin.dart';
 import 'package:tts_flow_dart/src/service/tts_events.dart';
@@ -35,6 +36,10 @@ final class TtsFlow
   final _managedOutputs = HashSet<TtsOutput>.identity();
   final _outputInitializations = HashMap<TtsOutput, Future<void>>.identity();
   final _playbackOutputs = <String, TtsOutput>{};
+  final _utteranceIdsByRequestKey = <String, String>{};
+  final _requestEventControllers =
+      <String, StreamController<TtsRequestEvent>>{};
+  var _nextRequestKey = 0;
 
   @override
   TtsEngine get engine => _engine;
@@ -66,17 +71,28 @@ final class TtsFlow
       .where((event) => event is TtsRequestEvent)
       .cast<TtsRequestEvent>();
 
+  @override
+  @protected
+  String? utteranceIdForRequestKey(String requestKey) =>
+      _utteranceIdsByRequestKey[requestKey];
+
+  @override
+  @protected
+  void onRequestEventEmitted(TtsRequestEvent event) {
+    _requestEventControllers[event.requestKey]?.add(event);
+  }
+
   bool get isQueuePaused => state.isPaused;
   bool get isInitialized => state.isInitialized;
 
-  /// Whether [requestId] has physical playback that can still be controlled.
-  bool hasActivePlayback(String requestId) {
-    final output = _playbackOutputs[requestId];
+  /// Whether [requestKey] has physical playback that can still be controlled.
+  bool hasActivePlayback(String requestKey) {
+    final output = _playbackOutputs[requestKey];
     final PlaybackControllableOutput? controllableOutput =
         output is PlaybackControllableOutput
         ? output as PlaybackControllableOutput
         : null;
-    return controllableOutput?.hasActivePlayback(requestId) ?? false;
+    return controllableOutput?.hasActivePlayback(requestKey) ?? false;
   }
 
   Future<void> init() async {
@@ -110,19 +126,27 @@ final class TtsFlow
     return _engine.getDefaultVoiceForLocale(locale);
   }
 
-  Stream<TtsChunk> speak(
-    String requestId,
+  /// Enqueues [text] and returns the handle for this concrete request.
+  ///
+  /// [utteranceId] is an application correlation label and may be reused.
+  /// The flow always generates an independent, opaque [TtsRequestHandle.requestKey]
+  /// for pipeline routing and controls.
+  TtsRequestHandle speak(
     String text, {
+    String? utteranceId,
     Map<String, Object> params = const <String, Object>{},
     TtsOutput? output,
   }) {
     _ensureReady();
 
+    final requestKey = 'request-${++_nextRequestKey}';
+    final resolvedUtteranceId = utteranceId ?? requestKey;
+
     if (engine.maxInputByteSize > 0 && text.length > engine.maxInputByteSize) {
       throw TtsError(
         code: TtsErrorCode.maxInputByteSizeExceeded,
         message: 'Text length exceeds maximum allowed byte size.',
-        requestId: requestId,
+        requestKey: requestKey,
       );
     }
 
@@ -130,18 +154,22 @@ final class TtsFlow
       throw TtsError(
         code: TtsErrorCode.invalidRequest,
         message: 'No effective output configured for request.',
-        requestId: requestId,
+        requestKey: requestKey,
       );
     }
 
     final request = buildRequest(
-      requestId: requestId,
+      requestKey: requestKey,
+      utteranceId: resolvedUtteranceId,
       text: text,
       params: params,
       output: output,
     );
 
     state.unhaltOnEnqueue();
+    _utteranceIdsByRequestKey[requestKey] = resolvedUtteranceId;
+    final requestEvents = StreamController<TtsRequestEvent>();
+    _requestEventControllers[requestKey] = requestEvents;
 
     final controller = StreamController<TtsChunk>();
     final queued = QueuedRequest(request: request, controller: controller);
@@ -149,17 +177,27 @@ final class TtsFlow
 
     emitRequestEvent(
       TtsRequestEventType.requestQueued,
-      requestId: request.requestId,
+      requestKey: request.requestKey,
       state: TtsRequestState.queued,
     );
     emitQueueEvent(
       TtsQueueEventType.requestEnqueued,
       queueLength: scheduler.length,
-      requestId: request.requestId,
+      requestKey: request.requestKey,
     );
 
     unawaited(processQueue());
-    return controller.stream;
+    return TtsRequestHandle(
+      requestKey: requestKey,
+      utteranceId: resolvedUtteranceId,
+      chunks: controller.stream,
+      events: requestEvents.stream,
+      stopSynthesis: () => stopSynthesis(requestKey),
+      pausePlayback: () => pausePlayback(requestKey),
+      resumePlayback: () => resumePlayback(requestKey),
+      stopPlayback: () => stopPlayback(requestKey),
+      hasActivePlayback: () => hasActivePlayback(requestKey),
+    );
   }
 
   /// Prevents the queue from starting another synthesis request.
@@ -184,39 +222,67 @@ final class TtsFlow
     state.activeControl?.cancel(CancelReason.stopCurrent);
   }
 
-  /// Pauses physical playback for [requestId].
-  Future<void> pausePlayback(String requestId) async {
-    final output = _requirePlaybackOutput(requestId);
-    await (output as PlaybackControllableOutput).pausePlayback(requestId);
+  /// Stops one request whether it is queued or actively synthesizing.
+  ///
+  /// Audio already submitted to a physical output is intentionally unaffected;
+  /// call [stopPlayback] through the request handle for that lifecycle.
+  Future<void> stopSynthesis(String requestKey) async {
+    _ensureReady();
+    if (state.activeRequestKey == requestKey) {
+      state.activeControl?.cancel(CancelReason.stopCurrent);
+      return;
+    }
+
+    final queued = scheduler.removeFirstWhere(
+      (item) => item.request.requestKey == requestKey,
+    );
+    if (queued == null) {
+      return;
+    }
+
+    emitRequestEvent(
+      TtsRequestEventType.requestSynthesisStopped,
+      requestKey: requestKey,
+      state: TtsRequestState.stopped,
+    );
+    unawaited(queued.controller.close());
+    releaseRequestIdentity(requestKey);
+  }
+
+  /// Pauses physical playback for [requestKey].
+  Future<void> pausePlayback(String requestKey) async {
+    final output = _requirePlaybackOutput(requestKey);
+    await (output as PlaybackControllableOutput).pausePlayback(requestKey);
     emitRequestEvent(
       TtsRequestEventType.requestPlaybackPaused,
-      requestId: requestId,
+      requestKey: requestKey,
       outputId: output.outputId,
     );
   }
 
-  /// Resumes physical playback for [requestId].
-  Future<void> resumePlayback(String requestId) async {
-    final output = _requirePlaybackOutput(requestId);
-    await (output as PlaybackControllableOutput).resumePlayback(requestId);
+  /// Resumes physical playback for [requestKey].
+  Future<void> resumePlayback(String requestKey) async {
+    final output = _requirePlaybackOutput(requestKey);
+    await (output as PlaybackControllableOutput).resumePlayback(requestKey);
     emitRequestEvent(
       TtsRequestEventType.requestPlaybackResumed,
-      requestId: requestId,
+      requestKey: requestKey,
       outputId: output.outputId,
     );
   }
 
-  /// Stops physical playback for [requestId].
-  Future<void> stopPlayback(String requestId) async {
-    final output = _requirePlaybackOutput(requestId);
-    await (output as PlaybackControllableOutput).stopPlayback(requestId);
-    await cancelPlaybackEventListenersForRequest(requestId);
-    unregisterPlaybackControl(requestId);
+  /// Stops physical playback for [requestKey].
+  Future<void> stopPlayback(String requestKey) async {
+    final output = _requirePlaybackOutput(requestKey);
+    await (output as PlaybackControllableOutput).stopPlayback(requestKey);
+    await cancelPlaybackEventListenersForRequest(requestKey);
+    unregisterPlaybackControl(requestKey);
     emitRequestEvent(
       TtsRequestEventType.requestPlaybackStopped,
-      requestId: requestId,
+      requestKey: requestKey,
       outputId: output.outputId,
     );
+    releaseRequestIdentity(requestKey);
   }
 
   Future<int> clearQueue() async {
@@ -225,10 +291,11 @@ final class TtsFlow
     for (final item in pending) {
       emitRequestEvent(
         TtsRequestEventType.requestCanceled,
-        requestId: item.request.requestId,
+        requestKey: item.request.requestKey,
         state: TtsRequestState.canceled,
       );
       unawaited(item.controller.close());
+      releaseRequestIdentity(item.request.requestKey);
     }
 
     if (pending.isNotEmpty) {
@@ -252,6 +319,11 @@ final class TtsFlow
     await _engine.dispose();
     await _disposeManagedOutputs();
     _playbackOutputs.clear();
+    _utteranceIdsByRequestKey.clear();
+    for (final controller in _requestEventControllers.values) {
+      await controller.close();
+    }
+    _requestEventControllers.clear();
     state.markDisposed();
     await eventBus.close();
   }
@@ -285,31 +357,46 @@ final class TtsFlow
 
   @override
   @protected
-  void registerPlaybackControl(String requestId, TtsOutput output) {
+  void registerPlaybackControl(String requestKey, TtsOutput output) {
     if (output is PlaybackControllableOutput) {
-      _playbackOutputs[requestId] = output;
+      _playbackOutputs[requestKey] = output;
     }
   }
 
   @override
   @protected
-  void unregisterPlaybackControl(String requestId) {
-    _playbackOutputs.remove(requestId);
+  void unregisterPlaybackControl(String requestKey) {
+    _playbackOutputs.remove(requestKey);
   }
 
-  TtsOutput _requirePlaybackOutput(String requestId) {
+  @override
+  @protected
+  bool hasPlaybackControl(String requestKey) =>
+      _playbackOutputs.containsKey(requestKey);
+
+  @override
+  @protected
+  void releaseRequestIdentity(String requestKey) {
+    _utteranceIdsByRequestKey.remove(requestKey);
+    final controller = _requestEventControllers.remove(requestKey);
+    if (controller != null) {
+      unawaited(controller.close());
+    }
+  }
+
+  TtsOutput _requirePlaybackOutput(String requestKey) {
     _ensureReady();
-    final output = _playbackOutputs[requestId];
+    final output = _playbackOutputs[requestKey];
     final PlaybackControllableOutput? controllableOutput =
         output is PlaybackControllableOutput
         ? output as PlaybackControllableOutput
         : null;
     if (output == null || controllableOutput == null) {
-      throw StateError('No active controllable playback for "$requestId".');
+      throw StateError('No active controllable playback for "$requestKey".');
     }
-    if (!controllableOutput.hasActivePlayback(requestId)) {
-      _playbackOutputs.remove(requestId);
-      throw StateError('Playback is no longer active for "$requestId".');
+    if (!controllableOutput.hasActivePlayback(requestKey)) {
+      _playbackOutputs.remove(requestKey);
+      throw StateError('Playback is no longer active for "$requestKey".');
     }
     return output;
   }

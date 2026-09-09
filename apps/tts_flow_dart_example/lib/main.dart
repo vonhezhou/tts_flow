@@ -21,10 +21,7 @@ Future<void> main() async {
           chunkDelay: const Duration(milliseconds: 5),
         );
 
-  final service = TtsFlow(
-    engine: engine,
-    defaultOutput: NullOutput(),
-  );
+  final service = TtsFlow(engine: engine, defaultOutput: NullOutput());
   await service.init();
 
   print(
@@ -35,18 +32,28 @@ Future<void> main() async {
 
   final queueSub = service.queueEvents.listen((event) {
     print(
-        'queue: ${event.type} len=${event.queueLength} req=${event.requestId}');
+      'queue: ${event.type} len=${event.queueLength} '
+      'key=${event.requestKey} utterance=${event.utteranceId}',
+    );
   });
   final requestSub = service.requestEvents.listen((event) {
-    print('request: ${event.type} req=${event.requestId}');
+    print(
+      'request: ${event.type} key=${event.requestKey} '
+      'utterance=${event.utteranceId}',
+    );
   });
 
   service.preferredFormat = TtsAudioFormat.pcm;
-  final first = service.speak('example-1', 'First request uses preferred WAV.');
+  final first = service.speak(
+    'First request uses preferred WAV.',
+    utteranceId: 'example-1',
+  );
 
   service.preferredFormat = TtsAudioFormat.mp3;
   final second = service.speak(
-      'example-2', 'Second request falls back to compatible format.');
+    'Second request falls back to compatible format.',
+    utteranceId: 'example-2',
+  );
 
   final firstChunks = await first.toList();
   final secondChunks = await second.toList();

@@ -112,7 +112,7 @@ final class FileTtsEngine with TtsEngineDefaults implements TtsEngine {
         message:
             'Resolved audio spec is not supported by this provider: '
             '$resolvedFormat',
-        requestId: request.requestId,
+        requestKey: request.requestKey,
       );
     }
 
@@ -144,7 +144,7 @@ final class FileTtsEngine with TtsEngineDefaults implements TtsEngine {
 
       if (pendingChunk != null) {
         yield TtsAudioChunk(
-          requestId: request.requestId,
+          requestKey: request.requestKey,
           sequenceNumber: sequence,
           bytes: pendingChunk,
           audioSpec: realAudioSpec,
@@ -160,7 +160,7 @@ final class FileTtsEngine with TtsEngineDefaults implements TtsEngine {
 
     if (pendingChunk != null && !control.isCanceled) {
       yield TtsAudioChunk(
-        requestId: request.requestId,
+        requestKey: request.requestKey,
         sequenceNumber: sequence,
         bytes: pendingChunk,
         audioSpec: realAudioSpec,

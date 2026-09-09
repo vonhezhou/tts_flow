@@ -80,7 +80,7 @@ final class Decoder implements TtsOutput {
     _session = session;
     _buffer = BytesBuilder(copy: false);
 
-    _negotiatedSpec = _resolveAudioSpec(requestId: session.requestId);
+    _negotiatedSpec = _resolveAudioSpec(requestKey: session.requestKey);
 
     final outputSession = session.copyWith(
       audioSpec: _negotiatedSpec,
@@ -98,8 +98,8 @@ final class Decoder implements TtsOutput {
     if (session == null || buffer == null) {
       throw StateError('Decoder session is not initialized.');
     }
-    if (chunk.requestId != session.requestId) {
-      throw StateError('Chunk requestId does not match active session.');
+    if (chunk.requestKey != session.requestKey) {
+      throw StateError('Chunk requestKey does not match active session.');
     }
 
     if (chunk is! TtsAudioChunk) {
@@ -146,7 +146,7 @@ final class Decoder implements TtsOutput {
     }
 
     final decodedChunk = TtsAudioChunk(
-      requestId: session.requestId,
+      requestKey: session.requestKey,
       sequenceNumber: _chunkSequenceNumber++,
       bytes: decodedPcmBytes,
       audioSpec: negotiatedSpec,
@@ -186,17 +186,17 @@ final class Decoder implements TtsOutput {
   }
 
   /// for test only
-  TtsAudioSpec resolveAudioSpecForTest(String requestId) {
-    return _resolveAudioSpec(requestId: requestId);
+  TtsAudioSpec resolveAudioSpecForTest(String requestKey) {
+    return _resolveAudioSpec(requestKey: requestKey);
   }
 
-  TtsAudioSpec _resolveAudioSpec({required String requestId}) {
+  TtsAudioSpec _resolveAudioSpec({required String requestKey}) {
     final spec = _formatNegotiator.negotiateSpec(
       engineCapabilities: outAudioCapabilities,
       outputCapabilities: output.inAudioCapabilities,
       preferredOrder: TtsAudioFormat.values,
       preferredFormat: TtsAudioFormat.pcm,
-      requestId: requestId,
+      requestKey: requestKey,
     );
 
     if (spec.format == TtsAudioFormat.pcm && spec.pcm == null) {

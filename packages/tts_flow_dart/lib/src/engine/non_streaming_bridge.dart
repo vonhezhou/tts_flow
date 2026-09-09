@@ -7,7 +7,7 @@ final class NonStreamingBridge {
   const NonStreamingBridge._();
 
   static Stream<TtsChunk> toChunkStream({
-    required String requestId,
+    required String requestKey,
     required TtsAudioSpec audioSpec,
     required Uint8List audioBytes,
     int chunkSizeBytes = 4096,
@@ -15,7 +15,7 @@ final class NonStreamingBridge {
   }) async* {
     if (audioBytes.isEmpty) {
       yield TtsAudioChunk(
-        requestId: requestId,
+        requestKey: requestKey,
         sequenceNumber: 0,
         bytes: Uint8List(0),
         audioSpec: audioSpec,
@@ -32,7 +32,7 @@ final class NonStreamingBridge {
           : start + chunkSizeBytes;
       final bytes = Uint8List.sublistView(audioBytes, start, end);
       yield TtsAudioChunk(
-        requestId: requestId,
+        requestKey: requestKey,
         sequenceNumber: sequence,
         bytes: bytes,
         audioSpec: audioSpec,

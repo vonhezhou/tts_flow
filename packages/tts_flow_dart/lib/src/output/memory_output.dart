@@ -47,8 +47,8 @@ final class MemoryOutput implements TtsOutput {
       throw StateError('MemoryOutput session is not initialized.');
     }
 
-    if (chunk.requestId != session.requestId) {
-      throw StateError('Chunk requestId does not match active session.');
+    if (chunk.requestKey != session.requestKey) {
+      throw StateError('Chunk requestKey does not match active session.');
     }
 
     if (chunk is! TtsAudioChunk) {
@@ -69,7 +69,7 @@ final class MemoryOutput implements TtsOutput {
     _session = null;
     _buffer = null;
     return InMemoryAudioArtifact(
-      requestId: session.requestId,
+      requestKey: session.requestKey,
       audioSpec: session.audioSpec,
       audioBytes: audioBytes,
       totalBytes: audioBytes.length,

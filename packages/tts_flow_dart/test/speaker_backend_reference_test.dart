@@ -21,10 +21,10 @@ final class _ReferenceSpeakerBackend implements SpeakerBackend {
 
   @override
   Future<String> startPlayback({
-    required String requestId,
+    required String requestKey,
     required TtsAudioSpec audioSpec,
   }) async {
-    final playbackId = 'ref-$requestId';
+    final playbackId = 'ref-$requestKey';
     _buffers[playbackId] = <int>[];
     _closed.remove(playbackId);
     return playbackId;
@@ -86,7 +86,7 @@ void main() {
       final backend = _ReferenceSpeakerBackend();
 
       final playbackId = await backend.startPlayback(
-        requestId: 'r1',
+        requestKey: 'r1',
         audioSpec: const TtsAudioSpec.mp3(),
       );
 
@@ -94,7 +94,7 @@ void main() {
         playbackId: playbackId,
         chunk: TtsAudioChunk(
           bytes: Uint8List.fromList([1, 2]),
-          requestId: '',
+          requestKey: '',
           sequenceNumber: 0,
           isLastChunk: false,
           timestamp: DateTime.now(),
@@ -105,7 +105,7 @@ void main() {
         playbackId: playbackId,
         chunk: TtsAudioChunk(
           bytes: Uint8List.fromList([3]),
-          requestId: '',
+          requestKey: '',
           sequenceNumber: 0,
           isLastChunk: true,
           timestamp: DateTime.now(),
@@ -119,7 +119,7 @@ void main() {
           playbackId: playbackId,
           chunk: TtsAudioChunk(
             bytes: Uint8List.fromList([4]),
-            requestId: '',
+            requestKey: '',
             sequenceNumber: 0,
             isLastChunk: false,
             timestamp: DateTime.now(),
@@ -134,14 +134,14 @@ void main() {
       final backend = _ReferenceSpeakerBackend();
 
       final playbackId = await backend.startPlayback(
-        requestId: 'r2',
+        requestKey: 'r2',
         audioSpec: const TtsAudioSpec.mp3(),
       );
       await backend.appendChunk(
         playbackId: playbackId,
         chunk: TtsAudioChunk(
           bytes: Uint8List.fromList([9]),
-          requestId: '',
+          requestKey: '',
           sequenceNumber: 0,
           isLastChunk: true,
           timestamp: DateTime.now(),
@@ -155,7 +155,7 @@ void main() {
           playbackId: playbackId,
           chunk: TtsAudioChunk(
             bytes: Uint8List.fromList([10]),
-            requestId: '',
+            requestKey: '',
             sequenceNumber: 0,
             isLastChunk: true,
             timestamp: DateTime.now(),

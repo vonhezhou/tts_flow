@@ -11,7 +11,7 @@ final class TtsFormatNegotiator {
     required Set<AudioCapability> engineCapabilities,
     required Set<AudioCapability> outputCapabilities,
     required List<TtsAudioFormat> preferredOrder,
-    required String requestId,
+    required String requestKey,
     TtsAudioFormat? preferredFormat,
     int? preferredSampleRateHz,
   }) {
@@ -29,7 +29,7 @@ final class TtsFormatNegotiator {
             'outputFormats: ${_sortedFormats(outputCapabilities)}, '
             'preferredFormat: $preferredFormat, '
             'preferredOrder: $preferredOrder',
-        requestId: requestId,
+        requestKey: requestKey,
       );
     }
 
@@ -37,7 +37,7 @@ final class TtsFormatNegotiator {
       intersection: intersection,
       preferredOrder: preferredOrder,
       preferredFormat: preferredFormat,
-      requestId: requestId,
+      requestKey: requestKey,
     );
 
     if (selectedFormat == TtsAudioFormat.mp3) {
@@ -76,7 +76,7 @@ final class TtsFormatNegotiator {
               'preferredSampleRateHz: $preferredSampleRateHz, '
               'enginePcmCapabilities: ${enginePcm.toList()}, '
               'outputPcmCapabilities: ${outputPcm.toList()}',
-          requestId: requestId,
+          requestKey: requestKey,
         );
       }
     }
@@ -87,14 +87,14 @@ final class TtsFormatNegotiator {
     required Set<TtsAudioFormat> engineFormats,
     required Set<TtsAudioFormat> outputFormats,
     required List<TtsAudioFormat> preferredOrder,
-    required String requestId,
+    required String requestKey,
     TtsAudioFormat? preferredFormat,
   }) {
     final resolved = negotiateSpec(
       engineCapabilities: engineFormats.map(_formatToCapability).toSet(),
       outputCapabilities: outputFormats.map(_formatToCapability).toSet(),
       preferredOrder: preferredOrder,
-      requestId: requestId,
+      requestKey: requestKey,
       preferredFormat: preferredFormat,
     );
     return resolved.format;
@@ -164,7 +164,7 @@ final class TtsFormatNegotiator {
   TtsAudioFormat _resolveFormat({
     required Set<TtsAudioFormat> intersection,
     required List<TtsAudioFormat> preferredOrder,
-    required String requestId,
+    required String requestKey,
     TtsAudioFormat? preferredFormat,
   }) {
     if (preferredFormat != null && intersection.contains(preferredFormat)) {
@@ -184,7 +184,7 @@ final class TtsFormatNegotiator {
           'sharedFormats: ${_sortedFormatSet(intersection)}, '
           'preferredFormat: $preferredFormat, '
           'preferredOrder: $preferredOrder',
-      requestId: requestId,
+      requestKey: requestKey,
     );
   }
 

@@ -5,13 +5,13 @@ import 'package:tts_flow_dart/src/core/tts_sentence_cue.dart';
 
 abstract class TtsChunk {
   TtsChunk({
-    required this.requestId,
+    required this.requestKey,
     required this.sequenceNumber,
     required this.isLastChunk,
     required this.timestamp,
   });
 
-  final String requestId;
+  final String requestKey;
   final int sequenceNumber;
   final bool isLastChunk;
   final DateTime timestamp;
@@ -19,7 +19,7 @@ abstract class TtsChunk {
 
 class TtsAudioChunk extends TtsChunk {
   TtsAudioChunk({
-    required super.requestId,
+    required super.requestKey,
     required super.sequenceNumber,
     required super.isLastChunk,
     required super.timestamp,
@@ -38,7 +38,7 @@ class TtsAudioChunk extends TtsChunk {
 /// cache its cues and match them with physical playback position events.
 class TtsSentenceCueChunk extends TtsChunk {
   TtsSentenceCueChunk({
-    required super.requestId,
+    required super.requestKey,
     required super.sequenceNumber,
     required super.isLastChunk,
     required super.timestamp,

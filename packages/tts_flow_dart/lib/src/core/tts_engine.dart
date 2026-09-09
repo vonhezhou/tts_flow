@@ -17,7 +17,7 @@ import 'package:tts_flow_dart/src/core/tts_voice.dart';
 /// - [engineId] should be stable and unique enough for diagnostics.
 /// - [outAudioCapabilities] must reflect real format support.
 /// - [synthesize] should emit ordered chunks with the same request id as
-///   [TtsRequest.requestId].
+///   [TtsRequest.requestKey].
 /// - Providers with reliable sentence timing may emit [TtsSentenceCueChunk]
 ///   alongside audio. Its offsets are relative to [TtsRequest.text], and its
 ///   timing is relative to the request audio timeline. Providers without

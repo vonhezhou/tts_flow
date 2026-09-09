@@ -6,7 +6,8 @@ Core design choices in this repository:
 
 - Fixed service wiring: each TtsFlow instance uses one engine and one output.
 - Service-scoped defaults: voice/options/format are configured once per service.
-- Unified API: speak(requestId, text, [params]) always returns a stream of `TtsChunk`.
+- Unified API: `speak(text, utteranceId: ...)` returns a `TtsRequestHandle`,
+  which is also a stream of `TtsChunk`.
 - FIFO queue semantics with halt-on-failure behavior.
 
 ## Audio Negotiation
@@ -47,9 +48,9 @@ inputs) to speed up integration debugging.
 - Queue orchestration and controls:
   - init
   - speak
-  - pauseCurrent
-  - resumeCurrent
-  - stopCurrent
+  - pauseQueue / resumeQueue
+  - stopActiveSynthesis
+  - request-handle playback controls
   - clearQueue
 - Voice discovery helpers:
   - getAvailableVoices
@@ -96,9 +97,11 @@ Future<void> main() async {
  service.preferredFormat = TtsAudioFormat.wav;
  service.sampleRateHz = 24000;
 
- final chunks = await service
-   .speak('hello-1', 'Hello from flutter uni tts')
-   .toList();
+ final request = service.speak(
+   'Hello from flutter uni tts',
+   utteranceId: 'hello-1',
+ );
+ final chunks = await request.toList();
 
  print('Received ${chunks.length} chunks.');
  await service.dispose();
@@ -132,7 +135,7 @@ Future<void> playFixedBytes() async {
 
   final chunks = await engine
       .synthesize(
-        const TtsRequest(requestId: 'raw-1', text: 'ignored input text'),
+        const TtsRequest(requestKey: 'raw-1', utteranceId: 'raw', text: 'ignored input text'),
         SynthesisControl(),
         const TtsAudioSpec.mp3(),
       )
@@ -159,7 +162,7 @@ Future<void> playMp3File() async {
   );
 
   final stream = engine.synthesize(
-    const TtsRequest(requestId: 'mp3-1', text: 'ignored input text'),
+    const TtsRequest(requestKey: 'mp3-1', utteranceId: 'mp3', text: 'ignored input text'),
     SynthesisControl(),
     const TtsAudioSpec.mp3(),
   );
@@ -204,7 +207,7 @@ Future<void> playWavOrPcm() async {
 
   await wavEngine
       .synthesize(
-        const TtsRequest(requestId: 'wav-1', text: 'ignored'),
+        const TtsRequest(requestKey: 'wav-1', utteranceId: 'wav', text: 'ignored'),
         SynthesisControl(),
         const TtsAudioSpec.pcm(wavDescriptor),
       )
@@ -212,7 +215,7 @@ Future<void> playWavOrPcm() async {
 
   await pcmEngine
       .synthesize(
-        const TtsRequest(requestId: 'pcm-1', text: 'ignored'),
+        const TtsRequest(requestKey: 'pcm-1', utteranceId: 'pcm', text: 'ignored'),
         SynthesisControl(),
         const TtsAudioSpec.pcm(wavDescriptor),
       )
@@ -275,7 +278,7 @@ Future<void> main() async {
   service.preferredFormat = TtsAudioFormat.wav;
 
   await service
-      .speak('fanout-1', 'hello fanout')
+      .speak('hello fanout', utteranceId: 'fanout-1')
       .drain();
 
   await service.dispose();
@@ -299,7 +302,7 @@ Use this when implementing a custom backend for `SpeakerOutput`.
 Lifecycle per request:
 
 1. `init()` prepares backend resources before any playback begins.
-2. `startPlayback(requestId, audioSpec)` creates session state and returns a
+2. `startPlayback(requestKey, audioSpec)` creates session state and returns a
    stable `playbackId`.
 3. `appendChunk(playbackId, chunks)` appends ordered bytes for that session.
 4. End with either:
@@ -312,7 +315,7 @@ Lifecycle per request:
 
 Semantics:
 
-- `requestCompleted` means synthesis/output ingestion is finished.
+- `requestSynthesisCompleted` means synthesis/output ingestion is finished.
 - `requestPlaybackCompleted` means the speaker backend reported physical
   playback completion.
 - `requestPlaybackFailed` means the physical player failed. It is independent
@@ -350,10 +353,10 @@ final class MySpeakerBackend implements SpeakerBackend {
 
   @override
   Future<String> startPlayback({
-    required String requestId,
+    required String requestKey,
     required TtsAudioSpec audioSpec,
   }) async {
-    final playbackId = 'pb-$requestId';
+    final playbackId = 'pb-$requestKey';
     _sessions[playbackId] = <int>[];
     return playbackId;
   }

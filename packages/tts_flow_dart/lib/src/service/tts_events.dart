@@ -31,19 +31,25 @@ final class TtsQueueEvent implements TtsFlowEvent {
     required this.type,
     required this.timestamp,
     required this.queueLength,
-    this.requestId,
+    this.requestKey,
+    this.utteranceId,
   });
 
   final TtsQueueEventType type;
   final DateTime timestamp;
   final int queueLength;
-  final String? requestId;
+  final String? requestKey;
+
+  /// Application correlation label for [requestKey], when this event belongs
+  /// to one request.
+  final String? utteranceId;
 }
 
 final class TtsRequestEvent implements TtsFlowEvent {
   const TtsRequestEvent({
     required this.type,
-    required this.requestId,
+    required this.requestKey,
+    required this.utteranceId,
     required this.timestamp,
     this.state,
     this.chunk,
@@ -55,7 +61,11 @@ final class TtsRequestEvent implements TtsFlowEvent {
   });
 
   final TtsRequestEventType type;
-  final String requestId;
+  final String requestKey;
+
+  /// Application-supplied correlation label. Unlike [requestKey], this is
+  /// allowed to be reused by multiple concrete requests.
+  final String utteranceId;
   final DateTime timestamp;
   final TtsRequestState? state;
   final TtsChunk? chunk;

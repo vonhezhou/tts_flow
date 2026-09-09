@@ -11,7 +11,7 @@ class ChunkAudioSource extends StreamAudioSource {
   ChunkAudioSource({
     required this.audioSpec,
     required this.playbackId,
-    required this.requestId,
+    required this.requestKey,
     required this.index,
     required this.isTerminalSegment,
     this.onStarted,
@@ -32,7 +32,7 @@ class ChunkAudioSource extends StreamAudioSource {
   final int index;
 
   /// The request identifier for the TTS request this segment belongs to.
-  final String requestId;
+  final String requestKey;
 
   /// The previous duration of this session.
   Duration playbackOffset = Duration.zero;
@@ -97,8 +97,7 @@ class ChunkAudioSource extends StreamAudioSource {
     }
 
     final requestStart = (start ?? 0).clamp(0, bytes.length);
-    final requestEnd = (end ?? bytes.length)
-        .clamp(requestStart, bytes.length);
+    final requestEnd = (end ?? bytes.length).clamp(requestStart, bytes.length);
 
     // other source did not work.
     // ignore: experimental_member_use

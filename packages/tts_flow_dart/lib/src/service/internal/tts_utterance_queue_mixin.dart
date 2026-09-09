@@ -37,10 +37,16 @@ mixin TtsUtteranceQueueMixin on TtsFlowEventBus {
   Future<void> ensureOutputInitialized(TtsOutput output);
 
   @protected
-  void registerPlaybackControl(String requestId, TtsOutput output);
+  void registerPlaybackControl(String requestKey, TtsOutput output);
 
   @protected
-  void unregisterPlaybackControl(String requestId);
+  void unregisterPlaybackControl(String requestKey);
+
+  @protected
+  bool hasPlaybackControl(String requestKey);
+
+  @protected
+  void releaseRequestIdentity(String requestKey);
 
   @protected
   final formatNegotiator = const TtsFormatNegotiator();
@@ -103,7 +109,7 @@ mixin TtsUtteranceQueueMixin on TtsFlowEventBus {
       item.controller.add(chunk);
       emitRequestEvent(
         TtsRequestEventType.requestChunkReceived,
-        requestId: request.requestId,
+        requestKey: request.requestKey,
         state: TtsRequestState.running,
         chunk: chunk,
       );
@@ -117,22 +123,23 @@ mixin TtsUtteranceQueueMixin on TtsFlowEventBus {
 
     final control = SynthesisControl();
     state.activeControl = control;
+    state.activeRequestKey = request.requestKey;
 
     emitQueueEvent(
       TtsQueueEventType.requestDequeued,
       queueLength: scheduler.length,
-      requestId: request.requestId,
+      requestKey: request.requestKey,
     );
     emitRequestEvent(
       TtsRequestEventType.requestStarted,
-      requestId: request.requestId,
+      requestKey: request.requestKey,
       state: TtsRequestState.running,
     );
 
     try {
       await ensureOutputInitialized(effectiveOutput);
       await _registerPlaybackEventListeners(
-        requestId: request.requestId,
+        requestKey: request.requestKey,
         output: effectiveOutput,
       );
 
@@ -142,7 +149,7 @@ mixin TtsUtteranceQueueMixin on TtsFlowEventBus {
           code: TtsErrorCode.formatNegotiationFailed,
           message:
               'Negotiated audio spec is not supported by engine "${engine.engineId}".',
-          requestId: request.requestId,
+          requestKey: request.requestKey,
         );
       }
       var activeAudioSpec = audioSpec;
@@ -157,20 +164,20 @@ mixin TtsUtteranceQueueMixin on TtsFlowEventBus {
             code: TtsErrorCode.formatNegotiationFailed,
             message:
                 'Resolved audio spec is not accepted by output "${effectiveOutput.outputId}".',
-            requestId: request.requestId,
+            requestKey: request.requestKey,
           );
         }
 
         await effectiveOutput.initSession(
           TtsOutputSession(
-            requestId: request.requestId,
+            requestKey: request.requestKey,
             audioSpec: spec,
             voice: request.voice,
             options: request.options,
             params: request.params,
           ),
         );
-        registerPlaybackControl(request.requestId, effectiveOutput);
+        registerPlaybackControl(request.requestKey, effectiveOutput);
         activeAudioSpec = spec;
         outputSessionInitialized = true;
       }
@@ -193,7 +200,7 @@ mixin TtsUtteranceQueueMixin on TtsFlowEventBus {
             message:
                 'Chunk audio spec changed after session initialization. '
                 'expected: $activeAudioSpec, received: ${chunk.audioSpec}',
-            requestId: request.requestId,
+            requestKey: request.requestKey,
           );
         }
 
@@ -222,13 +229,14 @@ mixin TtsUtteranceQueueMixin on TtsFlowEventBus {
         if (outputSessionInitialized) {
           await effectiveOutput.onCancelSession(control);
         }
-        await _cancelPlaybackEventListenersForRequest(request.requestId);
-        unregisterPlaybackControl(request.requestId);
+        await _cancelPlaybackEventListenersForRequest(request.requestKey);
+        unregisterPlaybackControl(request.requestKey);
         emitRequestEvent(
           TtsRequestEventType.requestSynthesisStopped,
-          requestId: request.requestId,
+          requestKey: request.requestKey,
           state: TtsRequestState.stopped,
         );
+        releaseRequestIdentity(request.requestKey);
       } else {
         if (!outputSessionInitialized) {
           await ensureOutputSessionInitialized(audioSpec);
@@ -236,25 +244,30 @@ mixin TtsUtteranceQueueMixin on TtsFlowEventBus {
         await effectiveOutput.finalizeSession();
         emitRequestEvent(
           TtsRequestEventType.requestSynthesisCompleted,
-          requestId: request.requestId,
+          requestKey: request.requestKey,
           state: TtsRequestState.completed,
         );
+        if (!hasPlaybackControl(request.requestKey) &&
+            !_hasPlaybackEventListenersForRequest(request.requestKey)) {
+          releaseRequestIdentity(request.requestKey);
+        }
       }
 
       unawaited(item.controller.close());
       return false;
     } catch (error) {
       final failure = _mapRequestFailure(error, request);
-      await _cancelPlaybackEventListenersForRequest(request.requestId);
-      unregisterPlaybackControl(request.requestId);
+      await _cancelPlaybackEventListenersForRequest(request.requestKey);
+      unregisterPlaybackControl(request.requestKey);
       emitRequestEvent(
         TtsRequestEventType.requestSynthesisFailed,
-        requestId: request.requestId,
+        requestKey: request.requestKey,
         state: TtsRequestState.failed,
         error: failure.ttsError,
         outputId: failure.outputId,
         outputError: failure.outputError,
       );
+      releaseRequestIdentity(request.requestKey);
       item.controller.addError(failure.ttsError);
       unawaited(item.controller.close());
 
@@ -263,7 +276,7 @@ mixin TtsUtteranceQueueMixin on TtsFlowEventBus {
         emitQueueEvent(
           TtsQueueEventType.queueHalted,
           queueLength: scheduler.length,
-          requestId: request.requestId,
+          requestKey: request.requestKey,
         );
         await cancelPendingAfterFailure();
         return true;
@@ -272,6 +285,7 @@ mixin TtsUtteranceQueueMixin on TtsFlowEventBus {
       return false;
     } finally {
       state.activeControl = null;
+      state.activeRequestKey = null;
       state.clearPauseBuffer();
     }
   }
@@ -291,7 +305,7 @@ mixin TtsUtteranceQueueMixin on TtsFlowEventBus {
       item.controller.add(chunk);
       emitRequestEvent(
         TtsRequestEventType.requestChunkReceived,
-        requestId: request.requestId,
+        requestKey: request.requestKey,
         state: TtsRequestState.running,
         chunk: chunk,
       );
@@ -325,7 +339,7 @@ mixin TtsUtteranceQueueMixin on TtsFlowEventBus {
     item.controller.add(chunk);
     emitRequestEvent(
       TtsRequestEventType.requestChunkReceived,
-      requestId: request.requestId,
+      requestKey: request.requestKey,
       state: TtsRequestState.running,
       chunk: chunk,
     );
@@ -337,10 +351,11 @@ mixin TtsUtteranceQueueMixin on TtsFlowEventBus {
     for (final item in pending) {
       emitRequestEvent(
         TtsRequestEventType.requestCanceled,
-        requestId: item.request.requestId,
+        requestKey: item.request.requestKey,
         state: TtsRequestState.canceled,
       );
       unawaited(item.controller.close());
+      releaseRequestIdentity(item.request.requestKey);
     }
   }
 
@@ -350,7 +365,7 @@ mixin TtsUtteranceQueueMixin on TtsFlowEventBus {
       engineCapabilities: engine.outAudioCapabilities,
       outputCapabilities: effectiveOutput.inAudioCapabilities,
       preferredOrder: config.preferredFormatOrder,
-      requestId: request.requestId,
+      requestKey: request.requestKey,
       preferredFormat: request.preferredFormat,
       preferredSampleRateHz: request.options?.sampleRateHz,
     );
@@ -369,21 +384,21 @@ mixin TtsUtteranceQueueMixin on TtsFlowEventBus {
     }
   }
 
-  /// Stops forwarding physical-playback terminal events for [requestId].
+  /// Stops forwarding physical-playback terminal events for [requestKey].
   ///
   /// A caller that explicitly stops playback has already established its
   /// terminal state, so retaining these subscriptions can otherwise leave a
   /// stale listener behind when a backend does not publish a terminal event.
   @protected
-  Future<void> cancelPlaybackEventListenersForRequest(String requestId) {
-    return _cancelPlaybackEventListenersForRequest(requestId);
+  Future<void> cancelPlaybackEventListenersForRequest(String requestKey) {
+    return _cancelPlaybackEventListenersForRequest(requestKey);
   }
 
   Future<void> _registerPlaybackEventListeners({
-    required String requestId,
+    required String requestKey,
     required TtsOutput output,
   }) async {
-    await _cancelPlaybackEventListenersForRequest(requestId);
+    await _cancelPlaybackEventListenersForRequest(requestKey);
 
     final PlaybackControllableOutput? controllableOutput =
         output is PlaybackControllableOutput
@@ -392,35 +407,35 @@ mixin TtsUtteranceQueueMixin on TtsFlowEventBus {
 
     if (output case final PlaybackAwareOutput playbackAwareOutput) {
       final events = playbackAwareOutput.playbackCompletedEvents.where(
-        (event) => event.requestId == requestId,
+        (event) => event.requestKey == requestKey,
       );
       final subscription =
           (controllableOutput == null ? events.take(1) : events).listen(
             (event) {
               emitRequestEvent(
                 TtsRequestEventType.requestPlaybackCompleted,
-                requestId: event.requestId,
+                requestKey: event.requestKey,
                 state: TtsRequestState.completed,
                 outputId: event.outputId,
                 playbackId: event.playbackId,
                 playedDuration: event.playedDuration,
               );
               if (controllableOutput == null ||
-                  !controllableOutput.hasActivePlayback(requestId)) {
-                unregisterPlaybackControl(requestId);
-                unawaited(_cancelPlaybackEventListenersForRequest(requestId));
+                  !controllableOutput.hasActivePlayback(requestKey)) {
+                unregisterPlaybackControl(requestKey);
+                unawaited(_finishPhysicalPlayback(requestKey));
               }
             },
             onDone: () {
-              _playbackCompletionSubscriptions.remove(requestId);
+              _playbackCompletionSubscriptions.remove(requestKey);
             },
           );
-      _playbackCompletionSubscriptions[requestId] = subscription;
+      _playbackCompletionSubscriptions[requestKey] = subscription;
     }
 
     if (output case final PlaybackFailureAwareOutput failureAwareOutput) {
       final events = failureAwareOutput.playbackFailedEvents.where(
-        (event) => event.requestId == requestId,
+        (event) => event.requestKey == requestKey,
       );
       final subscription =
           (controllableOutput == null ? events.take(1) : events).listen(
@@ -430,41 +445,52 @@ mixin TtsUtteranceQueueMixin on TtsFlowEventBus {
               // not a retroactive synthesis/request state transition.
               emitRequestEvent(
                 TtsRequestEventType.requestPlaybackFailed,
-                requestId: event.requestId,
+                requestKey: event.requestKey,
                 outputId: event.outputId,
                 playbackId: event.playbackId,
                 error: event.error,
               );
               if (controllableOutput == null ||
-                  !controllableOutput.hasActivePlayback(requestId)) {
-                unregisterPlaybackControl(requestId);
-                unawaited(_cancelPlaybackEventListenersForRequest(requestId));
+                  !controllableOutput.hasActivePlayback(requestKey)) {
+                unregisterPlaybackControl(requestKey);
+                unawaited(_finishPhysicalPlayback(requestKey));
               }
             },
             onDone: () {
-              _playbackFailureSubscriptions.remove(requestId);
+              _playbackFailureSubscriptions.remove(requestKey);
             },
           );
-      _playbackFailureSubscriptions[requestId] = subscription;
+      _playbackFailureSubscriptions[requestKey] = subscription;
     }
   }
 
-  Future<void> _cancelPlaybackEventListenersForRequest(String requestId) async {
-    await _cancelPlaybackCompletionListenerForRequest(requestId);
-    await _cancelPlaybackFailureListenerForRequest(requestId);
+  Future<void> _cancelPlaybackEventListenersForRequest(
+    String requestKey,
+  ) async {
+    await _cancelPlaybackCompletionListenerForRequest(requestKey);
+    await _cancelPlaybackFailureListenerForRequest(requestKey);
+  }
+
+  bool _hasPlaybackEventListenersForRequest(String requestKey) =>
+      _playbackCompletionSubscriptions.containsKey(requestKey) ||
+      _playbackFailureSubscriptions.containsKey(requestKey);
+
+  Future<void> _finishPhysicalPlayback(String requestKey) async {
+    await _cancelPlaybackEventListenersForRequest(requestKey);
+    releaseRequestIdentity(requestKey);
   }
 
   Future<void> _cancelPlaybackCompletionListenerForRequest(
-    String requestId,
+    String requestKey,
   ) async {
-    final subscription = _playbackCompletionSubscriptions.remove(requestId);
+    final subscription = _playbackCompletionSubscriptions.remove(requestKey);
     await subscription?.cancel();
   }
 
   Future<void> _cancelPlaybackFailureListenerForRequest(
-    String requestId,
+    String requestKey,
   ) async {
-    final subscription = _playbackFailureSubscriptions.remove(requestId);
+    final subscription = _playbackFailureSubscriptions.remove(requestKey);
     await subscription?.cancel();
   }
 }
@@ -477,13 +503,13 @@ _RequestFailure _mapRequestFailure(Object error, TtsRequest request) {
       ? TtsError(
           code: baseError.code,
           message: baseError.message,
-          requestId: baseError.requestId ?? request.requestId,
+          requestKey: baseError.requestKey ?? request.requestKey,
           cause: baseError.cause,
         )
       : TtsError(
           code: TtsErrorCode.internalError,
           message: 'Request processing failed.',
-          requestId: request.requestId,
+          requestKey: request.requestKey,
           cause: error,
         );
 

@@ -118,7 +118,7 @@ final class MulticastOutput implements TtsOutput, PlaybackControllableOutput {
       } catch (error) {
         final converted = _toOutputError(
           error,
-          requestId: null,
+          requestKey: null,
           stage: 'init',
           outputId: output.outputId,
         );
@@ -148,7 +148,7 @@ final class MulticastOutput implements TtsOutput, PlaybackControllableOutput {
         if (output case final PlaybackControllableOutput playbackOutput) {
           _playbackControlsByRequest
               .putIfAbsent(
-                session.requestId,
+                session.requestKey,
                 () => <PlaybackControllableOutput>{},
               )
               .add(playbackOutput);
@@ -156,7 +156,7 @@ final class MulticastOutput implements TtsOutput, PlaybackControllableOutput {
       } catch (error) {
         final converted = _toOutputError(
           error,
-          requestId: session.requestId,
+          requestKey: session.requestKey,
           stage: 'initSession',
           outputId: output.outputId,
         );
@@ -164,7 +164,7 @@ final class MulticastOutput implements TtsOutput, PlaybackControllableOutput {
         if (errorPolicy == MulticastOutputErrorPolicy.failFast) {
           await _rollbackOutputs(
             entries: _activeOutputs.entries.toList(),
-            requestId: session.requestId,
+            requestKey: session.requestKey,
             stage: 'initSession',
             failingOutputId: output.outputId,
           );
@@ -174,7 +174,7 @@ final class MulticastOutput implements TtsOutput, PlaybackControllableOutput {
       }
     }
 
-    _ensureAtLeastOneOutput(requestId: session.requestId);
+    _ensureAtLeastOneOutput(requestKey: session.requestKey);
   }
 
   @override
@@ -183,8 +183,8 @@ final class MulticastOutput implements TtsOutput, PlaybackControllableOutput {
     if (session == null) {
       throw StateError('MulticastOutput session is not initialized.');
     }
-    if (chunk.requestId != session.requestId) {
-      throw StateError('Chunk requestId does not match active session.');
+    if (chunk.requestKey != session.requestKey) {
+      throw StateError('Chunk requestKey does not match active session.');
     }
 
     for (final entry in _activeOutputs.entries.toList()) {
@@ -193,7 +193,7 @@ final class MulticastOutput implements TtsOutput, PlaybackControllableOutput {
       } catch (error) {
         final converted = _toOutputError(
           error,
-          requestId: session.requestId,
+          requestKey: session.requestKey,
           stage: 'consumeChunk',
           outputId: entry.key,
         );
@@ -202,7 +202,7 @@ final class MulticastOutput implements TtsOutput, PlaybackControllableOutput {
         if (errorPolicy == MulticastOutputErrorPolicy.failFast) {
           await _rollbackOutputs(
             entries: _activeOutputs.entries.toList(),
-            requestId: session.requestId,
+            requestKey: session.requestKey,
             stage: 'consumeChunk',
             failingOutputId: entry.key,
           );
@@ -212,7 +212,7 @@ final class MulticastOutput implements TtsOutput, PlaybackControllableOutput {
       }
     }
 
-    _ensureAtLeastOneOutput(requestId: session.requestId);
+    _ensureAtLeastOneOutput(requestKey: session.requestKey);
   }
 
   @override
@@ -230,7 +230,7 @@ final class MulticastOutput implements TtsOutput, PlaybackControllableOutput {
       } catch (error) {
         final converted = _toOutputError(
           error,
-          requestId: session.requestId,
+          requestKey: session.requestKey,
           stage: 'finalizeSession',
           outputId: entry.key,
         );
@@ -239,7 +239,7 @@ final class MulticastOutput implements TtsOutput, PlaybackControllableOutput {
         if (errorPolicy == MulticastOutputErrorPolicy.failFast) {
           await _rollbackOutputs(
             entries: _activeOutputs.entries.toList(),
-            requestId: session.requestId,
+            requestKey: session.requestKey,
             stage: 'finalizeSession',
             failingOutputId: entry.key,
           );
@@ -256,7 +256,7 @@ final class MulticastOutput implements TtsOutput, PlaybackControllableOutput {
     }
 
     final artifact = MulticastAudioArtifact(
-      requestId: session.requestId,
+      requestKey: session.requestKey,
       audioSpec: session.audioSpec,
       artifacts: artifacts,
       outputErrors: _outputErrors,
@@ -267,16 +267,16 @@ final class MulticastOutput implements TtsOutput, PlaybackControllableOutput {
 
   @override
   Future<void> onCancelSession(SynthesisControl control) async {
-    final requestId = _session?.requestId;
+    final requestKey = _session?.requestKey;
     final activeEntries = _activeOutputs.entries.toList();
     for (final entry in activeEntries) {
       try {
         await entry.value.onCancelSession(control);
       } catch (error) {
-        final requestId = _session?.requestId;
+        final requestKey = _session?.requestKey;
         final converted = _toOutputError(
           error,
-          requestId: requestId,
+          requestKey: requestKey,
           stage: 'onCancelSession',
           outputId: entry.key,
         );
@@ -287,41 +287,41 @@ final class MulticastOutput implements TtsOutput, PlaybackControllableOutput {
         }
       }
     }
-    if (requestId != null) {
-      _playbackControlsByRequest.remove(requestId);
+    if (requestKey != null) {
+      _playbackControlsByRequest.remove(requestKey);
     }
     _clearSession();
   }
 
   @override
-  bool hasActivePlayback(String requestId) {
-    final controls = _playbackControlsByRequest[requestId];
+  bool hasActivePlayback(String requestKey) {
+    final controls = _playbackControlsByRequest[requestKey];
     return controls != null && controls.isNotEmpty;
   }
 
   @override
-  Future<void> pausePlayback(String requestId) {
+  Future<void> pausePlayback(String requestKey) {
     return _controlPlayback(
-      requestId,
-      (output) => output.pausePlayback(requestId),
+      requestKey,
+      (output) => output.pausePlayback(requestKey),
     );
   }
 
   @override
-  Future<void> resumePlayback(String requestId) {
+  Future<void> resumePlayback(String requestKey) {
     return _controlPlayback(
-      requestId,
-      (output) => output.resumePlayback(requestId),
+      requestKey,
+      (output) => output.resumePlayback(requestKey),
     );
   }
 
   @override
-  Future<void> stopPlayback(String requestId) async {
+  Future<void> stopPlayback(String requestKey) async {
     await _controlPlayback(
-      requestId,
-      (output) => output.stopPlayback(requestId),
+      requestKey,
+      (output) => output.stopPlayback(requestKey),
     );
-    _playbackControlsByRequest.remove(requestId);
+    _playbackControlsByRequest.remove(requestKey);
   }
 
   @override
@@ -333,7 +333,7 @@ final class MulticastOutput implements TtsOutput, PlaybackControllableOutput {
       } catch (error) {
         final converted = _toOutputError(
           error,
-          requestId: _session?.requestId,
+          requestKey: _session?.requestKey,
           stage: 'dispose',
           outputId: output.outputId,
         );
@@ -364,7 +364,7 @@ final class MulticastOutput implements TtsOutput, PlaybackControllableOutput {
     Object error, {
     required String outputId,
     required String stage,
-    String? requestId,
+    String? requestKey,
   }) {
     if (error is TtsOutputFailure) {
       return error.error;
@@ -373,19 +373,19 @@ final class MulticastOutput implements TtsOutput, PlaybackControllableOutput {
       return TtsError(
         code: error.code,
         message: error.message,
-        requestId: error.requestId ?? requestId,
+        requestKey: error.requestKey ?? requestKey,
         cause: error.cause,
       );
     }
     return TtsError(
       code: TtsErrorCode.outputWriteFailed,
       message: 'Output "$outputId" failed during $stage.',
-      requestId: requestId,
+      requestKey: requestKey,
       cause: error,
     );
   }
 
-  void _ensureAtLeastOneOutput({required String requestId}) {
+  void _ensureAtLeastOneOutput({required String requestKey}) {
     if (_activeOutputs.isNotEmpty) {
       return;
     }
@@ -400,12 +400,12 @@ final class MulticastOutput implements TtsOutput, PlaybackControllableOutput {
   }
 
   Future<void> _controlPlayback(
-    String requestId,
+    String requestKey,
     Future<void> Function(PlaybackControllableOutput output) operation,
   ) async {
-    final controls = _playbackControlsByRequest[requestId];
+    final controls = _playbackControlsByRequest[requestKey];
     if (controls == null || controls.isEmpty) {
-      throw StateError('No active playback for "$requestId".');
+      throw StateError('No active playback for "$requestKey".');
     }
     for (final output in controls.toList()) {
       await operation(output);
@@ -416,7 +416,7 @@ final class MulticastOutput implements TtsOutput, PlaybackControllableOutput {
     TtsOutput source,
     TtsOutputPlaybackCompletedEvent event,
   ) {
-    _removePlaybackControl(source, event.requestId);
+    _removePlaybackControl(source, event.requestKey);
     _playbackCompletedController.add(event);
   }
 
@@ -424,11 +424,11 @@ final class MulticastOutput implements TtsOutput, PlaybackControllableOutput {
     TtsOutput source,
     TtsOutputPlaybackFailedEvent event,
   ) {
-    _removePlaybackControl(source, event.requestId);
+    _removePlaybackControl(source, event.requestKey);
     _playbackFailedController.add(event);
   }
 
-  void _removePlaybackControl(TtsOutput source, String requestId) {
+  void _removePlaybackControl(TtsOutput source, String requestKey) {
     final PlaybackControllableOutput? playbackControl =
         source is PlaybackControllableOutput
         ? source as PlaybackControllableOutput
@@ -436,19 +436,19 @@ final class MulticastOutput implements TtsOutput, PlaybackControllableOutput {
     if (playbackControl == null) {
       return;
     }
-    final controls = _playbackControlsByRequest[requestId];
+    final controls = _playbackControlsByRequest[requestKey];
     if (controls == null) {
       return;
     }
     controls.remove(playbackControl);
     if (controls.isEmpty) {
-      _playbackControlsByRequest.remove(requestId);
+      _playbackControlsByRequest.remove(requestKey);
     }
   }
 
   Future<void> _rollbackOutputs({
     required List<MapEntry<String, TtsOutput>> entries,
-    required String? requestId,
+    required String? requestKey,
     required String stage,
     required String failingOutputId,
   }) async {
@@ -465,7 +465,7 @@ final class MulticastOutput implements TtsOutput, PlaybackControllableOutput {
       } catch (error) {
         final converted = _toOutputError(
           error,
-          requestId: requestId,
+          requestKey: requestKey,
           stage: '$stage.rollback.onCancelSession',
           outputId: entry.key,
         );

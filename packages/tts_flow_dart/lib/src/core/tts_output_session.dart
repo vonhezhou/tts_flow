@@ -4,7 +4,7 @@ import 'package:tts_flow_dart/src/core/tts_voice.dart';
 
 final class TtsOutputSession {
   const TtsOutputSession({
-    required this.requestId,
+    required this.requestKey,
     required this.audioSpec,
     required this.voice,
     required this.options,
@@ -12,20 +12,20 @@ final class TtsOutputSession {
   });
 
   TtsOutputSession copyWith({
-    String? requestId,
+    String? requestKey,
     TtsAudioSpec? audioSpec,
     TtsVoice? voice,
     TtsOptions? options,
     Map<String, Object>? params,
   }) => TtsOutputSession(
-    requestId: requestId ?? this.requestId,
+    requestKey: requestKey ?? this.requestKey,
     audioSpec: audioSpec ?? this.audioSpec,
     voice: voice ?? this.voice,
     options: options ?? this.options,
     params: params ?? this.params,
   );
 
-  final String requestId;
+  final String requestKey;
   final TtsAudioSpec audioSpec;
   final TtsVoice? voice;
   final TtsOptions? options;

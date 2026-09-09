@@ -11,6 +11,11 @@
 
 ## Unreleased
 
+- Breaking: `speak(text, utteranceId: ...)` now returns a `TtsRequestHandle`.
+  The flow generates an opaque `requestKey` for all engine/output/playback
+  routing; application-supplied `utteranceId` is retained for event correlation
+  and may be reused safely.
+
 - Breaking: `TtsAudioFormat.wav` has been removed from the enum. Engines that
   previously advertised `wav` output now advertise `pcm` and strip the WAV
   header internally before yielding chunks to the flow.

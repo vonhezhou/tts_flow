@@ -14,7 +14,7 @@ final class JustAudioPlaybackErrorEvent {
   /// Creates a playback error event.
   const JustAudioPlaybackErrorEvent({
     required this.playbackId,
-    required this.requestId,
+    required this.requestKey,
     required this.error,
   });
 
@@ -22,7 +22,7 @@ final class JustAudioPlaybackErrorEvent {
   final String playbackId;
 
   /// The TTS request that owns the failed playback session.
-  final String requestId;
+  final String requestKey;
 
   /// The platform error emitted by just_audio.
   final PlayerException error;
@@ -37,7 +37,7 @@ final class JustAudioPlaybackWaitingEvent {
   /// Creates a waiting event for a source-list playback underflow.
   const JustAudioPlaybackWaitingEvent({
     required this.playbackId,
-    required this.requestId,
+    required this.requestKey,
     required this.sourceIndex,
     required this.timestamp,
   });
@@ -46,7 +46,7 @@ final class JustAudioPlaybackWaitingEvent {
   final String playbackId;
 
   /// The TTS request that owns this playback session.
-  final String requestId;
+  final String requestKey;
 
   /// Index of the source that exhausted the currently queued playlist.
   final int sourceIndex;
@@ -63,7 +63,7 @@ final class JustAudioPlaybackSourceStartedEvent {
   /// Creates a source-start event.
   const JustAudioPlaybackSourceStartedEvent({
     required this.playbackId,
-    required this.requestId,
+    required this.requestKey,
     required this.sourceIndex,
     required this.timestamp,
   });
@@ -72,7 +72,7 @@ final class JustAudioPlaybackSourceStartedEvent {
   final String playbackId;
 
   /// The TTS request that owns this playback session.
-  final String requestId;
+  final String requestKey;
 
   /// Index of the source the native player began reading.
   final int sourceIndex;
@@ -84,12 +84,12 @@ final class JustAudioPlaybackSourceStartedEvent {
 final class _PlaybackSession {
   _PlaybackSession({
     required this.playbackId,
-    required this.requestId,
+    required this.requestKey,
     required this.audioSpec,
   });
 
   final String playbackId;
-  final String requestId;
+  final String requestKey;
   final TtsAudioSpec audioSpec;
 
   ChunkAudioSource? tailSource;
@@ -373,19 +373,19 @@ class JustAudioBackend
 
   @override
   Future<String> startPlayback({
-    required String requestId,
+    required String requestKey,
     required TtsAudioSpec audioSpec,
   }) => _enqueuePlayerOperation(() async {
-    var playbackId = requestId;
+    var playbackId = requestKey;
     var suffix = 1;
     while (_sessions.containsKey(playbackId)) {
-      playbackId = '$requestId-$suffix';
+      playbackId = '$requestKey-$suffix';
       suffix++;
     }
 
     _sessions[playbackId] = _PlaybackSession(
       playbackId: playbackId,
-      requestId: requestId,
+      requestKey: requestKey,
       audioSpec: audioSpec,
     );
     _completedPlaybackIds.remove(playbackId);
@@ -454,7 +454,7 @@ class JustAudioBackend
       audioSpec: session.audioSpec,
       playbackId: session.playbackId,
       index: sourceIndex,
-      requestId: session.requestId,
+      requestKey: session.requestKey,
       isTerminalSegment: false,
       onStarted: () {
         if (_disposeRequested) {
@@ -463,7 +463,7 @@ class JustAudioBackend
         _playbackSourceStartedController.add(
           JustAudioPlaybackSourceStartedEvent(
             playbackId: session.playbackId,
-            requestId: session.requestId,
+            requestKey: session.requestKey,
             sourceIndex: sourceIndex,
             timestamp: DateTime.now().toUtc(),
           ),
@@ -598,7 +598,7 @@ class JustAudioBackend
         _playbackWaitingController.add(
           JustAudioPlaybackWaitingEvent(
             playbackId: session.playbackId,
-            requestId: session.requestId,
+            requestKey: session.requestKey,
             sourceIndex: source.index,
             timestamp: DateTime.now().toUtc(),
           ),
@@ -618,7 +618,7 @@ class JustAudioBackend
 
     _playbackCompletedController.add(
       SpeakerPlaybackCompletedEvent(
-        requestId: session.requestId,
+        requestKey: session.requestKey,
         playbackId: session.playbackId,
         playedDuration: session.calcTotalDuration(),
       ),
@@ -664,18 +664,18 @@ class JustAudioBackend
     _playbackErrorController.add(
       JustAudioPlaybackErrorEvent(
         playbackId: session.playbackId,
-        requestId: session.requestId,
+        requestKey: session.requestKey,
         error: error,
       ),
     );
     _playbackFailedController.add(
       SpeakerPlaybackFailedEvent(
-        requestId: session.requestId,
+        requestKey: session.requestKey,
         playbackId: session.playbackId,
         error: TtsError(
           code: TtsErrorCode.outputPlaybackFailed,
           message: 'just_audio playback failed: ${error.message ?? error.code}',
-          requestId: session.requestId,
+          requestKey: session.requestKey,
           cause: error,
         ),
       ),
@@ -729,7 +729,7 @@ class JustAudioBackend
 
     _logger.fine(
       'onDuration: '
-      '${curSource.requestId},${curSource.index} '
+      '${curSource.requestKey},${curSource.index} '
       '$duration, ${curSource.playbackOffset}',
     );
   }
@@ -756,7 +756,7 @@ class JustAudioBackend
     _playbackPositionController.add(
       TtsPlaybackPositionEvent(
         playbackId: curSource.playbackId,
-        requestId: curSource.requestId,
+        requestKey: curSource.requestKey,
         position: newPos,
       ),
     );

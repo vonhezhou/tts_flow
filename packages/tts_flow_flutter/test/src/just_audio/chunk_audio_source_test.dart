@@ -11,7 +11,7 @@ void main() {
       final source = ChunkAudioSource(
         audioSpec: const TtsAudioSpec.mp3(),
         playbackId: 'playback-1',
-        requestId: 'request-1',
+        requestKey: 'request-1',
         index: 0,
         isTerminalSegment: false,
         onStarted: () => starts += 1,

@@ -238,7 +238,7 @@ class OpenAiTtsEngine with TtsEngineDefaults implements TtsEngine {
 
         if (pending != null) {
           yield TtsAudioChunk(
-            requestId: request.requestId,
+            requestKey: request.requestKey,
             sequenceNumber: sequence,
             bytes: Uint8List.fromList(pending),
             audioSpec: resolvedFormat,
@@ -257,7 +257,7 @@ class OpenAiTtsEngine with TtsEngineDefaults implements TtsEngine {
 
       final lastBytes = pending ?? Uint8List(0);
       yield TtsAudioChunk(
-        requestId: request.requestId,
+        requestKey: request.requestKey,
         sequenceNumber: sequence,
         bytes: Uint8List.fromList(lastBytes),
         audioSpec: resolvedFormat,
@@ -268,14 +268,14 @@ class OpenAiTtsEngine with TtsEngineDefaults implements TtsEngine {
       throw TtsError(
         code: mapStatusCode(error.statusCode),
         message: error.message,
-        requestId: request.requestId,
+        requestKey: request.requestKey,
         cause: error,
       );
     } catch (error) {
       throw TtsError(
         code: TtsErrorCode.networkError,
         message: 'OpenAI TTS request failed.',
-        requestId: request.requestId,
+        requestKey: request.requestKey,
         cause: error,
       );
     }

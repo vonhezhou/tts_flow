@@ -38,7 +38,7 @@ void main() {
     test('returns bytes and resolved format', () async {
       final output = MemoryOutput();
       const session = TtsOutputSession(
-        requestId: 'mem-1',
+        requestKey: 'mem-1',
         audioSpec: _pcmSpec,
         voice: null,
         options: null,
@@ -53,7 +53,7 @@ void main() {
 
       expect(artifact, isA<InMemoryAudioArtifact>());
       final mem = artifact as InMemoryAudioArtifact;
-      expect(mem.requestId, 'mem-1');
+      expect(mem.requestKey, 'mem-1');
       expect(mem.audioSpec.format, TtsAudioFormat.pcm);
       expect(mem.totalBytes, 3);
       expect(mem.audioBytes, Uint8List.fromList([1, 2, 3]));
@@ -64,7 +64,7 @@ void main() {
 
       await output.initSession(
         const TtsOutputSession(
-          requestId: 'a',
+          requestKey: 'a',
           audioSpec: _mp3Spec,
           voice: null,
           options: null,
@@ -77,7 +77,7 @@ void main() {
 
       await output.initSession(
         const TtsOutputSession(
-          requestId: 'b',
+          requestKey: 'b',
           audioSpec: _pcmSpec,
           voice: null,
           options: null,
@@ -97,7 +97,7 @@ void main() {
     test('discards bytes and returns empty artifact payload', () async {
       final output = NullOutput();
       const session = TtsOutputSession(
-        requestId: 'null-1',
+        requestKey: 'null-1',
         audioSpec: _pcmSpec,
         voice: null,
         options: null,
@@ -112,16 +112,16 @@ void main() {
       );
 
       final artifact = await output.finalizeSession() as InMemoryAudioArtifact;
-      expect(artifact.requestId, 'null-1');
+      expect(artifact.requestKey, 'null-1');
       expect(artifact.audioSpec.format, TtsAudioFormat.pcm);
       expect(artifact.totalBytes, 0);
       expect(artifact.audioBytes, isEmpty);
     });
 
-    test('rejects chunk requestId mismatch', () async {
+    test('rejects chunk requestKey mismatch', () async {
       final output = NullOutput();
       const session = TtsOutputSession(
-        requestId: 'null-2',
+        requestKey: 'null-2',
         audioSpec: _mp3Spec,
         voice: null,
         options: null,
@@ -152,7 +152,7 @@ void main() {
           channels: 1,
         );
         const session = TtsOutputSession(
-          requestId: 'wav-1',
+          requestKey: 'wav-1',
           audioSpec: TtsAudioSpec.pcm(descriptor),
           voice: null,
           options: TtsOptions(sampleRateHz: 16000),
@@ -196,7 +196,7 @@ void main() {
         final bytes = _mp3Bytes(frames: 1);
 
         const session = TtsOutputSession(
-          requestId: 'mp3-1',
+          requestKey: 'mp3-1',
           audioSpec: _mp3Spec,
           voice: null,
           options: null,
@@ -241,7 +241,7 @@ void main() {
 
         await output.initSession(
           const TtsOutputSession(
-            requestId: 'mp3-append-1',
+            requestKey: 'mp3-append-1',
             audioSpec: _mp3Spec,
             voice: null,
             options: null,
@@ -254,7 +254,7 @@ void main() {
 
         await output.initSession(
           const TtsOutputSession(
-            requestId: 'mp3-append-2',
+            requestKey: 'mp3-append-2',
             audioSpec: _mp3Spec,
             voice: null,
             options: null,
@@ -299,7 +299,7 @@ void main() {
 
         await output.initSession(
           const TtsOutputSession(
-            requestId: 'mp3-append-id3v1-1',
+            requestKey: 'mp3-append-id3v1-1',
             audioSpec: _mp3Spec,
             voice: null,
             options: null,
@@ -312,7 +312,7 @@ void main() {
 
         await output.initSession(
           const TtsOutputSession(
-            requestId: 'mp3-append-id3v1-2',
+            requestKey: 'mp3-append-id3v1-2',
             audioSpec: _mp3Spec,
             voice: null,
             options: null,
@@ -370,7 +370,7 @@ void main() {
 
           await output.initSession(
             const TtsOutputSession(
-              requestId: 'mp3-mismatch-1',
+              requestKey: 'mp3-mismatch-1',
               audioSpec: _mp3Spec,
               voice: null,
               options: null,
@@ -389,7 +389,7 @@ void main() {
 
           await output.initSession(
             const TtsOutputSession(
-              requestId: 'mp3-mismatch-2',
+              requestKey: 'mp3-mismatch-2',
               audioSpec: _mp3Spec,
               voice: null,
               options: null,
@@ -421,7 +421,7 @@ void main() {
 
           await output.initSession(
             const TtsOutputSession(
-              requestId: 'mp3-mismatch-3',
+              requestKey: 'mp3-mismatch-3',
               audioSpec: _mp3Spec,
               voice: null,
               options: null,
@@ -461,7 +461,7 @@ void main() {
           );
           await output.initSession(
             const TtsOutputSession(
-              requestId: 'wav-finalize-fail-0',
+              requestKey: 'wav-finalize-fail-0',
               audioSpec: TtsAudioSpec.pcm(baselineDescriptor),
               voice: null,
               options: null,
@@ -486,7 +486,7 @@ void main() {
           await expectLater(
             output.initSession(
               const TtsOutputSession(
-                requestId: 'wav-finalize-fail-1',
+                requestKey: 'wav-finalize-fail-1',
                 audioSpec: TtsAudioSpec.pcm(mismatchedDescriptor),
                 voice: null,
                 options: null,
@@ -505,7 +505,7 @@ void main() {
 
           await output.initSession(
             const TtsOutputSession(
-              requestId: 'wav-finalize-fail-2',
+              requestKey: 'wav-finalize-fail-2',
               audioSpec: TtsAudioSpec.pcm(baselineDescriptor),
               voice: null,
               options: null,
@@ -543,7 +543,7 @@ void main() {
           channels: 1,
         );
         const session = TtsOutputSession(
-          requestId: 'wav-2',
+          requestKey: 'wav-2',
           audioSpec: TtsAudioSpec.pcm(descriptor),
           voice: null,
           options: null,
@@ -578,7 +578,7 @@ void main() {
         );
 
         const session = TtsOutputSession(
-          requestId: 'pcm-1',
+          requestKey: 'pcm-1',
           audioSpec: TtsAudioSpec.pcm(descriptor),
           voice: null,
           options: null,
@@ -625,7 +625,7 @@ void main() {
 
           await output.initSession(
             const TtsOutputSession(
-              requestId: 'append-1',
+              requestKey: 'append-1',
               audioSpec: TtsAudioSpec.pcm(descriptor),
               voice: null,
               options: null,
@@ -638,7 +638,7 @@ void main() {
 
           await output.initSession(
             const TtsOutputSession(
-              requestId: 'append-2',
+              requestKey: 'append-2',
               audioSpec: TtsAudioSpec.pcm(descriptor),
               voice: null,
               options: null,
@@ -688,7 +688,7 @@ void main() {
 
           await output.initSession(
             const TtsOutputSession(
-              requestId: 'mismatch-1',
+              requestKey: 'mismatch-1',
               audioSpec: TtsAudioSpec.pcm(lockedDescriptor),
               voice: null,
               options: null,
@@ -704,7 +704,7 @@ void main() {
           await expectLater(
             output.initSession(
               const TtsOutputSession(
-                requestId: 'mismatch-2',
+                requestKey: 'mismatch-2',
                 audioSpec: TtsAudioSpec.pcm(mismatchedDescriptor),
                 voice: null,
                 options: null,
@@ -744,7 +744,7 @@ void main() {
 
           await output.initSession(
             const TtsOutputSession(
-              requestId: 'preserve-1',
+              requestKey: 'preserve-1',
               audioSpec: TtsAudioSpec.pcm(descriptor),
               voice: null,
               options: null,
@@ -759,7 +759,7 @@ void main() {
 
           await output.initSession(
             const TtsOutputSession(
-              requestId: 'preserve-2',
+              requestKey: 'preserve-2',
               audioSpec: TtsAudioSpec.pcm(descriptor),
               voice: null,
               options: null,
@@ -799,7 +799,7 @@ void main() {
 
           await output.initSession(
             const TtsOutputSession(
-              requestId: 'mp3-preserve-1',
+              requestKey: 'mp3-preserve-1',
               audioSpec: _mp3Spec,
               voice: null,
               options: null,
@@ -814,7 +814,7 @@ void main() {
 
           await output.initSession(
             const TtsOutputSession(
-              requestId: 'mp3-preserve-2',
+              requestKey: 'mp3-preserve-2',
               audioSpec: _mp3Spec,
               voice: null,
               options: null,
@@ -865,7 +865,7 @@ void main() {
         );
 
         const session = TtsOutputSession(
-          requestId: 'Multicast-1',
+          requestKey: 'Multicast-1',
           audioSpec: _pcmSpec,
           voice: null,
           options: null,
@@ -895,7 +895,7 @@ void main() {
       );
 
       const session = TtsOutputSession(
-        requestId: 'Multicast-2',
+        requestKey: 'Multicast-2',
         audioSpec: _pcmSpec,
         voice: null,
         options: null,
@@ -933,7 +933,7 @@ void main() {
         );
 
         const session = TtsOutputSession(
-          requestId: 'Multicast-init-rollback',
+          requestKey: 'Multicast-init-rollback',
           audioSpec: _pcmSpec,
           voice: null,
           options: null,
@@ -969,7 +969,7 @@ void main() {
       );
 
       const session = TtsOutputSession(
-        requestId: 'Multicast-finalize-rollback',
+        requestKey: 'Multicast-finalize-rollback',
         audioSpec: _pcmSpec,
         voice: null,
         options: null,
@@ -1047,7 +1047,7 @@ final class _FailingTestOutput implements TtsOutput {
       throw StateError('No active output session.');
     }
     return InMemoryAudioArtifact(
-      requestId: session.requestId,
+      requestKey: session.requestKey,
       audioSpec: session.audioSpec,
       audioBytes: Uint8List(0),
       totalBytes: 0,
@@ -1118,14 +1118,14 @@ final class _PcmConstraintOutput implements TtsOutput {
 }
 
 TtsChunk _chunk(
-  String requestId,
+  String requestKey,
   int seq,
   List<int> bytes,
   TtsAudioFormat format, {
   bool isLast = false,
 }) {
   return TtsAudioChunk(
-    requestId: requestId,
+    requestKey: requestKey,
     sequenceNumber: seq,
     bytes: Uint8List.fromList(bytes),
     audioSpec: _audioSpecForFormat(format),
@@ -1148,14 +1148,14 @@ TtsAudioSpec _audioSpecForFormat(TtsAudioFormat format) {
 }
 
 TtsChunk _pcmChunk(
-  String requestId,
+  String requestKey,
   int seq,
   List<int> bytes,
   PcmDescriptor descriptor, {
   bool isLast = false,
 }) {
   return TtsAudioChunk(
-    requestId: requestId,
+    requestKey: requestKey,
     sequenceNumber: seq,
     bytes: Uint8List.fromList(bytes),
     audioSpec: TtsAudioSpec.pcm(descriptor),

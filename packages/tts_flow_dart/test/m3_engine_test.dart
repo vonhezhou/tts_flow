@@ -40,7 +40,7 @@ void main() {
           ),
         },
         preferredOrder: const [TtsAudioFormat.pcm],
-        requestId: 'n0',
+        requestKey: 'n0',
         preferredSampleRateHz: 24000,
       );
 
@@ -71,7 +71,7 @@ void main() {
             ),
           },
           preferredOrder: const [TtsAudioFormat.pcm],
-          requestId: 'n0b',
+          requestKey: 'n0b',
           preferredSampleRateHz: 24000,
         );
 
@@ -99,7 +99,7 @@ void main() {
           ),
         },
         preferredOrder: const [TtsAudioFormat.pcm],
-        requestId: 'n0c',
+        requestKey: 'n0c',
       );
 
       expect(resolved.format, TtsAudioFormat.pcm);
@@ -118,7 +118,7 @@ void main() {
           ),
         },
         preferredOrder: const [TtsAudioFormat.pcm],
-        requestId: 'n0d',
+        requestKey: 'n0d',
         preferredSampleRateHz: 22050,
       );
 
@@ -145,7 +145,7 @@ void main() {
           ),
         },
         preferredOrder: const [TtsAudioFormat.pcm],
-        requestId: 'n0e',
+        requestKey: 'n0e',
       );
 
       expect(resolved.format, TtsAudioFormat.pcm);
@@ -171,7 +171,7 @@ void main() {
           ),
         },
         preferredOrder: const [TtsAudioFormat.pcm],
-        requestId: 'n0f',
+        requestKey: 'n0f',
       );
 
       expect(resolved.format, TtsAudioFormat.pcm);
@@ -183,7 +183,7 @@ void main() {
         engineFormats: {TtsAudioFormat.mp3, TtsAudioFormat.pcm},
         outputFormats: {TtsAudioFormat.mp3},
         preferredOrder: const [TtsAudioFormat.pcm, TtsAudioFormat.mp3],
-        requestId: 'n1',
+        requestKey: 'n1',
         preferredFormat: TtsAudioFormat.mp3,
       );
 
@@ -195,7 +195,7 @@ void main() {
         engineFormats: {TtsAudioFormat.aac, TtsAudioFormat.mp3},
         outputFormats: {TtsAudioFormat.aac, TtsAudioFormat.mp3},
         preferredOrder: const [TtsAudioFormat.pcm, TtsAudioFormat.aac],
-        requestId: 'n2',
+        requestKey: 'n2',
       );
 
       expect(resolved, TtsAudioFormat.aac);
@@ -207,7 +207,7 @@ void main() {
           engineFormats: {TtsAudioFormat.mp3},
           outputFormats: {TtsAudioFormat.pcm},
           preferredOrder: const [TtsAudioFormat.pcm],
-          requestId: 'n3',
+          requestKey: 'n3',
         ),
         throwsA(
           isA<TtsError>().having(
@@ -225,7 +225,7 @@ void main() {
           engineCapabilities: {const Mp3Capability()},
           outputCapabilities: {PcmCapability()},
           preferredOrder: const [TtsAudioFormat.pcm],
-          requestId: 'n4',
+          requestKey: 'n4',
           preferredFormat: TtsAudioFormat.pcm,
         );
         fail('Expected TtsError to be thrown.');
@@ -257,7 +257,7 @@ void main() {
             ),
           },
           preferredOrder: const [TtsAudioFormat.pcm],
-          requestId: 'n5',
+          requestKey: 'n5',
           preferredSampleRateHz: 24000,
         );
         fail('Expected TtsError to be thrown.');
@@ -282,7 +282,7 @@ void main() {
 
       final chunks = await engine
           .synthesize(
-            const TtsRequest(requestId: 'fx1', text: 'this should be ignored'),
+            const TtsRequest(requestKey: 'fx1', text: 'this should be ignored'),
             control,
             _mp3Spec,
           )
@@ -297,7 +297,7 @@ void main() {
 
       expect(reconstructed, payload);
       expect(chunks.last.isLastChunk, isTrue);
-      expect(chunks.every((chunk) => chunk.requestId == 'fx1'), isTrue);
+      expect(chunks.every((chunk) => chunk.requestKey == 'fx1'), isTrue);
     });
 
     test('limits send speed when maxBytesPerSecond is set', () async {
@@ -315,7 +315,7 @@ void main() {
 
       final chunks = await engine
           .synthesize(
-            const TtsRequest(requestId: 'fx2', text: 'ignored too'),
+            const TtsRequest(requestKey: 'fx2', text: 'ignored too'),
             control,
             _mp3Spec,
           )
@@ -341,7 +341,7 @@ void main() {
         await expectLater(
           engine
               .synthesize(
-                const TtsRequest(requestId: 'fx3', text: 'ignored'),
+                const TtsRequest(requestKey: 'fx3', text: 'ignored'),
                 SynthesisControl(),
                 _pcmSpec,
               )
@@ -374,7 +374,7 @@ void main() {
 
       engine
           .synthesize(
-            const TtsRequest(requestId: 'fx4', text: 'ignored too'),
+            const TtsRequest(requestKey: 'fx4', text: 'ignored too'),
             control,
             _mp3Spec,
           )
@@ -752,7 +752,7 @@ void main() {
 
       final chunks = await engine
           .synthesize(
-            const TtsRequest(requestId: 'o1', text: 'hello'),
+            const TtsRequest(requestKey: 'o1', text: 'hello'),
             SynthesisControl(),
             _mp3Spec,
           )
@@ -789,7 +789,7 @@ void main() {
       await expectLater(
         engine
             .synthesize(
-              const TtsRequest(requestId: 'o2', text: 'hello'),
+              const TtsRequest(requestKey: 'o2', text: 'hello'),
               SynthesisControl(),
               _mp3Spec,
             )
@@ -866,7 +866,7 @@ void main() {
       await expectLater(
         engine
             .synthesize(
-              const TtsRequest(requestId: 'o3', text: 'hello'),
+              const TtsRequest(requestKey: 'o3', text: 'hello'),
               SynthesisControl(),
               _mp3Spec,
             )
@@ -893,7 +893,7 @@ void main() {
       await expectLater(
         engine
             .synthesize(
-              const TtsRequest(requestId: 'o4', text: 'hello'),
+              const TtsRequest(requestKey: 'o4', text: 'hello'),
               SynthesisControl(),
               _mp3Spec,
             )
@@ -920,7 +920,7 @@ void main() {
 
         final chunks = await engine
             .synthesize(
-              const TtsRequest(requestId: 'j1', text: 'hello'),
+              const TtsRequest(requestKey: 'j1', text: 'hello'),
               SynthesisControl(),
               _mp3Spec,
             )

@@ -21,7 +21,7 @@ void main() {
 
       await output.initSession(
         const TtsOutputSession(
-          requestId: 'spk-1',
+          requestKey: 'spk-1',
           audioSpec: _mp3Spec,
           voice: null,
           options: null,
@@ -34,7 +34,7 @@ void main() {
       expect(artifact, isA<PlaybackAudioArtifact>());
 
       final speaker = artifact as PlaybackAudioArtifact;
-      expect(speaker.requestId, 'spk-1');
+      expect(speaker.requestKey, 'spk-1');
       expect(speaker.audioSpec.format, TtsAudioFormat.mp3);
       expect(speaker.playbackId, 'playback-spk-1');
       expect(backend.writtenBytes['playback-spk-1'], [1, 2, 3]);
@@ -50,7 +50,7 @@ void main() {
 
       await output.initSession(
         const TtsOutputSession(
-          requestId: 'spk-2',
+          requestKey: 'spk-2',
           audioSpec: _pcmSpec,
           voice: null,
           options: null,
@@ -71,7 +71,7 @@ void main() {
 
       await output.initSession(
         const TtsOutputSession(
-          requestId: 'spk-a',
+          requestKey: 'spk-a',
           audioSpec: _mp3Spec,
           voice: null,
           options: null,
@@ -82,7 +82,7 @@ void main() {
 
       await output.initSession(
         const TtsOutputSession(
-          requestId: 'spk-b',
+          requestKey: 'spk-b',
           audioSpec: _pcmSpec,
           voice: null,
           options: null,
@@ -101,7 +101,7 @@ void main() {
 
       await output.initSession(
         const TtsOutputSession(
-          requestId: 'spk-control',
+          requestKey: 'spk-control',
           audioSpec: _mp3Spec,
           voice: null,
           options: null,
@@ -130,7 +130,7 @@ void main() {
 
       await output.initSession(
         const TtsOutputSession(
-          requestId: 'spk-multicast-control',
+          requestKey: 'spk-multicast-control',
           audioSpec: _mp3Spec,
           voice: null,
           options: null,
@@ -160,12 +160,12 @@ void main() {
 
       backend.playbackFailedController.add(
         const SpeakerPlaybackFailedEvent(
-          requestId: 'spk-failed',
+          requestKey: 'spk-failed',
           playbackId: 'playback-spk-failed',
           error: TtsError(
             code: TtsErrorCode.outputPlaybackFailed,
             message: 'decoder failed',
-            requestId: 'spk-failed',
+            requestKey: 'spk-failed',
           ),
         ),
       );
@@ -189,7 +189,7 @@ void main() {
 
       backend.playbackFailedController.add(
         const SpeakerPlaybackFailedEvent(
-          requestId: 'multi-failed',
+          requestKey: 'multi-failed',
           playbackId: 'playback-multi-failed',
           error: TtsError(
             code: TtsErrorCode.outputPlaybackFailed,
@@ -220,7 +220,7 @@ void main() {
         addTearDown(sub.cancel);
         backend.playbackPositionController.add(
           const TtsPlaybackPositionEvent(
-            requestId: 'spk-timeline',
+            requestKey: 'spk-timeline',
             playbackId: 'playback-spk-timeline',
             position: Duration(milliseconds: 420),
           ),
@@ -236,9 +236,9 @@ void main() {
   });
 }
 
-TtsChunk _chunk(String requestId, List<int> bytes, TtsAudioFormat format) {
+TtsChunk _chunk(String requestKey, List<int> bytes, TtsAudioFormat format) {
   return TtsAudioChunk(
-    requestId: requestId,
+    requestKey: requestKey,
     sequenceNumber: 0,
     bytes: Uint8List.fromList(bytes),
     audioSpec: _audioSpecForFormat(format),
@@ -300,10 +300,10 @@ final class _FakeSpeakerBackend
 
   @override
   Future<String> startPlayback({
-    required String requestId,
+    required String requestKey,
     required TtsAudioSpec audioSpec,
   }) async {
-    final playbackId = 'playback-$requestId';
+    final playbackId = 'playback-$requestKey';
     writtenBytes[playbackId] = <int>[];
     startedSpecs[playbackId] = audioSpec;
     return playbackId;

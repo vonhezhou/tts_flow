@@ -13,7 +13,9 @@ void main() {
       );
       await flow.init();
 
-      final chunks = await flow.speak('chapter-1', 'First sentence.').toList();
+      final chunks = await flow
+          .speak('First sentence.', utteranceId: 'chapter-1')
+          .toList();
 
       expect(chunks.first, isA<TtsSentenceCueChunk>());
       final cueChunk = chunks.first as TtsSentenceCueChunk;
@@ -65,7 +67,7 @@ final class _CueFirstEngine with TtsEngineDefaults implements TtsEngine {
     TtsAudioSpec resolvedFormat,
   ) async* {
     yield TtsSentenceCueChunk(
-      requestId: request.requestId,
+      requestKey: request.requestKey,
       sequenceNumber: 0,
       isLastChunk: false,
       timestamp: DateTime.now().toUtc(),
@@ -78,7 +80,7 @@ final class _CueFirstEngine with TtsEngineDefaults implements TtsEngine {
       ],
     );
     yield TtsAudioChunk(
-      requestId: request.requestId,
+      requestKey: request.requestKey,
       sequenceNumber: 1,
       isLastChunk: true,
       timestamp: DateTime.now().toUtc(),

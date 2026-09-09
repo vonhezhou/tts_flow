@@ -73,7 +73,7 @@ final class DemoSentenceCueEngine with TtsEngineDefaults implements TtsEngine {
     }
     if (cues.isNotEmpty) {
       yield TtsSentenceCueChunk(
-        requestId: request.requestId,
+        requestKey: request.requestKey,
         sequenceNumber: 0,
         isLastChunk: false,
         timestamp: DateTime.now().toUtc(),
@@ -88,7 +88,7 @@ final class DemoSentenceCueEngine with TtsEngineDefaults implements TtsEngine {
     )) {
       if (chunk is TtsAudioChunk) {
         yield TtsAudioChunk(
-          requestId: chunk.requestId,
+          requestKey: chunk.requestKey,
           sequenceNumber: chunk.sequenceNumber + 1,
           isLastChunk: chunk.isLastChunk,
           timestamp: chunk.timestamp,

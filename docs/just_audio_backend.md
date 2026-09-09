@@ -110,7 +110,7 @@ finalized
 
 - 后端必须监听 `AudioPlayer.errorStream`，将异步平台解码错误关联到活跃 `playbackId` 并终止该 session。
 - `JustAudioBackend.playbackErrorStream` 保留 just_audio 的原始 `PlayerException`，供平台诊断；同时它通过可选的 `SpeakerPlaybackFailureAwareBackend` 能力发出标准 `SpeakerPlaybackFailedEvent`。`SpeakerOutput`、`MulticastOutput` 和 `TtsFlow.requestEvents` 会将其继续传递为 `TtsOutputPlaybackFailedEvent` 与 `requestPlaybackFailed`。
-- `requestPlaybackFailed` 是独立的物理播放终态：它不向已经完成的 `speak()` stream 补抛错误，也不追溯修改此前的 `requestCompleted`，更不触发合成队列的 fail-fast 策略。调用方应使用它提示播放失败、记录诊断或自行发起新的播放请求。
+- `requestPlaybackFailed` 是独立的物理播放终态：它不向已经完成的 `TtsRequestHandle` chunk stream 补抛错误，也不追溯修改此前的 `requestSynthesisCompleted`，更不触发合成队列的 fail-fast 策略。调用方应使用它提示播放失败、记录诊断或自行发起新的播放请求。
 - `playbackWaitingStream` 是非终态诊断信号：未 finalized 的 source-list 耗尽时发出，后续 chunk 仍可创建新 source 并恢复。它为模拟器、真机和单元测试提供可自动断言的抖动指标，不等同于解码错误。
 - `playbackSourceStartedStream` 在原生播放器第一次请求某个 source 时发出。它对应 `ChunkAudioSource.hasStarted` 从 false 变为 true 的精确边界，可用于受控回归的供给时序门控；不要用各平台语义不同的 `ProcessingState.ready` 推断这个边界。
 - 每个被冻结的 `ChunkAudioSource` 都是一个有限的、支持 HTTP byte-range 的 source。播放器若重试或按 range 读取，backend 必须返回与声明的 `sourceLength`、`contentLength`、`offset` 一致的快照，不能无视 `request(start, end)` 后仍返回完整流；这对 macOS AVFoundation 尤其重要。
@@ -120,7 +120,7 @@ finalized
 - `addAudioSource`、移除 source、seek、play、stop 与处理 completed 回调必须进入同一个串行操作队列，防止 await 期间互相交错。
 - `pausePlayback`、`resumePlayback`、`stopPlayback` 必须能作用于合成已结束但设备仍在播放的 session；上层需要保留对应 playback handle。
 - 所有内部 `StreamController` 在 dispose 时关闭。句子时间等语义 chunk
-  由 `TtsFlow.speak()` 的返回流交给阅读层，不经播放器后端转发；后端只
+  由 `TtsFlow.speak()` 返回的 `TtsRequestHandle` 交给阅读层，不经播放器后端转发；后端只
   通过可选的 `PlaybackTimelineReporter` 提供物理播放位置。
 
 ## 非目标

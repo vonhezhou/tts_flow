@@ -3,15 +3,15 @@ import 'dart:typed_data';
 import 'package:tts_flow_dart/tts_flow_dart.dart';
 
 sealed class AudioArtifact {
-  const AudioArtifact({required this.requestId, required this.audioSpec});
+  const AudioArtifact({required this.requestKey, required this.audioSpec});
 
-  final String requestId;
+  final String requestKey;
   final TtsAudioSpec audioSpec;
 }
 
 final class InMemoryAudioArtifact extends AudioArtifact {
   const InMemoryAudioArtifact({
-    required super.requestId,
+    required super.requestKey,
     required super.audioSpec,
     required this.audioBytes,
     required this.totalBytes,
@@ -23,7 +23,7 @@ final class InMemoryAudioArtifact extends AudioArtifact {
 
 final class FileAudioArtifact extends AudioArtifact {
   const FileAudioArtifact({
-    required super.requestId,
+    required super.requestKey,
     required super.audioSpec,
     required this.filePath,
     required this.fileSizeBytes,
@@ -35,7 +35,7 @@ final class FileAudioArtifact extends AudioArtifact {
 
 final class PlaybackAudioArtifact extends AudioArtifact {
   const PlaybackAudioArtifact({
-    required super.requestId,
+    required super.requestKey,
     required super.audioSpec,
     required this.playbackId,
   });
@@ -45,7 +45,7 @@ final class PlaybackAudioArtifact extends AudioArtifact {
 
 final class MulticastAudioArtifact extends AudioArtifact {
   MulticastAudioArtifact({
-    required super.requestId,
+    required super.requestKey,
     required super.audioSpec,
     required Map<String, AudioArtifact> artifacts,
     required Map<String, TtsError> outputErrors,

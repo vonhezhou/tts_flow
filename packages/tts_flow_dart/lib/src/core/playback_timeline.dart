@@ -1,15 +1,15 @@
 /// A position reported on the physical playback timeline for one request.
 ///
 /// [position] is measured from the beginning of the audio rendered for
-/// [requestId], rather than from the current platform playlist item.
+/// [requestKey], rather than from the current platform playlist item.
 final class TtsPlaybackPositionEvent {
   const TtsPlaybackPositionEvent({
-    required this.requestId,
+    required this.requestKey,
     required this.playbackId,
     required this.position,
   });
 
-  final String requestId;
+  final String requestKey;
   final String playbackId;
   final Duration position;
 }

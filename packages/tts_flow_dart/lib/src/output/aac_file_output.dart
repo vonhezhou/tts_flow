@@ -48,7 +48,7 @@ final class AacFileOutput implements TtsOutput {
       throw TtsError(
         code: TtsErrorCode.unsupportedFormat,
         message: 'AacFileOutput only accepts AAC audio format.',
-        requestId: session.requestId,
+        requestKey: session.requestKey,
       );
     }
 
@@ -76,8 +76,8 @@ final class AacFileOutput implements TtsOutput {
     if (session == null || sink == null) {
       throw StateError('AacFileOutput session is not initialized.');
     }
-    if (chunk.requestId != session.requestId) {
-      throw StateError('Chunk requestId does not match active session.');
+    if (chunk.requestKey != session.requestKey) {
+      throw StateError('Chunk requestKey does not match active session.');
     }
 
     if (chunk is! TtsAudioChunk) {
@@ -91,7 +91,7 @@ final class AacFileOutput implements TtsOutput {
       throw TtsError(
         code: TtsErrorCode.outputWriteFailed,
         message: 'Failed writing chunk to AAC output file.',
-        requestId: session.requestId,
+        requestKey: session.requestKey,
         cause: error,
       );
     }
@@ -111,7 +111,7 @@ final class AacFileOutput implements TtsOutput {
 
       final sessionHeader = await _readSessionHeader(
         tempFile,
-        requestId: session.requestId,
+        requestKey: session.requestKey,
       );
       final currentTargetHeader = await _readTargetHeader(targetFile);
       final lockedHeader = _state.lockedHeader;
@@ -128,7 +128,7 @@ final class AacFileOutput implements TtsOutput {
         _warnIfChanged(
           existing: currentTargetHeader,
           incoming: sessionHeader,
-          requestId: session.requestId,
+          requestKey: session.requestKey,
         );
       }
 
@@ -146,7 +146,7 @@ final class AacFileOutput implements TtsOutput {
       final fileSize = await targetFile.length();
 
       return FileAudioArtifact(
-        requestId: session.requestId,
+        requestKey: session.requestKey,
         audioSpec: session.audioSpec,
         filePath: targetFile.path,
         fileSizeBytes: fileSize,
@@ -159,7 +159,7 @@ final class AacFileOutput implements TtsOutput {
       throw TtsError(
         code: TtsErrorCode.outputWriteFailed,
         message: 'Failed finalizing AAC output file.',
-        requestId: session.requestId,
+        requestKey: session.requestKey,
         cause: error,
       );
     } finally {
@@ -182,7 +182,7 @@ final class AacFileOutput implements TtsOutput {
   void _warnIfChanged({
     required AdtsFrameHeader existing,
     required AdtsFrameHeader incoming,
-    required String requestId,
+    required String requestKey,
   }) {
     if (existing.samplingFrequencyIndex != incoming.samplingFrequencyIndex) {
       final existingHz =
@@ -192,7 +192,7 @@ final class AacFileOutput implements TtsOutput {
       _log.warning(
         'AacFileOutput[$outputId]: sample rate changed from $existingHz Hz '
         'to $incomingHz Hz while appending to $filePath '
-        '(requestId: $requestId). The resulting file may not play correctly '
+        '(requestKey: $requestKey). The resulting file may not play correctly '
         'on all decoders.',
       );
     }
@@ -203,7 +203,7 @@ final class AacFileOutput implements TtsOutput {
       _log.warning(
         'AacFileOutput[$outputId]: channel count changed from $existingCh '
         'to $incomingCh while appending to $filePath '
-        '(requestId: $requestId). The resulting file may not play correctly '
+        '(requestKey: $requestKey). The resulting file may not play correctly '
         'on all decoders.',
       );
     }
@@ -228,7 +228,7 @@ final class AacFileOutput implements TtsOutput {
 
   Future<AdtsFrameHeader> _readSessionHeader(
     File tempFile, {
-    required String requestId,
+    required String requestKey,
   }) async {
     try {
       final probe = Uint8List.fromList(
@@ -239,7 +239,7 @@ final class AacFileOutput implements TtsOutput {
       throw TtsError(
         code: TtsErrorCode.outputWriteFailed,
         message: 'Session AAC output does not contain a valid ADTS header.',
-        requestId: requestId,
+        requestKey: requestKey,
         cause: error,
       );
     }

@@ -38,7 +38,7 @@ class _TtsFlowExamplePageState extends State<TtsFlowExamplePage> {
   var _isBusy = false;
   var _isPaused = false;
   var _requestCounter = 0;
-  String? _playbackRequestId;
+  TtsRequestHandle? _playbackRequest;
   var _status = 'Initializing TtsFlow...';
 
   Duration _backendPos = Duration.zero;
@@ -209,26 +209,26 @@ class _TtsFlowExamplePageState extends State<TtsFlowExamplePage> {
 
   void _onQueueEvent(TtsQueueEvent event) {
     _log.fine(
-      'queue event type=${event.type.name} len=${event.queueLength} req=${event.requestId ?? '-'}',
+      'queue event type=${event.type.name} len=${event.queueLength} req=${event.requestKey ?? '-'}',
     );
     _pushEvent(
-      'queue ${event.type.name} len=${event.queueLength} req=${event.requestId ?? '-'}',
+      'queue ${event.type.name} len=${event.queueLength} req=${event.requestKey ?? '-'}',
     );
   }
 
   void _onRequestEvent(TtsRequestEvent event) {
     _log.fine(
-      'request event type=${event.type.name} req=${event.requestId} playback=${event.playbackId ?? '-'}',
+      'request event type=${event.type.name} req=${event.requestKey} playback=${event.playbackId ?? '-'}',
     );
     _pushEvent(
-      'request ${event.type.name} req=${event.requestId} playback=${event.playbackId ?? '-'}',
+      'request ${event.type.name} req=${event.requestKey} playback=${event.playbackId ?? '-'}',
     );
-    if (event.requestId == _playbackRequestId &&
+    if (event.requestKey == _playbackRequest?.requestKey &&
         (event.type == TtsRequestEventType.requestPlaybackCompleted ||
             event.type == TtsRequestEventType.requestPlaybackFailed ||
             event.type == TtsRequestEventType.requestPlaybackStopped ||
             event.type == TtsRequestEventType.requestSynthesisStopped)) {
-      _playbackRequestId = null;
+      _playbackRequest = null;
     }
   }
 
@@ -244,22 +244,31 @@ class _TtsFlowExamplePageState extends State<TtsFlowExamplePage> {
       _status = 'Synthesizing and playing...';
     });
 
-    final requestId = 'flutter-example-${++_requestCounter}';
-    _playbackRequestId = requestId;
-    _log.info('Starting speech request $requestId with ${text.length} chars.');
+    final utteranceId = 'flutter-example-${++_requestCounter}';
+    final request = service.speak(text, utteranceId: utteranceId);
+    _playbackRequest = request;
+    _log.info(
+      'Starting speech request ${request.requestKey} with ${text.length} chars.',
+    );
 
     try {
-      final chunks = await service.speak(requestId, text).toList();
+      final chunks = await request.toList();
       if (!mounted) {
         return;
       }
-      _log.info('Finished request $requestId with ${chunks.length} chunks.');
+      _log.info(
+        'Finished request ${request.requestKey} with ${chunks.length} chunks.',
+      );
       setState(() {
         _status =
-            'Finished request $requestId. Engine emitted ${chunks.length} chunks.';
+            'Finished request ${request.requestKey}. Engine emitted ${chunks.length} chunks.';
       });
     } catch (error, stackTrace) {
-      _log.severe('Speak failed for request $requestId.', error, stackTrace);
+      _log.severe(
+        'Speak failed for request ${request.requestKey}.',
+        error,
+        stackTrace,
+      );
       if (!mounted) {
         return;
       }
@@ -281,11 +290,11 @@ class _TtsFlowExamplePageState extends State<TtsFlowExamplePage> {
       return;
     }
     _log.info('Stopping current request.');
-    final requestId = _playbackRequestId;
-    if (requestId != null && service.hasActivePlayback(requestId)) {
-      await service.stopPlayback(requestId);
+    final request = _playbackRequest;
+    if (request?.hasActivePlayback ?? false) {
+      await request!.stopPlayback();
     }
-    await service.stopActiveSynthesis();
+    await request?.stopSynthesis();
     if (!mounted) {
       return;
     }
@@ -302,13 +311,11 @@ class _TtsFlowExamplePageState extends State<TtsFlowExamplePage> {
     }
 
     final service = _service;
-    final requestId = _playbackRequestId;
-    if (service == null ||
-        requestId == null ||
-        !service.hasActivePlayback(requestId)) {
+    final request = _playbackRequest;
+    if (service == null || request == null || !request.hasActivePlayback) {
       return;
     }
-    await service.pausePlayback(requestId);
+    await request.pausePlayback();
     if (!mounted) {
       return;
     }
@@ -324,13 +331,11 @@ class _TtsFlowExamplePageState extends State<TtsFlowExamplePage> {
     }
 
     final service = _service;
-    final requestId = _playbackRequestId;
-    if (service == null ||
-        requestId == null ||
-        !service.hasActivePlayback(requestId)) {
+    final request = _playbackRequest;
+    if (service == null || request == null || !request.hasActivePlayback) {
       return;
     }
-    await service.resumePlayback(requestId);
+    await request.resumePlayback();
     if (!mounted) {
       return;
     }

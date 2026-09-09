@@ -49,13 +49,15 @@ mixin TtsOptionsMixin {
 
   @protected
   TtsRequest buildRequest({
-    required String requestId,
+    required String requestKey,
+    required String utteranceId,
     required String text,
     required Map<String, Object> params,
     TtsOutput? output,
   }) {
     return TtsRequest(
-      requestId: requestId,
+      requestKey: requestKey,
+      utteranceId: utteranceId,
       text: text,
       voice: voice,
       preferredFormat: preferredFormat,

@@ -107,7 +107,7 @@ void main() {
     group('consumeChunk', () {
       test('throws when session not initialized', () async {
         final chunk = TtsAudioChunk(
-          requestId: 'test-request',
+          requestKey: 'test-request',
           sequenceNumber: 0,
           bytes: Uint8List.fromList([1, 2, 3]),
           audioSpec: const TtsAudioSpec.mp3(),

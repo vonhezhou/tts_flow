@@ -9,13 +9,13 @@ final class ReadingHighlight {
   const ReadingHighlight({
     required this.startOffset,
     required this.endOffset,
-    required this.requestId,
+    required this.requestKey,
     required this.isEstimated,
   });
 
   final int startOffset;
   final int endOffset;
-  final String requestId;
+  final String requestKey;
 
   /// True when the provider gave no sentence timing and the full request is
   /// highlighted as the documented fallback.
@@ -45,6 +45,7 @@ final class ReadingSession {
   final Map<String, List<TtsSentenceCue>> _cues =
       <String, List<TtsSentenceCue>>{};
   final Map<String, Duration> _positions = <String, Duration>{};
+  final List<TtsRequestHandle> _requestHandles = <TtsRequestHandle>[];
   final List<StreamSubscription<TtsChunk>> _synthesisSubscriptions =
       <StreamSubscription<TtsChunk>>[];
   StreamSubscription<TtsPlaybackPositionEvent>? _timelineSubscription;
@@ -58,13 +59,16 @@ final class ReadingSession {
     _sessionNumber++;
     final planned = planReadingRequests(
       text: text,
-      requestIdPrefix: 'reader-$_sessionNumber',
+      utteranceIdPrefix: 'reader-$_sessionNumber',
     );
     for (final request in planned) {
-      _requests[request.requestId] = request;
-      final subscription = _flow.speak(request.requestId, request.text).listen((
-        chunk,
-      ) {
+      final handle = _flow.speak(
+        request.text,
+        utteranceId: request.utteranceId,
+      );
+      _requestHandles.add(handle);
+      _requests[handle.requestKey] = request;
+      final subscription = handle.listen((chunk) {
         if (chunk is TtsSentenceCueChunk) {
           _storeCues(chunk);
         }
@@ -74,17 +78,20 @@ final class ReadingSession {
   }
 
   Future<void> stop() async {
-    await _flow.stopActiveSynthesis();
+    for (final handle in _requestHandles) {
+      await handle.stopSynthesis();
+    }
     await _flow.clearQueue();
-    for (final requestId in _requests.keys) {
-      if (_flow.hasActivePlayback(requestId)) {
-        await _flow.stopPlayback(requestId);
+    for (final handle in _requestHandles) {
+      if (handle.hasActivePlayback) {
+        await handle.stopPlayback();
       }
     }
     for (final subscription in _synthesisSubscriptions) {
       await subscription.cancel();
     }
     _synthesisSubscriptions.clear();
+    _requestHandles.clear();
     _requests.clear();
     _cues.clear();
     _positions.clear();
@@ -92,35 +99,35 @@ final class ReadingSession {
   }
 
   void _storeCues(TtsSentenceCueChunk chunk) {
-    final cues = _cues.putIfAbsent(chunk.requestId, () => <TtsSentenceCue>[]);
+    final cues = _cues.putIfAbsent(chunk.requestKey, () => <TtsSentenceCue>[]);
     cues
       ..addAll(chunk.cues)
       ..sort((a, b) => a.audioStart.compareTo(b.audioStart));
-    final currentPosition = _positions[chunk.requestId];
+    final currentPosition = _positions[chunk.requestKey];
     if (currentPosition != null) {
-      _updateHighlight(chunk.requestId, currentPosition);
+      _updateHighlight(chunk.requestKey, currentPosition);
     }
   }
 
   void _onPlaybackPosition(TtsPlaybackPositionEvent event) {
-    if (!_requests.containsKey(event.requestId)) {
+    if (!_requests.containsKey(event.requestKey)) {
       return;
     }
-    _positions[event.requestId] = event.position;
-    _updateHighlight(event.requestId, event.position);
+    _positions[event.requestKey] = event.position;
+    _updateHighlight(event.requestKey, event.position);
   }
 
   void _onRequestEvent(TtsRequestEvent event) {
     if (event.type != TtsRequestEventType.requestStarted) {
       return;
     }
-    final request = _requests[event.requestId];
+    final request = _requests[event.requestKey];
     if (request == null) {
       return;
     }
     _setHighlight(
       ReadingHighlight(
-        requestId: event.requestId,
+        requestKey: event.requestKey,
         startOffset: request.documentStartOffset,
         endOffset: request.documentStartOffset + request.text.length,
         isEstimated: true,
@@ -128,16 +135,16 @@ final class ReadingSession {
     );
   }
 
-  void _updateHighlight(String requestId, Duration position) {
-    final request = _requests[requestId];
+  void _updateHighlight(String requestKey, Duration position) {
+    final request = _requests[requestKey];
     if (request == null) {
       return;
     }
-    final cues = _cues[requestId];
+    final cues = _cues[requestKey];
     if (cues == null || cues.isEmpty) {
       _setHighlight(
         ReadingHighlight(
-          requestId: requestId,
+          requestKey: requestKey,
           startOffset: request.documentStartOffset,
           endOffset: request.documentStartOffset + request.text.length,
           isEstimated: true,
@@ -158,7 +165,7 @@ final class ReadingSession {
     }
     _setHighlight(
       ReadingHighlight(
-        requestId: requestId,
+        requestKey: requestKey,
         startOffset: request.documentStartOffset + selected.startOffset,
         endOffset: request.documentStartOffset + selected.endOffset,
         isEstimated: false,
@@ -168,7 +175,7 @@ final class ReadingSession {
 
   void _setHighlight(ReadingHighlight next) {
     final current = highlight.value;
-    if (current?.requestId == next.requestId &&
+    if (current?.requestKey == next.requestKey &&
         current?.startOffset == next.startOffset &&
         current?.endOffset == next.endOffset &&
         current?.isEstimated == next.isEstimated) {

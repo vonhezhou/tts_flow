@@ -13,13 +13,13 @@ class _MockAudioPlayer extends Mock implements AudioPlayer {}
 class _FakeAudioSource extends Fake implements AudioSource {}
 
 TtsAudioChunk _audioChunk({
-  required String requestId,
+  required String requestKey,
   required int sequenceNumber,
   required List<int> bytes,
 }) {
   return TtsAudioChunk(
     bytes: Uint8List.fromList(bytes),
-    requestId: requestId,
+    requestKey: requestKey,
     sequenceNumber: sequenceNumber,
     isLastChunk: false,
     timestamp: DateTime.now(),
@@ -120,7 +120,7 @@ void main() {
         addTearDown(backend.dispose);
 
         final firstPlaybackId = await backend.startPlayback(
-          requestId: 'r1',
+          requestKey: 'r1',
           audioSpec: const TtsAudioSpec.mp3(),
         );
 
@@ -128,7 +128,7 @@ void main() {
           playbackId: firstPlaybackId,
           chunk: TtsAudioChunk(
             bytes: Uint8List.fromList([1, 2, 3]),
-            requestId: '',
+            requestKey: '',
             sequenceNumber: 0,
             isLastChunk: false,
             timestamp: DateTime.now(),
@@ -145,14 +145,14 @@ void main() {
         expect(firstSource.isTerminalSegment, isTrue);
 
         final secondPlaybackId = await backend.startPlayback(
-          requestId: 'r2',
+          requestKey: 'r2',
           audioSpec: const TtsAudioSpec.mp3(),
         );
         await backend.appendChunk(
           playbackId: secondPlaybackId,
           chunk: TtsAudioChunk(
             bytes: Uint8List.fromList([9]),
-            requestId: '',
+            requestKey: '',
             sequenceNumber: 0,
             isLastChunk: true,
             timestamp: DateTime.now(),
@@ -178,14 +178,14 @@ void main() {
       });
 
       final playbackId = await backend.startPlayback(
-        requestId: 'non-blocking-play',
+        requestKey: 'non-blocking-play',
         audioSpec: const TtsAudioSpec.mp3(),
       );
       await backend
           .appendChunk(
             playbackId: playbackId,
             chunk: _audioChunk(
-              requestId: 'non-blocking-play',
+              requestKey: 'non-blocking-play',
               sequenceNumber: 0,
               bytes: [1, 2],
             ),
@@ -224,14 +224,14 @@ void main() {
         addTearDown(sourceStartedSub.cancel);
 
         final playbackId = await backend.startPlayback(
-          requestId: 'r1',
+          requestKey: 'r1',
           audioSpec: const TtsAudioSpec.mp3(),
         );
         await backend.appendChunk(
           playbackId: playbackId,
           chunk: TtsAudioChunk(
             bytes: Uint8List.fromList([1, 2]),
-            requestId: 'r1',
+            requestKey: 'r1',
             sequenceNumber: 0,
             isLastChunk: false,
             timestamp: DateTime.now(),
@@ -260,7 +260,7 @@ void main() {
           playbackId: playbackId,
           chunk: TtsAudioChunk(
             bytes: Uint8List.fromList([3, 4]),
-            requestId: 'r1',
+            requestKey: 'r1',
             sequenceNumber: 1,
             isLastChunk: true,
             timestamp: DateTime.now(),
@@ -303,13 +303,13 @@ void main() {
         addTearDown(completedSub.cancel);
 
         final playbackId = await backend.startPlayback(
-          requestId: 'continuous',
+          requestKey: 'continuous',
           audioSpec: const TtsAudioSpec.mp3(),
         );
         await backend.appendChunk(
           playbackId: playbackId,
           chunk: _audioChunk(
-            requestId: 'continuous',
+            requestKey: 'continuous',
             sequenceNumber: 0,
             bytes: [1, 2],
           ),
@@ -320,7 +320,7 @@ void main() {
         await backend.appendChunk(
           playbackId: playbackId,
           chunk: _audioChunk(
-            requestId: 'continuous',
+            requestKey: 'continuous',
             sequenceNumber: 1,
             bytes: [3, 4],
           ),
@@ -348,14 +348,14 @@ void main() {
         addTearDown(backend.dispose);
 
         final playbackId = await backend.startPlayback(
-          requestId: 'r1',
+          requestKey: 'r1',
           audioSpec: const TtsAudioSpec.mp3(),
         );
         await backend.appendChunk(
           playbackId: playbackId,
           chunk: TtsAudioChunk(
             bytes: Uint8List.fromList([1]),
-            requestId: '',
+            requestKey: '',
             sequenceNumber: 0,
             isLastChunk: false,
             timestamp: DateTime.now(),
@@ -386,14 +386,14 @@ void main() {
       addTearDown(backendFailureSub.cancel);
 
       final playbackId = await backend.startPlayback(
-        requestId: 'r1',
+        requestKey: 'r1',
         audioSpec: const TtsAudioSpec.mp3(),
       );
       await backend.appendChunk(
         playbackId: playbackId,
         chunk: TtsAudioChunk(
           bytes: Uint8List.fromList([1, 2]),
-          requestId: 'r1',
+          requestKey: 'r1',
           sequenceNumber: 0,
           isLastChunk: false,
           timestamp: DateTime.now(),
@@ -407,10 +407,10 @@ void main() {
 
       expect(events, hasLength(1));
       expect(events.single.playbackId, playbackId);
-      expect(events.single.requestId, 'r1');
+      expect(events.single.requestKey, 'r1');
       expect(events.single.error.message, 'decode failed');
       expect(backendFailureEvents, hasLength(1));
-      expect(backendFailureEvents.single.requestId, 'r1');
+      expect(backendFailureEvents.single.requestKey, 'r1');
       expect(
         backendFailureEvents.single.error.code,
         TtsErrorCode.outputPlaybackFailed,
@@ -427,14 +427,14 @@ void main() {
       addTearDown(sub.cancel);
 
       final playbackId = await backend.startPlayback(
-        requestId: 'r1',
+        requestKey: 'r1',
         audioSpec: const TtsAudioSpec.mp3(),
       );
       await backend.appendChunk(
         playbackId: playbackId,
         chunk: TtsAudioChunk(
           bytes: Uint8List.fromList([1, 2]),
-          requestId: '',
+          requestKey: '',
           sequenceNumber: 0,
           isLastChunk: false,
           timestamp: DateTime.now(),
@@ -450,7 +450,7 @@ void main() {
       await Future<void>.delayed(Duration.zero);
 
       expect(events, hasLength(1));
-      expect(events.single.requestId, 'r1');
+      expect(events.single.requestKey, 'r1');
       expect(events.single.playbackId, playbackId);
       expect(sources, isEmpty);
       await expectLater(
@@ -466,14 +466,14 @@ void main() {
         addTearDown(backend.dispose);
 
         final firstPlaybackId = await backend.startPlayback(
-          requestId: 'r1',
+          requestKey: 'r1',
           audioSpec: const TtsAudioSpec.mp3(),
         );
         await backend.appendChunk(
           playbackId: firstPlaybackId,
           chunk: TtsAudioChunk(
             bytes: Uint8List.fromList([1, 2]),
-            requestId: '',
+            requestKey: '',
             sequenceNumber: 0,
             isLastChunk: false,
             timestamp: DateTime.now(),
@@ -483,14 +483,14 @@ void main() {
         await backend.finalizePlayback(playbackId: firstPlaybackId);
 
         final secondPlaybackId = await backend.startPlayback(
-          requestId: 'r2',
+          requestKey: 'r2',
           audioSpec: const TtsAudioSpec.mp3(),
         );
         await backend.appendChunk(
           playbackId: secondPlaybackId,
           chunk: TtsAudioChunk(
             bytes: Uint8List.fromList([9, 8]),
-            requestId: '',
+            requestKey: '',
             sequenceNumber: 0,
             isLastChunk: true,
             timestamp: DateTime.now(),
@@ -524,14 +524,14 @@ void main() {
         addTearDown(backend.dispose);
 
         final firstPlaybackId = await backend.startPlayback(
-          requestId: 'r1',
+          requestKey: 'r1',
           audioSpec: const TtsAudioSpec.mp3(),
         );
         await backend.appendChunk(
           playbackId: firstPlaybackId,
           chunk: TtsAudioChunk(
             bytes: Uint8List.fromList([1, 2]),
-            requestId: '',
+            requestKey: '',
             sequenceNumber: 0,
             isLastChunk: false,
             timestamp: DateTime.now(),
@@ -540,14 +540,14 @@ void main() {
         );
 
         final secondPlaybackId = await backend.startPlayback(
-          requestId: 'r2',
+          requestKey: 'r2',
           audioSpec: const TtsAudioSpec.mp3(),
         );
         await backend.appendChunk(
           playbackId: secondPlaybackId,
           chunk: TtsAudioChunk(
             bytes: Uint8List.fromList([9]),
-            requestId: '',
+            requestKey: '',
             sequenceNumber: 0,
             isLastChunk: true,
             timestamp: DateTime.now(),
@@ -584,7 +584,7 @@ void main() {
       addTearDown(sub.cancel);
 
       final playbackId = await backend.startPlayback(
-        requestId: 'r1',
+        requestKey: 'r1',
         audioSpec: const TtsAudioSpec.mp3(),
       );
 
@@ -592,7 +592,7 @@ void main() {
         playbackId: playbackId,
         chunk: TtsAudioChunk(
           bytes: Uint8List.fromList([1, 2]),
-          requestId: 'r1',
+          requestKey: 'r1',
           sequenceNumber: 0,
           isLastChunk: false,
           timestamp: DateTime.now(),
@@ -615,7 +615,7 @@ void main() {
         playbackId: playbackId,
         chunk: TtsAudioChunk(
           bytes: Uint8List.fromList([3, 4]),
-          requestId: 'r1',
+          requestKey: 'r1',
           sequenceNumber: 1,
           isLastChunk: true,
           timestamp: DateTime.now(),
@@ -632,8 +632,8 @@ void main() {
       expect(positions, [
         isA<TtsPlaybackPositionEvent>()
             .having(
-              (event) => event.requestId,
-              'requestId',
+              (event) => event.requestKey,
+              'requestKey',
               'r1',
             )
             .having(
@@ -643,8 +643,8 @@ void main() {
             ),
         isA<TtsPlaybackPositionEvent>()
             .having(
-              (event) => event.requestId,
-              'requestId',
+              (event) => event.requestKey,
+              'requestKey',
               'r1',
             )
             .having(

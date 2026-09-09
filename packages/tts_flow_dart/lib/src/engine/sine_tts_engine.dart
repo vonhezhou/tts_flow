@@ -144,7 +144,7 @@ final class SineTtsEngine with TtsEngineDefaults implements TtsEngine {
       }
 
       yield TtsAudioChunk(
-        requestId: request.requestId,
+        requestKey: request.requestKey,
         sequenceNumber: i,
         bytes: chunkBytes,
         audioSpec: resolvedFormat,

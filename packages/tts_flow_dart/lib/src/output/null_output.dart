@@ -38,8 +38,8 @@ final class NullOutput implements TtsOutput {
     if (session == null) {
       throw StateError('NullOutput session is not initialized.');
     }
-    if (chunk.requestId != session.requestId) {
-      throw StateError('Chunk requestId does not match active session.');
+    if (chunk.requestKey != session.requestKey) {
+      throw StateError('Chunk requestKey does not match active session.');
     }
   }
 
@@ -51,7 +51,7 @@ final class NullOutput implements TtsOutput {
     }
     _session = null;
     return InMemoryAudioArtifact(
-      requestId: session.requestId,
+      requestKey: session.requestKey,
       audioSpec: session.audioSpec,
       audioBytes: Uint8List(0),
       totalBytes: 0,

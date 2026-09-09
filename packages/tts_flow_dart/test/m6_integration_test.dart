@@ -23,7 +23,7 @@ void main() {
         service.preferredFormat = TtsAudioFormat.pcm;
 
         final chunks = await service
-            .speak('i-1', 'integration sample text')
+            .speak('integration sample text', utteranceId: 'i-1')
             .toList();
 
         expect(chunks, isNotEmpty);
@@ -52,12 +52,12 @@ void main() {
       final canceledIds = <String>[];
       final sub = service.requestEvents.listen((event) {
         if (event.type == TtsRequestEventType.requestCanceled) {
-          canceledIds.add(event.requestId);
+          canceledIds.add(event.utteranceId);
         }
       });
 
-      final first = service.speak('fail-1', 'this request fails');
-      final second = service.speak('fail-2', 'should be canceled');
+      final first = service.speak('this request fails', utteranceId: 'fail-1');
+      final second = service.speak('should be canceled', utteranceId: 'fail-2');
 
       await expectLater(first.toList(), throwsA(isA<TtsError>()));
       expect(await second.toList(), isEmpty);
@@ -96,7 +96,7 @@ void main() {
           service.preferredFormat = TtsAudioFormat.pcm;
 
           final chunks = await service
-              .speak('fanout-m6-1', 'fanout integration request')
+              .speak('fanout integration request', utteranceId: 'fanout-m6-1')
               .toList();
 
           expect(chunks, isNotEmpty);
@@ -156,16 +156,16 @@ final class _FailingEngine with TtsEngineDefaults implements TtsEngine {
     SynthesisControl control,
     TtsAudioSpec resolvedFormat,
   ) async* {
-    if (request.requestId == 'fail-1') {
+    if (request.utteranceId == 'fail-1') {
       throw const TtsError(
         code: TtsErrorCode.networkError,
         message: 'Injected test failure.',
-        requestId: 'fail-1',
+        requestKey: 'fail-1',
       );
     }
 
     yield TtsAudioChunk(
-      requestId: request.requestId,
+      requestKey: request.requestKey,
       sequenceNumber: 0,
       bytes: Uint8List.fromList([1]),
       audioSpec: resolvedFormat,

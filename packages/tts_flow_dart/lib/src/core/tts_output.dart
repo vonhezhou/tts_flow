@@ -45,7 +45,7 @@ abstract interface class TtsOutput {
   /// Starts a new request-scoped output session.
   ///
   /// Implementations should reset per-request state and prepare the sink for
-  /// chunks that belong to [session.requestId].
+  /// chunks that belong to [session.requestKey].
   Future<void> initSession(TtsOutputSession session);
 
   /// Consumes one synthesized [chunk] for the active session.
@@ -95,23 +95,23 @@ abstract interface class PlaybackFailureAwareOutput {
 /// playback state.
 abstract interface class PlaybackControllableOutput
     implements PlaybackAwareOutput, PlaybackFailureAwareOutput {
-  /// Whether [requestId] still has physical playback that can be controlled.
-  bool hasActivePlayback(String requestId);
+  /// Whether [requestKey] still has physical playback that can be controlled.
+  bool hasActivePlayback(String requestKey);
 
-  Future<void> pausePlayback(String requestId);
-  Future<void> resumePlayback(String requestId);
-  Future<void> stopPlayback(String requestId);
+  Future<void> pausePlayback(String requestKey);
+  Future<void> resumePlayback(String requestKey);
+  Future<void> stopPlayback(String requestKey);
 }
 
 final class TtsOutputPlaybackCompletedEvent {
   const TtsOutputPlaybackCompletedEvent({
-    required this.requestId,
+    required this.requestKey,
     required this.outputId,
     required this.playbackId,
     this.playedDuration,
   });
 
-  final String requestId;
+  final String requestKey;
   final String outputId;
   final String playbackId;
 
@@ -122,13 +122,13 @@ final class TtsOutputPlaybackCompletedEvent {
 
 final class TtsOutputPlaybackFailedEvent {
   const TtsOutputPlaybackFailedEvent({
-    required this.requestId,
+    required this.requestKey,
     required this.outputId,
     required this.playbackId,
     required this.error,
   });
 
-  final String requestId;
+  final String requestKey;
   final String outputId;
   final String playbackId;
 

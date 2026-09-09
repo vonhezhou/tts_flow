@@ -20,14 +20,14 @@ void main() {
       final started = <String>[];
       final sub = service.requestEvents.listen((event) {
         if (event.type == TtsRequestEventType.requestStarted) {
-          started.add(event.requestId);
+          started.add(event.utteranceId);
         }
       });
 
       await service.init();
 
-      final streamA = service.speak('a', 'first request payload');
-      final streamB = service.speak('b', 'second request payload');
+      final streamA = service.speak('first request payload', utteranceId: 'a');
+      final streamB = service.speak('second request payload', utteranceId: 'b');
 
       await streamA.toList();
       await streamB.toList();
@@ -35,6 +35,62 @@ void main() {
 
       expect(started, ['a', 'b']);
       await sub.cancel();
+      await service.dispose();
+    });
+
+    test('reused utterance IDs retain distinct request handles', () async {
+      final service = TtsFlow(
+        engine: SineTtsEngine(
+          engineId: 'fake-engine',
+          supportsStreaming: true,
+          chunkCount: 1,
+        ),
+        defaultOutput: NullOutput(),
+      );
+      final started = <TtsRequestEvent>[];
+      final subscription = service.requestEvents
+          .where((event) => event.type == TtsRequestEventType.requestStarted)
+          .listen(started.add);
+
+      await service.init();
+      final first = service.speak('first', utteranceId: 'shared-label');
+      final second = service.speak('second', utteranceId: 'shared-label');
+      final firstHandleEvents = first.events.toList();
+
+      expect(first.requestKey, isNot(second.requestKey));
+      expect(first.utteranceId, 'shared-label');
+      expect(second.utteranceId, 'shared-label');
+      await first.toList();
+      await second.toList();
+      final firstEvents = await firstHandleEvents;
+
+      expect(started, hasLength(2));
+      expect(
+        started.map((event) => event.utteranceId),
+        everyElement('shared-label'),
+      );
+      expect(started.map((event) => event.requestKey).toSet(), {
+        first.requestKey,
+        second.requestKey,
+      });
+      expect(
+        firstEvents.map((event) => event.type),
+        containsAll(<TtsRequestEventType>[
+          TtsRequestEventType.requestQueued,
+          TtsRequestEventType.requestStarted,
+          TtsRequestEventType.requestSynthesisCompleted,
+        ]),
+      );
+      expect(
+        firstEvents.every(
+          (event) =>
+              event.requestKey == first.requestKey &&
+              event.utteranceId == first.utteranceId,
+        ),
+        isTrue,
+      );
+
+      await subscription.cancel();
       await service.dispose();
     });
 
@@ -51,8 +107,8 @@ void main() {
 
       await service.init();
 
-      final active = service.speak('active', 'active request');
-      final pending = service.speak('pending', 'pending request');
+      final active = service.speak('active request', utteranceId: 'active');
+      final pending = service.speak('pending request', utteranceId: 'pending');
 
       await Future<void>.delayed(const Duration(milliseconds: 8));
       final clearedCount = await service.clearQueue();
@@ -83,10 +139,10 @@ void main() {
         await service.init();
 
         final longStream = service.speak(
-          'long',
           'this is a long request payload',
+          utteranceId: 'long',
         );
-        final nextStream = service.speak('next', 'next request');
+        final nextStream = service.speak('next request', utteranceId: 'next');
 
         await Future<void>.delayed(const Duration(milliseconds: 12));
         await service.stopActiveSynthesis();
@@ -97,7 +153,7 @@ void main() {
         expect(
           events.any(
             (event) =>
-                event.requestId == 'long' &&
+                event.utteranceId == 'long' &&
                 event.type == TtsRequestEventType.requestSynthesisStopped,
           ),
           isTrue,
@@ -105,7 +161,7 @@ void main() {
 
         final nextStartedIndex = events.indexWhere(
           (event) =>
-              event.requestId == 'next' &&
+              event.utteranceId == 'next' &&
               event.type == TtsRequestEventType.requestStarted,
         );
         expect(nextStartedIndex, isNonNegative);
@@ -143,7 +199,10 @@ void main() {
 
         await service.init();
 
-        final stream = service.speak('output-fail', 'fail through output');
+        final stream = service.speak(
+          'fail through output',
+          utteranceId: 'output-fail',
+        );
 
         await expectLater(stream.toList(), throwsA(isA<TtsError>()));
         await Future<void>.delayed(const Duration(milliseconds: 20));
@@ -171,7 +230,9 @@ void main() {
       await service.init();
       service.preferredFormat = TtsAudioFormat.pcm;
 
-      final chunks = await service.speak('chunk-spec-init', 'hello').toList();
+      final chunks = await service
+          .speak('hello', utteranceId: 'chunk-spec-init')
+          .toList();
 
       expect(chunks, hasLength(1));
       expect(chunks.single, isA<TtsAudioChunk>());
@@ -206,7 +267,10 @@ void main() {
 
         await service.init();
 
-        final stream = service.speak('pcm-disjoint', 'disjoint constraints');
+        final stream = service.speak(
+          'disjoint constraints',
+          utteranceId: 'pcm-disjoint',
+        );
 
         await expectLater(
           stream.toList(),
@@ -231,9 +295,9 @@ void main() {
           chunkCount: 2,
           chunkDelay: const Duration(milliseconds: 2),
         ),
-        defaultOutput: _FailByRequestIdOutput(
+        defaultOutput: _FailFirstOutput(
           outputId: 'selective-fail',
-          failingRequestIds: {'first'},
+          remainingFailures: 1,
         ),
         config: const TtsFlowConfig(
           queueFailurePolicy: TtsQueueFailurePolicy.continueOnError,
@@ -245,8 +309,11 @@ void main() {
 
       await service.init();
 
-      final first = service.speak('first', 'this will fail');
-      final second = service.speak('second', 'this should still run');
+      final first = service.speak('this will fail', utteranceId: 'first');
+      final second = service.speak(
+        'this should still run',
+        utteranceId: 'second',
+      );
 
       await expectLater(first.toList(), throwsA(isA<TtsError>()));
       final secondChunks = await second.toList();
@@ -255,7 +322,7 @@ void main() {
       expect(
         events.any(
           (event) =>
-              event.requestId == 'second' &&
+              event.utteranceId == 'second' &&
               event.type == TtsRequestEventType.requestSynthesisCompleted,
         ),
         isTrue,
@@ -279,7 +346,7 @@ void main() {
       final started = <String>[];
       final sub = service.requestEvents.listen((event) {
         if (event.type == TtsRequestEventType.requestStarted) {
-          started.add(event.requestId);
+          started.add(event.utteranceId);
         }
       });
 
@@ -288,8 +355,8 @@ void main() {
       await service.pauseQueue();
       expect(service.isQueuePaused, isTrue);
 
-      final first = service.speak('paused-1', 'first queued');
-      final second = service.speak('paused-2', 'second queued');
+      final first = service.speak('first queued', utteranceId: 'paused-1');
+      final second = service.speak('second queued', utteranceId: 'paused-2');
 
       await Future<void>.delayed(const Duration(milliseconds: 30));
       expect(started, isEmpty);
@@ -320,7 +387,10 @@ void main() {
 
       await service.init();
 
-      final longStream = service.speak('cancel-reason', 'long request');
+      final longStream = service.speak(
+        'long request',
+        utteranceId: 'cancel-reason',
+      );
 
       await Future<void>.delayed(const Duration(milliseconds: 12));
       await service.stopActiveSynthesis();
@@ -347,8 +417,8 @@ void main() {
         await service.init();
 
         final stream = service.speak(
-          'dispose-paused',
           'this request should be canceled by service dispose while paused',
+          utteranceId: 'dispose-paused',
         );
 
         await Future<void>.delayed(const Duration(milliseconds: 12));
@@ -393,8 +463,8 @@ void main() {
 
       final streamedChunks = await service
           .speak(
-            'defaults-applied',
             'request uses service defaults',
+            utteranceId: 'defaults-applied',
             params: const {'style': 'news', 'emotion': 'calm'},
           )
           .toList();
@@ -410,7 +480,7 @@ void main() {
       );
 
       expect(
-        () => service.speak('not-ready', 'call before init'),
+        () => service.speak('call before init', utteranceId: 'not-ready'),
         throwsStateError,
       );
 
@@ -438,18 +508,19 @@ void main() {
         final sub = service.requestEvents.listen(events.add);
 
         await service.init();
-        await service.speak('playback-split', 'hello').toList();
+        final request = service.speak('hello', utteranceId: 'playback-split');
+        await request.toList();
 
         await Future<void>.delayed(const Duration(milliseconds: 60));
 
         final completedIndex = events.indexWhere(
           (event) =>
-              event.requestId == 'playback-split' &&
+              event.utteranceId == 'playback-split' &&
               event.type == TtsRequestEventType.requestSynthesisCompleted,
         );
         final playbackCompletedIndex = events.indexWhere(
           (event) =>
-              event.requestId == 'playback-split' &&
+              event.utteranceId == 'playback-split' &&
               event.type == TtsRequestEventType.requestPlaybackCompleted,
         );
 
@@ -459,7 +530,7 @@ void main() {
         final playbackEvent =
             events[playbackCompletedIndex.clamp(0, events.length - 1)];
         expect(playbackEvent.outputId, 'playback-aware');
-        expect(playbackEvent.playbackId, 'playback-playback-split');
+        expect(playbackEvent.playbackId, 'playback-${request.requestKey}');
         expect(playbackEvent.playedDuration, isNotNull);
         expect(playbackEvent.playedDuration!, greaterThan(Duration.zero));
 
@@ -490,17 +561,18 @@ void main() {
         final sub = service.requestEvents.listen(events.add);
 
         await service.init();
-        await service.speak('playback-failed', 'hello').toList();
+        final request = service.speak('hello', utteranceId: 'playback-failed');
+        await request.toList();
         await Future<void>.delayed(const Duration(milliseconds: 60));
 
         final completedIndex = events.indexWhere(
           (event) =>
-              event.requestId == 'playback-failed' &&
+              event.utteranceId == 'playback-failed' &&
               event.type == TtsRequestEventType.requestSynthesisCompleted,
         );
         final playbackFailedIndex = events.indexWhere(
           (event) =>
-              event.requestId == 'playback-failed' &&
+              event.utteranceId == 'playback-failed' &&
               event.type == TtsRequestEventType.requestPlaybackFailed,
         );
 
@@ -510,7 +582,7 @@ void main() {
             events[playbackFailedIndex.clamp(0, events.length - 1)];
         expect(playbackEvent.state, isNull);
         expect(playbackEvent.outputId, 'playback-aware');
-        expect(playbackEvent.playbackId, 'playback-playback-failed');
+        expect(playbackEvent.playbackId, 'playback-${request.requestKey}');
         expect(playbackEvent.error?.code, TtsErrorCode.outputPlaybackFailed);
 
         await sub.cancel();
@@ -534,18 +606,19 @@ void main() {
         final sub = service.requestEvents.listen(events.add);
 
         await service.init();
-        await service.speak('playback-control', 'hello').drain();
+        final request = service.speak('hello', utteranceId: 'playback-control');
+        await request.drain();
 
-        expect(service.hasActivePlayback('playback-control'), isTrue);
-        await service.pausePlayback('playback-control');
-        await service.resumePlayback('playback-control');
-        await service.stopPlayback('playback-control');
+        expect(request.hasActivePlayback, isTrue);
+        await request.pausePlayback();
+        await request.resumePlayback();
+        await request.stopPlayback();
         await Future<void>.delayed(Duration.zero);
 
         expect(output.pauseCount, 1);
         expect(output.resumeCount, 1);
         expect(output.stopCount, 1);
-        expect(service.hasActivePlayback('playback-control'), isFalse);
+        expect(request.hasActivePlayback, isFalse);
         expect(
           events.map((event) => event.type),
           containsAll(<TtsRequestEventType>[
@@ -578,7 +651,11 @@ void main() {
         await service.init();
 
         final chunks = await service
-            .speak('override-1', 'override output test', output: overrideOutput)
+            .speak(
+              'override output test',
+              utteranceId: 'override-1',
+              output: overrideOutput,
+            )
             .toList();
 
         expect(chunks, isNotEmpty);
@@ -606,7 +683,11 @@ void main() {
       expect(overrideOutput.initCount, 0);
 
       await service
-          .speak('override-lifecycle', 'hello', output: overrideOutput)
+          .speak(
+            'hello',
+            utteranceId: 'override-lifecycle',
+            output: overrideOutput,
+          )
           .drain();
 
       expect(overrideOutput.initCount, 1);
@@ -630,8 +711,12 @@ void main() {
       );
 
       await service.init();
-      await service.speak('reused-1', 'first', output: output).drain();
-      await service.speak('reused-2', 'second', output: output).drain();
+      await service
+          .speak('first', utteranceId: 'reused-1', output: output)
+          .drain();
+      await service
+          .speak('second', utteranceId: 'reused-2', output: output)
+          .drain();
 
       expect(output.initCount, 1);
       expect(output.initSessionCount, 2);
@@ -664,11 +749,17 @@ void main() {
         await service.init();
 
         await expectLater(
-          service.speak('init-fails', 'first', output: failingOutput).drain(),
+          service
+              .speak('first', utteranceId: 'init-fails', output: failingOutput)
+              .drain(),
           throwsA(isA<TtsError>()),
         );
         await service
-            .speak('init-succeeds', 'second', output: succeedingOutput)
+            .speak(
+              'second',
+              utteranceId: 'init-succeeds',
+              output: succeedingOutput,
+            )
             .drain();
 
         expect(failingOutput.initCount, 1);
@@ -693,7 +784,7 @@ void main() {
       await service.init();
 
       expect(
-        () => service.speak('no-output', 'missing output'),
+        () => service.speak('missing output', utteranceId: 'no-output'),
         throwsA(
           isA<TtsError>()
               .having(
@@ -701,7 +792,7 @@ void main() {
                 'code',
                 TtsErrorCode.invalidRequest,
               )
-              .having((error) => error.requestId, 'requestId', 'no-output'),
+              .having((error) => error.requestKey, 'requestKey', isNotEmpty),
         ),
       );
 
@@ -725,8 +816,8 @@ void main() {
 
         final chunks = await service
             .speak(
-              'no-default-override',
               'no default, use override',
+              utteranceId: 'no-default-override',
               output: overrideOutput,
             )
             .toList();
@@ -778,16 +869,14 @@ final class _AlwaysFailOutput implements TtsOutput {
   Future<void> dispose() async {}
 }
 
-final class _FailByRequestIdOutput implements TtsOutput {
-  _FailByRequestIdOutput({
-    required this.outputId,
-    required Set<String> failingRequestIds,
-  }) : _failingRequestIds = Set<String>.from(failingRequestIds);
+final class _FailFirstOutput implements TtsOutput {
+  _FailFirstOutput({required this.outputId, required int remainingFailures})
+    : _remainingFailures = remainingFailures;
 
   @override
   final String outputId;
 
-  final Set<String> _failingRequestIds;
+  int _remainingFailures;
   TtsOutputSession? _session;
 
   @override
@@ -807,7 +896,8 @@ final class _FailByRequestIdOutput implements TtsOutput {
     if (session == null) {
       return;
     }
-    if (_failingRequestIds.contains(session.requestId)) {
+    if (_remainingFailures > 0) {
+      _remainingFailures--;
       throw const TtsError(
         code: TtsErrorCode.outputWriteFailed,
         message: 'Injected request-specific failure.',
@@ -822,7 +912,7 @@ final class _FailByRequestIdOutput implements TtsOutput {
       throw StateError('No active output session.');
     }
     return InMemoryAudioArtifact(
-      requestId: session.requestId,
+      requestKey: session.requestKey,
       audioSpec: session.audioSpec,
       audioBytes: Uint8List(0),
       totalBytes: 0,
@@ -879,7 +969,7 @@ final class _CaptureCancelOutput implements TtsOutput {
     final bytes = _buffer.takeBytes();
     _session = null;
     return InMemoryAudioArtifact(
-      requestId: session.requestId,
+      requestKey: session.requestKey,
       audioSpec: session.audioSpec,
       audioBytes: bytes,
       totalBytes: bytes.length,
@@ -938,7 +1028,7 @@ final class _PcmOnlyOutput implements TtsOutput {
       throw StateError('No active output session.');
     }
     return InMemoryAudioArtifact(
-      requestId: session.requestId,
+      requestKey: session.requestKey,
       audioSpec: session.audioSpec,
       audioBytes: Uint8List(0),
       totalBytes: 0,
@@ -992,7 +1082,7 @@ final class _TrackingOutput implements TtsOutput {
     final session = _session;
     if (session == null) throw StateError('No active session.');
     return InMemoryAudioArtifact(
-      requestId: session.requestId,
+      requestKey: session.requestKey,
       audioSpec: session.audioSpec,
       audioBytes: Uint8List(0),
       totalBytes: 0,
@@ -1057,7 +1147,7 @@ final class _LifecycleTrackingOutput implements TtsOutput {
     }
     _session = null;
     return InMemoryAudioArtifact(
-      requestId: session.requestId,
+      requestKey: session.requestKey,
       audioSpec: session.audioSpec,
       audioBytes: Uint8List(0),
       totalBytes: 0,
@@ -1124,7 +1214,7 @@ final class _ChunkSpecEngine with TtsEngineDefaults implements TtsEngine {
     TtsAudioSpec resolvedFormat,
   ) async* {
     yield TtsAudioChunk(
-      requestId: request.requestId,
+      requestKey: request.requestKey,
       sequenceNumber: 0,
       bytes: Uint8List.fromList(<int>[1, 2, 3]),
       audioSpec: emittedSpec,
@@ -1181,7 +1271,7 @@ final class _PlaybackAwareTestOutput
   @override
   Future<void> initSession(TtsOutputSession session) async {
     _session = session;
-    _playbackId = 'playback-${session.requestId}';
+    _playbackId = 'playback-${session.requestKey}';
     _bytesCount = 0;
   }
 
@@ -1209,7 +1299,7 @@ final class _PlaybackAwareTestOutput
         }
         _playbackCompletedController.add(
           TtsOutputPlaybackCompletedEvent(
-            requestId: session.requestId,
+            requestKey: session.requestKey,
             outputId: outputId,
             playbackId: playbackId,
             playedDuration: Duration(milliseconds: _bytesCount),
@@ -1225,13 +1315,13 @@ final class _PlaybackAwareTestOutput
         }
         _playbackFailedController.add(
           TtsOutputPlaybackFailedEvent(
-            requestId: session.requestId,
+            requestKey: session.requestKey,
             outputId: outputId,
             playbackId: playbackId,
             error: TtsError(
               code: TtsErrorCode.outputPlaybackFailed,
               message: 'Playback failed in test output.',
-              requestId: session.requestId,
+              requestKey: session.requestKey,
             ),
           ),
         );
@@ -1241,7 +1331,7 @@ final class _PlaybackAwareTestOutput
     _session = null;
     _playbackId = null;
     return PlaybackAudioArtifact(
-      requestId: session.requestId,
+      requestKey: session.requestKey,
       audioSpec: session.audioSpec,
       playbackId: playbackId,
     );
@@ -1272,7 +1362,7 @@ final class _PlaybackControllableTestOutput
   final _completed =
       StreamController<TtsOutputPlaybackCompletedEvent>.broadcast();
   final _failed = StreamController<TtsOutputPlaybackFailedEvent>.broadcast();
-  final Set<String> _activeRequestIds = <String>{};
+  final Set<String> _activeRequestKeys = <String>{};
   TtsOutputSession? _session;
   var pauseCount = 0;
   var resumeCount = 0;
@@ -1295,7 +1385,7 @@ final class _PlaybackControllableTestOutput
   @override
   Future<void> initSession(TtsOutputSession session) async {
     _session = session;
-    _activeRequestIds.add(session.requestId);
+    _activeRequestKeys.add(session.requestKey);
   }
 
   @override
@@ -1309,53 +1399,53 @@ final class _PlaybackControllableTestOutput
     }
     _session = null;
     return PlaybackAudioArtifact(
-      requestId: session.requestId,
+      requestKey: session.requestKey,
       audioSpec: session.audioSpec,
-      playbackId: 'playback-${session.requestId}',
+      playbackId: 'playback-${session.requestKey}',
     );
   }
 
   @override
   Future<void> onCancelSession(SynthesisControl control) async {
-    final requestId = _session?.requestId;
-    if (requestId != null) {
-      _activeRequestIds.remove(requestId);
+    final requestKey = _session?.requestKey;
+    if (requestKey != null) {
+      _activeRequestKeys.remove(requestKey);
     }
     _session = null;
   }
 
   @override
-  bool hasActivePlayback(String requestId) =>
-      _activeRequestIds.contains(requestId);
+  bool hasActivePlayback(String requestKey) =>
+      _activeRequestKeys.contains(requestKey);
 
   @override
-  Future<void> pausePlayback(String requestId) async {
-    if (!hasActivePlayback(requestId)) {
+  Future<void> pausePlayback(String requestKey) async {
+    if (!hasActivePlayback(requestKey)) {
       throw StateError('No active playback.');
     }
     pauseCount++;
   }
 
   @override
-  Future<void> resumePlayback(String requestId) async {
-    if (!hasActivePlayback(requestId)) {
+  Future<void> resumePlayback(String requestKey) async {
+    if (!hasActivePlayback(requestKey)) {
       throw StateError('No active playback.');
     }
     resumeCount++;
   }
 
   @override
-  Future<void> stopPlayback(String requestId) async {
-    if (!hasActivePlayback(requestId)) {
+  Future<void> stopPlayback(String requestKey) async {
+    if (!hasActivePlayback(requestKey)) {
       throw StateError('No active playback.');
     }
     stopCount++;
-    _activeRequestIds.remove(requestId);
+    _activeRequestKeys.remove(requestKey);
   }
 
   @override
   Future<void> dispose() async {
-    _activeRequestIds.clear();
+    _activeRequestKeys.clear();
     await _completed.close();
     await _failed.close();
   }

@@ -19,4 +19,15 @@ final class QueueScheduler<T> {
     _queue.clear();
     return items;
   }
+
+  /// Removes and returns the first item satisfying [test], if any.
+  T? removeFirstWhere(bool Function(T item) test) {
+    for (final item in _queue.toList(growable: false)) {
+      if (test(item)) {
+        _queue.remove(item);
+        return item;
+      }
+    }
+    return null;
+  }
 }

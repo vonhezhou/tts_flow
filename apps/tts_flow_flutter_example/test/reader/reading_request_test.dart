@@ -17,7 +17,7 @@ void main() {
     const text = 'First sentence. Second sentence. Third sentence.';
     final requests = planReadingRequests(
       text: text,
-      requestIdPrefix: 'chapter-1',
+      utteranceIdPrefix: 'chapter-1',
       maxCharactersPerRequest: 36,
     );
 

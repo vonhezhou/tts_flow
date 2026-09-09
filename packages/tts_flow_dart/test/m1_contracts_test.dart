@@ -32,7 +32,7 @@ void main() {
         chunkCount: 1,
       );
 
-      final request = TtsRequest(requestId: 'r1', text: 'hello world');
+      final request = TtsRequest(requestKey: 'r1', text: 'hello world');
       final control = SynthesisControl();
 
       final chunks = await engine
@@ -67,7 +67,7 @@ void main() {
         chunkCount: 3,
       );
 
-      final request = TtsRequest(requestId: 'r2', text: 'chunk me please');
+      final request = TtsRequest(requestKey: 'r2', text: 'chunk me please');
       final control = SynthesisControl();
 
       final chunks = await engine
@@ -91,7 +91,7 @@ void main() {
       () async {
         final output = NullOutput();
         const session = TtsOutputSession(
-          requestId: 'r3',
+          requestKey: 'r3',
           audioSpec: _pcmSpec,
           voice: null,
           options: null,
@@ -100,7 +100,7 @@ void main() {
         await output.initSession(session);
         await output.consumeChunk(
           TtsAudioChunk(
-            requestId: 'r3',
+            requestKey: 'r3',
             sequenceNumber: 0,
             bytes: Uint8List.fromList([1, 2, 3]),
             audioSpec: _pcmSpec,
@@ -113,7 +113,7 @@ void main() {
         expect(artifact, isA<InMemoryAudioArtifact>());
 
         final memoryArtifact = artifact as InMemoryAudioArtifact;
-        expect(memoryArtifact.requestId, 'r3');
+        expect(memoryArtifact.requestKey, 'r3');
         expect(memoryArtifact.audioSpec.format, TtsAudioFormat.pcm);
         expect(memoryArtifact.totalBytes, 0);
       },

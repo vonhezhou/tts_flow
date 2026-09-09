@@ -36,7 +36,7 @@ final class Mp3FileOutput implements TtsOutput {
       throw TtsError(
         code: TtsErrorCode.unsupportedFormat,
         message: 'Mp3FileOutput only accepts MP3 audio format.',
-        requestId: session.requestId,
+        requestKey: session.requestKey,
       );
     }
 
@@ -45,7 +45,7 @@ final class Mp3FileOutput implements TtsOutput {
 
     final lockedHeader = await _readTargetHeader(
       target,
-      requestId: session.requestId,
+      requestKey: session.requestKey,
     );
 
     final tempFile = File('$filePath.tmp');
@@ -67,8 +67,8 @@ final class Mp3FileOutput implements TtsOutput {
     if (session == null || sink == null) {
       throw StateError('Mp3FileOutput session is not initialized.');
     }
-    if (chunk.requestId != session.requestId) {
-      throw StateError('Chunk requestId does not match active session.');
+    if (chunk.requestKey != session.requestKey) {
+      throw StateError('Chunk requestKey does not match active session.');
     }
 
     if (chunk is! TtsAudioChunk) {
@@ -82,7 +82,7 @@ final class Mp3FileOutput implements TtsOutput {
       throw TtsError(
         code: TtsErrorCode.outputWriteFailed,
         message: 'Failed writing chunk to MP3 output file.',
-        requestId: session.requestId,
+        requestKey: session.requestKey,
         cause: error,
       );
     }
@@ -101,11 +101,11 @@ final class Mp3FileOutput implements TtsOutput {
       await _state.flushAndCloseSink();
       final sessionHeader = await _readSessionHeader(
         tempFile,
-        requestId: session.requestId,
+        requestKey: session.requestKey,
       );
       final currentTargetHeader = await _readTargetHeader(
         targetFile,
-        requestId: session.requestId,
+        requestKey: session.requestKey,
       );
       final lockedHeader = _state.lockedHeader;
 
@@ -114,7 +114,7 @@ final class Mp3FileOutput implements TtsOutput {
           code: TtsErrorCode.invalidRequest,
           message:
               'Existing target MP3 file metadata changed during the session.',
-          requestId: session.requestId,
+          requestKey: session.requestKey,
         );
       }
       if (currentTargetHeader != null) {
@@ -125,7 +125,7 @@ final class Mp3FileOutput implements TtsOutput {
             message:
                 'Session MP3 MPEG version/layer does not match the '
                 'existing target file and cannot be safely appended.',
-            requestId: session.requestId,
+            requestKey: session.requestKey,
           );
         }
         if (currentTargetHeader.sampleRateHz != sessionHeader.sampleRateHz) {
@@ -133,7 +133,7 @@ final class Mp3FileOutput implements TtsOutput {
             'Mp3FileOutput[$outputId]: sample rate changed from '
             '${currentTargetHeader.sampleRateHz} Hz to '
             '${sessionHeader.sampleRateHz} Hz while appending to $filePath '
-            '(requestId: ${session.requestId}). The resulting file may '
+            '(requestKey: ${session.requestKey}). The resulting file may '
             'play with jumps or glitches.',
           );
         }
@@ -142,7 +142,7 @@ final class Mp3FileOutput implements TtsOutput {
             'Mp3FileOutput[$outputId]: channel count changed from '
             '${currentTargetHeader.channelCount} to '
             '${sessionHeader.channelCount} while appending to $filePath '
-            '(requestId: ${session.requestId}). The resulting file may '
+            '(requestKey: ${session.requestKey}). The resulting file may '
             'play with jumps or glitches.',
           );
         }
@@ -164,7 +164,7 @@ final class Mp3FileOutput implements TtsOutput {
       final fileSize = await targetFile.length();
 
       return FileAudioArtifact(
-        requestId: session.requestId,
+        requestKey: session.requestKey,
         audioSpec: session.audioSpec,
         filePath: targetFile.path,
         fileSizeBytes: fileSize,
@@ -177,7 +177,7 @@ final class Mp3FileOutput implements TtsOutput {
       throw TtsError(
         code: TtsErrorCode.outputWriteFailed,
         message: 'Failed finalizing MP3 output file.',
-        requestId: session.requestId,
+        requestKey: session.requestKey,
         cause: error,
       );
     } finally {
@@ -199,7 +199,7 @@ final class Mp3FileOutput implements TtsOutput {
 
   Future<Mp3FrameHeader?> _readTargetHeader(
     File target, {
-    required String requestId,
+    required String requestKey,
   }) async {
     if (!await target.exists()) {
       return null;
@@ -212,7 +212,7 @@ final class Mp3FileOutput implements TtsOutput {
         code: TtsErrorCode.invalidRequest,
         message:
             'Existing target MP3 file does not contain a valid frame header.',
-        requestId: requestId,
+        requestKey: requestKey,
         cause: error,
       );
     }
@@ -220,7 +220,7 @@ final class Mp3FileOutput implements TtsOutput {
 
   Future<Mp3FrameHeader> _readSessionHeader(
     File tempFile, {
-    required String requestId,
+    required String requestKey,
   }) async {
     try {
       return Mp3FrameHeader.parse(await tempFile.readAsBytes());
@@ -228,7 +228,7 @@ final class Mp3FileOutput implements TtsOutput {
       throw TtsError(
         code: TtsErrorCode.invalidRequest,
         message: 'Session MP3 output does not contain a valid frame header.',
-        requestId: requestId,
+        requestKey: requestKey,
         cause: error,
       );
     }

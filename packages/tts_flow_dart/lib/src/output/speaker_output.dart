@@ -51,13 +51,13 @@ abstract interface class SpeakerBackend {
   /// operation and should complete before [startPlayback].
   Future<void> init();
 
-  /// Starts a new playback session for [requestId] using [audioSpec].
+  /// Starts a new playback session for [requestKey] using [audioSpec].
   ///
   /// Returns a backend-generated playback identifier that must be passed to
   /// subsequent calls such as [appendChunk], [finalizePlayback], and
   /// [stopPlayback].
   Future<String> startPlayback({
-    required String requestId,
+    required String requestKey,
     required TtsAudioSpec audioSpec,
   });
 
@@ -104,12 +104,12 @@ abstract interface class SpeakerPlaybackFailureAwareBackend {
 
 final class SpeakerPlaybackCompletedEvent {
   const SpeakerPlaybackCompletedEvent({
-    required this.requestId,
+    required this.requestKey,
     required this.playbackId,
     this.playedDuration,
   });
 
-  final String requestId;
+  final String requestKey;
   final String playbackId;
 
   /// Optional elapsed playback time as reported by the speaker backend.
@@ -118,12 +118,12 @@ final class SpeakerPlaybackCompletedEvent {
 
 final class SpeakerPlaybackFailedEvent {
   const SpeakerPlaybackFailedEvent({
-    required this.requestId,
+    required this.requestKey,
     required this.playbackId,
     required this.error,
   });
 
-  final String requestId;
+  final String requestKey;
   final String playbackId;
   final TtsError error;
 }
@@ -194,15 +194,15 @@ final class SpeakerOutput implements TtsOutput, PlaybackControllableOutput {
 
   @override
   Future<void> initSession(TtsOutputSession session) async {
-    if (_playbackIdsByRequest.containsKey(session.requestId)) {
-      throw StateError('Playback already exists for ${session.requestId}.');
+    if (_playbackIdsByRequest.containsKey(session.requestKey)) {
+      throw StateError('Playback already exists for ${session.requestKey}.');
     }
     _session = session;
     _playbackId = await _backend.startPlayback(
-      requestId: session.requestId,
+      requestKey: session.requestKey,
       audioSpec: session.audioSpec,
     );
-    _playbackIdsByRequest[session.requestId] = _playbackId!;
+    _playbackIdsByRequest[session.requestKey] = _playbackId!;
   }
 
   @override
@@ -212,8 +212,8 @@ final class SpeakerOutput implements TtsOutput, PlaybackControllableOutput {
     if (session == null || playbackId == null) {
       throw StateError('SpeakerOutput session is not initialized.');
     }
-    if (chunk.requestId != session.requestId) {
-      throw StateError('Chunk requestId does not match active session.');
+    if (chunk.requestKey != session.requestKey) {
+      throw StateError('Chunk requestKey does not match active session.');
     }
 
     await _backend.appendChunk(playbackId: playbackId, chunk: chunk);
@@ -232,7 +232,7 @@ final class SpeakerOutput implements TtsOutput, PlaybackControllableOutput {
     _playbackId = null;
 
     return PlaybackAudioArtifact(
-      requestId: session.requestId,
+      requestKey: session.requestKey,
       audioSpec: session.audioSpec,
       playbackId: playbackId,
     );
@@ -247,32 +247,32 @@ final class SpeakerOutput implements TtsOutput, PlaybackControllableOutput {
       await _backend.stopPlayback(playbackId: playbackId, reason: reason);
     }
     if (session != null) {
-      _playbackIdsByRequest.remove(session.requestId);
+      _playbackIdsByRequest.remove(session.requestKey);
     }
     _session = null;
     _playbackId = null;
   }
 
   @override
-  bool hasActivePlayback(String requestId) =>
-      _playbackIdsByRequest.containsKey(requestId);
+  bool hasActivePlayback(String requestKey) =>
+      _playbackIdsByRequest.containsKey(requestKey);
 
   @override
-  Future<void> pausePlayback(String requestId) async {
-    await _backend.pausePlayback(playbackId: _requirePlaybackId(requestId));
+  Future<void> pausePlayback(String requestKey) async {
+    await _backend.pausePlayback(playbackId: _requirePlaybackId(requestKey));
   }
 
   @override
-  Future<void> resumePlayback(String requestId) async {
-    await _backend.resumePlayback(playbackId: _requirePlaybackId(requestId));
+  Future<void> resumePlayback(String requestKey) async {
+    await _backend.resumePlayback(playbackId: _requirePlaybackId(requestKey));
   }
 
   @override
-  Future<void> stopPlayback(String requestId) async {
-    final playbackId = _requirePlaybackId(requestId);
+  Future<void> stopPlayback(String requestKey) async {
+    final playbackId = _requirePlaybackId(requestKey);
     await _backend.stopPlayback(playbackId: playbackId, reason: 'stopPlayback');
-    _playbackIdsByRequest.remove(requestId);
-    if (_session?.requestId == requestId) {
+    _playbackIdsByRequest.remove(requestKey);
+    if (_session?.requestKey == requestKey) {
       _session = null;
       _playbackId = null;
     }
@@ -297,21 +297,21 @@ final class SpeakerOutput implements TtsOutput, PlaybackControllableOutput {
     await _backend.dispose();
   }
 
-  String _requirePlaybackId(String requestId) {
-    final playbackId = _playbackIdsByRequest[requestId];
+  String _requirePlaybackId(String requestKey) {
+    final playbackId = _playbackIdsByRequest[requestKey];
     if (playbackId == null) {
-      throw StateError('No active playback for "$requestId".');
+      throw StateError('No active playback for "$requestKey".');
     }
     return playbackId;
   }
 
   void _onBackendPlaybackCompleted(SpeakerPlaybackCompletedEvent event) {
-    if (_playbackIdsByRequest[event.requestId] == event.playbackId) {
-      _playbackIdsByRequest.remove(event.requestId);
+    if (_playbackIdsByRequest[event.requestKey] == event.playbackId) {
+      _playbackIdsByRequest.remove(event.requestKey);
     }
     _playbackCompletedController.add(
       TtsOutputPlaybackCompletedEvent(
-        requestId: event.requestId,
+        requestKey: event.requestKey,
         outputId: outputId,
         playbackId: event.playbackId,
         playedDuration: event.playedDuration,
@@ -320,12 +320,12 @@ final class SpeakerOutput implements TtsOutput, PlaybackControllableOutput {
   }
 
   void _onBackendPlaybackFailed(SpeakerPlaybackFailedEvent event) {
-    if (_playbackIdsByRequest[event.requestId] == event.playbackId) {
-      _playbackIdsByRequest.remove(event.requestId);
+    if (_playbackIdsByRequest[event.requestKey] == event.playbackId) {
+      _playbackIdsByRequest.remove(event.requestKey);
     }
     _playbackFailedController.add(
       TtsOutputPlaybackFailedEvent(
-        requestId: event.requestId,
+        requestKey: event.requestKey,
         outputId: outputId,
         playbackId: event.playbackId,
         error: event.error,

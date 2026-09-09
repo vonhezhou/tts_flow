@@ -16,6 +16,7 @@ export 'src/core/tts_output.dart';
 export 'src/core/tts_output_session.dart';
 export 'src/core/tts_policy.dart';
 export 'src/core/tts_request.dart';
+export 'src/core/tts_request_handle.dart';
 export 'src/core/tts_sentence_cue.dart';
 export 'src/core/tts_voice.dart';
 export 'src/engine/file_tts_engine.dart';
