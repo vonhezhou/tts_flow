@@ -15,6 +15,8 @@
   The flow generates an opaque `requestKey` for all engine/output/playback
   routing; application-supplied `utteranceId` is retained for event correlation
   and may be reused safely.
+- Breaking: request-specific synthesis and playback controls are available only
+  from `TtsRequestHandle`; `TtsFlow` retains queue-level controls only.
 
 - Breaking: `TtsAudioFormat.wav` has been removed from the enum. Engines that
   previously advertised `wav` output now advertise `pcm` and strip the WAV

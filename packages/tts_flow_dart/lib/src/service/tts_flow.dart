@@ -85,8 +85,7 @@ final class TtsFlow
   bool get isQueuePaused => state.isPaused;
   bool get isInitialized => state.isInitialized;
 
-  /// Whether [requestKey] has physical playback that can still be controlled.
-  bool hasActivePlayback(String requestKey) {
+  bool _hasActivePlayback(String requestKey) {
     final output = _playbackOutputs[requestKey];
     final PlaybackControllableOutput? controllableOutput =
         output is PlaybackControllableOutput
@@ -192,11 +191,11 @@ final class TtsFlow
       utteranceId: resolvedUtteranceId,
       chunks: controller.stream,
       events: requestEvents.stream,
-      stopSynthesis: () => stopSynthesis(requestKey),
-      pausePlayback: () => pausePlayback(requestKey),
-      resumePlayback: () => resumePlayback(requestKey),
-      stopPlayback: () => stopPlayback(requestKey),
-      hasActivePlayback: () => hasActivePlayback(requestKey),
+      stopSynthesis: () => _stopSynthesis(requestKey),
+      pausePlayback: () => _pausePlayback(requestKey),
+      resumePlayback: () => _resumePlayback(requestKey),
+      stopPlayback: () => _stopPlayback(requestKey),
+      hasActivePlayback: () => _hasActivePlayback(requestKey),
     );
   }
 
@@ -216,17 +215,14 @@ final class TtsFlow
   /// Cancels the synthesis request currently being produced by the engine.
   ///
   /// This does not control audio that has already been finalized for physical
-  /// playback. Use [stopPlayback] for that separate lifecycle.
+  /// playback. Use the corresponding `TtsRequestHandle.stopPlayback()` for
+  /// that separate lifecycle.
   Future<void> stopActiveSynthesis() async {
     _ensureReady();
     state.activeControl?.cancel(CancelReason.stopCurrent);
   }
 
-  /// Stops one request whether it is queued or actively synthesizing.
-  ///
-  /// Audio already submitted to a physical output is intentionally unaffected;
-  /// call [stopPlayback] through the request handle for that lifecycle.
-  Future<void> stopSynthesis(String requestKey) async {
+  Future<void> _stopSynthesis(String requestKey) async {
     _ensureReady();
     if (state.activeRequestKey == requestKey) {
       state.activeControl?.cancel(CancelReason.stopCurrent);
@@ -249,8 +245,7 @@ final class TtsFlow
     releaseRequestIdentity(requestKey);
   }
 
-  /// Pauses physical playback for [requestKey].
-  Future<void> pausePlayback(String requestKey) async {
+  Future<void> _pausePlayback(String requestKey) async {
     final output = _requirePlaybackOutput(requestKey);
     await (output as PlaybackControllableOutput).pausePlayback(requestKey);
     emitRequestEvent(
@@ -260,8 +255,7 @@ final class TtsFlow
     );
   }
 
-  /// Resumes physical playback for [requestKey].
-  Future<void> resumePlayback(String requestKey) async {
+  Future<void> _resumePlayback(String requestKey) async {
     final output = _requirePlaybackOutput(requestKey);
     await (output as PlaybackControllableOutput).resumePlayback(requestKey);
     emitRequestEvent(
@@ -271,8 +265,7 @@ final class TtsFlow
     );
   }
 
-  /// Stops physical playback for [requestKey].
-  Future<void> stopPlayback(String requestKey) async {
+  Future<void> _stopPlayback(String requestKey) async {
     final output = _requirePlaybackOutput(requestKey);
     await (output as PlaybackControllableOutput).stopPlayback(requestKey);
     await cancelPlaybackEventListenersForRequest(requestKey);
