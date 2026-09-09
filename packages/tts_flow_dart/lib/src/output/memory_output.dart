@@ -6,7 +6,7 @@ import 'package:tts_flow_dart/src/core/audio_capability.dart';
 import 'package:tts_flow_dart/src/core/synthesis_control.dart';
 import 'package:tts_flow_dart/src/core/tts_chunk.dart';
 import 'package:tts_flow_dart/src/core/tts_output.dart';
-import 'package:tts_flow_dart/src/core/tts_output_session.dart';
+import 'package:tts_flow_dart/src/core/tts_output_write_context.dart';
 
 final class MemoryOutput implements TtsOutput {
   MemoryOutput({this.outputId = 'memory-output'});
@@ -27,28 +27,28 @@ final class MemoryOutput implements TtsOutput {
     const AacCapability(),
   };
 
-  TtsOutputSession? _session;
+  TtsOutputWriteContext? _writeContext;
   BytesBuilder? _buffer;
 
   @override
   Future<void> init() async {}
 
   @override
-  Future<void> initSession(TtsOutputSession session) async {
-    _session = session;
+  Future<void> startWrite(TtsOutputWriteContext writeContext) async {
+    _writeContext = writeContext;
     _buffer = BytesBuilder(copy: false);
   }
 
   @override
-  Future<void> consumeChunk(TtsChunk chunk) async {
-    final session = _session;
+  Future<void> writeChunk(TtsChunk chunk) async {
+    final writeContext = _writeContext;
     final buffer = _buffer;
-    if (session == null || buffer == null) {
-      throw StateError('MemoryOutput session is not initialized.');
+    if (writeContext == null || buffer == null) {
+      throw StateError('MemoryOutput write has not started.');
     }
 
-    if (chunk.requestKey != session.requestKey) {
-      throw StateError('Chunk requestKey does not match active session.');
+    if (chunk.requestKey != writeContext.requestKey) {
+      throw StateError('Chunk requestKey does not match active write.');
     }
 
     if (chunk is! TtsAudioChunk) {
@@ -59,32 +59,32 @@ final class MemoryOutput implements TtsOutput {
   }
 
   @override
-  Future<AudioArtifact> finalizeSession() async {
-    final session = _session;
+  Future<AudioArtifact> finishWrite() async {
+    final writeContext = _writeContext;
     final buffer = _buffer;
-    if (session == null || buffer == null) {
-      throw StateError('MemoryOutput session is not initialized.');
+    if (writeContext == null || buffer == null) {
+      throw StateError('MemoryOutput write has not started.');
     }
     final audioBytes = buffer.takeBytes();
-    _session = null;
+    _writeContext = null;
     _buffer = null;
     return InMemoryAudioArtifact(
-      requestKey: session.requestKey,
-      audioSpec: session.audioSpec,
+      requestKey: writeContext.requestKey,
+      audioSpec: writeContext.audioSpec,
       audioBytes: audioBytes,
       totalBytes: audioBytes.length,
     );
   }
 
   @override
-  Future<void> onCancelSession(SynthesisControl control) async {
-    _session = null;
+  Future<void> cancelWrite(SynthesisControl control) async {
+    _writeContext = null;
     _buffer = null;
   }
 
   @override
   Future<void> dispose() async {
-    _session = null;
+    _writeContext = null;
     _buffer = null;
   }
 }

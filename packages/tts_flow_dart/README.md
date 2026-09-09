@@ -11,11 +11,10 @@ Core design choices in this repository:
   `synthesisResult`.
 - FIFO queue semantics with halt-on-failure behavior.
 
-For one `TtsFlow`, a `TtsOutput` has exactly one active ingestion session.
-The next request starts its output session only after the previous one is
-finalized or canceled. Physical speaker playback may still be observable after
-ingestion finalizes, but this does not imply concurrent mixing or concurrent
-output ingestion.
+For one `TtsFlow`, a `TtsOutput` has exactly one active write. The next
+request starts writing only after the previous write finishes or is canceled.
+Physical speaker playback may still be observable after a write finishes, but
+this does not imply concurrent mixing or concurrent output writes.
 
 ## Audio Negotiation
 
@@ -346,11 +345,11 @@ non-blocking observers.
 
 ## TtsRequestHandle.synthesisResult (Output Artifact)
 
-`synthesisResult` completes once synthesis and the primary output's ingestion
+`synthesisResult` completes once synthesis and the primary output's writing
 lifecycle reach a terminal state. It always resolves to one of:
 
 - `TtsSynthesisCompletedResult`, containing the `AudioArtifact` returned by
-  `TtsOutput.finalizeSession()`;
+  `TtsOutput.finishWrite()`;
 - `TtsSynthesisStoppedResult`, containing why the request ended without an
   artifact;
 - `TtsSynthesisFailedResult`, containing the request error.
@@ -380,7 +379,7 @@ Lifecycle per request:
 
 Semantics:
 
-- `requestSynthesisCompleted` means synthesis/output ingestion is finished.
+- `requestSynthesisCompleted` means synthesis/output writing is finished.
 - `requestPlaybackCompleted` means the speaker backend reported physical
   playback completion.
 - `requestPlaybackFailed` means the physical player failed. It is independent
@@ -448,7 +447,7 @@ final class MySpeakerBackend implements SpeakerBackend {
     if (buffer == null) {
       throw StateError('Unknown playbackId: $playbackId');
     }
-    // Replace with the backend's ingestion-close behavior.
+    // Replace with the backend's input-close behavior.
   }
 
   @override

@@ -14,7 +14,7 @@ export 'src/core/tts_engine.dart';
 export 'src/core/tts_errors.dart';
 export 'src/core/tts_flow_config.dart';
 export 'src/core/tts_output.dart';
-export 'src/core/tts_output_session.dart';
+export 'src/core/tts_output_write_context.dart';
 export 'src/core/tts_policy.dart';
 export 'src/core/tts_request.dart';
 export 'src/core/tts_request_handle.dart';

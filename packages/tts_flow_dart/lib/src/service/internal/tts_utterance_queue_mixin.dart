@@ -8,7 +8,7 @@ import 'package:tts_flow_dart/src/core/tts_engine.dart';
 import 'package:tts_flow_dart/src/core/tts_errors.dart';
 import 'package:tts_flow_dart/src/core/tts_flow_config.dart';
 import 'package:tts_flow_dart/src/core/tts_output.dart';
-import 'package:tts_flow_dart/src/core/tts_output_session.dart';
+import 'package:tts_flow_dart/src/core/tts_output_write_context.dart';
 import 'package:tts_flow_dart/src/core/tts_policy.dart';
 import 'package:tts_flow_dart/src/core/tts_request.dart';
 import 'package:tts_flow_dart/src/core/tts_synthesis_result.dart';
@@ -135,10 +135,10 @@ mixin TtsUtteranceQueueMixin on TtsFlowEventBus {
         );
       }
       var activeAudioSpec = audioSpec;
-      var outputSessionInitialized = false;
+      var outputWriteStarted = false;
 
-      Future<void> ensureOutputSessionInitialized(TtsAudioSpec spec) async {
-        if (outputSessionInitialized) {
+      Future<void> ensureOutputWriteStarted(TtsAudioSpec spec) async {
+        if (outputWriteStarted) {
           return;
         }
         if (!effectiveOutput.acceptsSpec(spec)) {
@@ -150,8 +150,8 @@ mixin TtsUtteranceQueueMixin on TtsFlowEventBus {
           );
         }
 
-        await effectiveOutput.initSession(
-          TtsOutputSession(
+        await effectiveOutput.startWrite(
+          TtsOutputWriteContext(
             requestKey: request.requestKey,
             audioSpec: spec,
             voice: request.voice,
@@ -161,7 +161,7 @@ mixin TtsUtteranceQueueMixin on TtsFlowEventBus {
         );
         registerPlaybackControl(request.requestKey, effectiveOutput);
         activeAudioSpec = spec;
-        outputSessionInitialized = true;
+        outputWriteStarted = true;
       }
 
       await for (final chunk in engine.synthesize(
@@ -174,13 +174,13 @@ mixin TtsUtteranceQueueMixin on TtsFlowEventBus {
         }
 
         if (chunk is! TtsAudioChunk) {
-        } else if (!outputSessionInitialized) {
-          await ensureOutputSessionInitialized(chunk.audioSpec);
+        } else if (!outputWriteStarted) {
+          await ensureOutputWriteStarted(chunk.audioSpec);
         } else if (chunk.audioSpec != activeAudioSpec) {
           throw TtsError(
             code: TtsErrorCode.invalidRequest,
             message:
-                'Chunk audio spec changed after session initialization. '
+                'Chunk audio spec changed after output writing started. '
                 'expected: $activeAudioSpec, received: ${chunk.audioSpec}',
             requestKey: request.requestKey,
           );
@@ -199,8 +199,8 @@ mixin TtsUtteranceQueueMixin on TtsFlowEventBus {
       }
 
       if (control.isCanceled) {
-        if (outputSessionInitialized) {
-          await effectiveOutput.onCancelSession(control);
+        if (outputWriteStarted) {
+          await effectiveOutput.cancelWrite(control);
         }
         await _cancelPlaybackEventListenersForRequest(request.requestKey);
         unregisterPlaybackControl(request.requestKey);
@@ -220,10 +220,10 @@ mixin TtsUtteranceQueueMixin on TtsFlowEventBus {
         );
         releaseRequestIdentity(request.requestKey);
       } else {
-        if (!outputSessionInitialized) {
-          await ensureOutputSessionInitialized(audioSpec);
+        if (!outputWriteStarted) {
+          await ensureOutputWriteStarted(audioSpec);
         }
-        final artifact = await effectiveOutput.finalizeSession();
+        final artifact = await effectiveOutput.finishWrite();
         emitRequestEvent(
           TtsRequestEventType.requestSynthesisCompleted,
           requestKey: request.requestKey,
@@ -295,7 +295,7 @@ mixin TtsUtteranceQueueMixin on TtsFlowEventBus {
   ) async {
     // Semantic chunks (for example sentence timing) belong to the request
     // stream, not to an audio sink. This also lets an engine publish timing
-    // before the first audio chunk has initialized an output session.
+    // before the first audio chunk has opened an output write.
     if (chunk is! TtsAudioChunk) {
       item.controller.add(chunk);
       emitRequestEvent(
@@ -307,7 +307,7 @@ mixin TtsUtteranceQueueMixin on TtsFlowEventBus {
       return;
     }
 
-    await effectiveOutput.consumeChunk(chunk);
+    await effectiveOutput.writeChunk(chunk);
     item.controller.add(chunk);
     emitRequestEvent(
       TtsRequestEventType.requestChunkReceived,

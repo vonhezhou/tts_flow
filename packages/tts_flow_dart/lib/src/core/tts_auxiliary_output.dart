@@ -1,8 +1,8 @@
 import 'package:tts_flow_dart/src/core/synthesis_control.dart';
 import 'package:tts_flow_dart/src/core/tts_chunk.dart';
-import 'package:tts_flow_dart/src/core/tts_output_session.dart';
+import 'package:tts_flow_dart/src/core/tts_output_write_context.dart';
 
-/// A non-blocking observer of a [PrioritizedOutput] session.
+/// A non-blocking observer of a [PrioritizedOutput] write.
 ///
 /// Every method is a synchronous notification. An implementation may begin
 /// asynchronous work, but it must manage its own ordering, buffering, error
@@ -20,17 +20,17 @@ abstract interface class TtsAuxiliaryOutput {
   /// Performs output-wide setup without blocking the primary output.
   void init();
 
-  /// Notifies this output that a request-scoped session has started.
-  void initSession(TtsOutputSession session);
+  /// Notifies this output that a request-scoped write has started.
+  void startWrite(TtsOutputWriteContext writeContext);
 
   /// Delivers one chunk after the primary output has accepted it.
-  void consumeChunk(TtsChunk chunk);
+  void writeChunk(TtsChunk chunk);
 
   /// Notifies this output that the primary output finalized successfully.
-  void finalizeSession();
+  void finishWrite();
 
-  /// Notifies this output that the primary session was canceled.
-  void onCancelSession(SynthesisControl control);
+  /// Notifies this output that the primary write was canceled.
+  void cancelWrite(SynthesisControl control);
 
   /// Releases output-wide resources.
   void dispose();
@@ -40,10 +40,10 @@ abstract interface class TtsAuxiliaryOutput {
 /// occurred.
 enum TtsAuxiliaryOutputStage {
   init,
-  initSession,
-  consumeChunk,
-  finalizeSession,
-  cancelSession,
+  startWrite,
+  writeChunk,
+  finishWrite,
+  cancelWrite,
   dispose,
 }
 

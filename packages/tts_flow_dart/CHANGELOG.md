@@ -21,9 +21,13 @@
   synthesis terminal result and exposes the `AudioArtifact` returned by a
   successfully finalized primary output without conflating it with physical
   playback completion.
-- Clarified the `TtsOutput` contract: a flow drives one output ingestion
-  session at a time; physical playback observation after ingestion does not
-  imply concurrent output sessions or request mixing.
+- Clarified the `TtsOutput` contract: a flow drives one output write at a
+  time; physical playback observation after writing does not imply concurrent
+  output writes or request mixing.
+- Breaking: renamed the output lifecycle to make its input-boundary semantics
+  explicit: `TtsOutputSession` is now `TtsOutputWriteContext`, and
+  `initSession` / `consumeChunk` / `finalizeSession` / `onCancelSession` are
+  now `startWrite` / `writeChunk` / `finishWrite` / `cancelWrite`.
 - Breaking: `speak(text, utteranceId: ...)` now returns a `TtsRequestHandle`.
   The flow generates an opaque `requestKey` for all engine/output/playback
   routing; application-supplied `utteranceId` is retained for event correlation

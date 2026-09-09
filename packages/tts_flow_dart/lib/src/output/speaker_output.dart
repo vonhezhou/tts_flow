@@ -8,7 +8,7 @@ import 'package:tts_flow_dart/src/core/synthesis_control.dart';
 import 'package:tts_flow_dart/src/core/tts_chunk.dart';
 import 'package:tts_flow_dart/src/core/tts_errors.dart';
 import 'package:tts_flow_dart/src/core/tts_output.dart';
-import 'package:tts_flow_dart/src/core/tts_output_session.dart';
+import 'package:tts_flow_dart/src/core/tts_output_write_context.dart';
 import 'package:tts_flow_dart/src/core/tts_policy.dart';
 
 /// Backend contract used by [SpeakerOutput] to stream audio to a speaker
@@ -35,7 +35,7 @@ import 'package:tts_flow_dart/src/core/tts_policy.dart';
 abstract interface class SpeakerBackend {
   /// Emits events when a playback stream physically finishes on the speaker.
   ///
-  /// This stream is independent from ingestion completion and can emit after
+  /// This stream is independent from input completion and can emit after
   /// [finalizePlayback] has returned.
   Stream<SpeakerPlaybackCompletedEvent> get playbackCompletedEvents;
 
@@ -70,13 +70,13 @@ abstract interface class SpeakerBackend {
     required TtsChunk chunk,
   });
 
-  /// Closes ingestion for [playbackId].
+  /// Closes audio input for [playbackId].
   ///
   /// This call must not be interpreted as physical speaker completion. Backends
   /// can continue rendering buffered audio after this method returns.
   ///
-  /// After ingestion finalization, the playback session should no longer accept
-  /// new audio data.
+  /// After input finalization, the playback session should no longer accept new
+  /// audio data.
   Future<void> finalizePlayback({required String playbackId});
 
   /// Stops [playbackId] before normal completion.
@@ -97,7 +97,7 @@ abstract interface class SpeakerBackend {
 /// Optional [SpeakerBackend] capability for platform playback failures.
 ///
 /// Kept separate from [SpeakerBackend] so existing backends remain source and
-/// binary compatible. A failure can occur after audio ingestion has finalized.
+/// binary compatible. A failure can occur after audio input has finalized.
 abstract interface class SpeakerPlaybackFailureAwareBackend {
   Stream<SpeakerPlaybackFailedEvent> get playbackFailedEvents;
 }
@@ -172,7 +172,7 @@ final class SpeakerOutput implements TtsOutput, PlaybackControllableOutput {
   Stream<TtsOutputPlaybackFailedEvent> get playbackFailedEvents =>
       _playbackFailedController.stream;
 
-  TtsOutputSession? _session;
+  TtsOutputWriteContext? _writeContext;
   String? _playbackId;
   final Map<String, String> _playbackIdsByRequest = <String, String>{};
 
@@ -193,63 +193,65 @@ final class SpeakerOutput implements TtsOutput, PlaybackControllableOutput {
   }
 
   @override
-  Future<void> initSession(TtsOutputSession session) async {
-    if (_playbackIdsByRequest.containsKey(session.requestKey)) {
-      throw StateError('Playback already exists for ${session.requestKey}.');
+  Future<void> startWrite(TtsOutputWriteContext writeContext) async {
+    if (_playbackIdsByRequest.containsKey(writeContext.requestKey)) {
+      throw StateError(
+        'Playback already exists for ${writeContext.requestKey}.',
+      );
     }
-    _session = session;
+    _writeContext = writeContext;
     _playbackId = await _backend.startPlayback(
-      requestKey: session.requestKey,
-      audioSpec: session.audioSpec,
+      requestKey: writeContext.requestKey,
+      audioSpec: writeContext.audioSpec,
     );
-    _playbackIdsByRequest[session.requestKey] = _playbackId!;
+    _playbackIdsByRequest[writeContext.requestKey] = _playbackId!;
   }
 
   @override
-  Future<void> consumeChunk(TtsChunk chunk) async {
-    final session = _session;
+  Future<void> writeChunk(TtsChunk chunk) async {
+    final writeContext = _writeContext;
     final playbackId = _playbackId;
-    if (session == null || playbackId == null) {
-      throw StateError('SpeakerOutput session is not initialized.');
+    if (writeContext == null || playbackId == null) {
+      throw StateError('SpeakerOutput write has not started.');
     }
-    if (chunk.requestKey != session.requestKey) {
-      throw StateError('Chunk requestKey does not match active session.');
+    if (chunk.requestKey != writeContext.requestKey) {
+      throw StateError('Chunk requestKey does not match active write.');
     }
 
     await _backend.appendChunk(playbackId: playbackId, chunk: chunk);
   }
 
   @override
-  Future<AudioArtifact> finalizeSession() async {
-    final session = _session;
+  Future<AudioArtifact> finishWrite() async {
+    final writeContext = _writeContext;
     final playbackId = _playbackId;
-    if (session == null || playbackId == null) {
-      throw StateError('SpeakerOutput session is not initialized.');
+    if (writeContext == null || playbackId == null) {
+      throw StateError('SpeakerOutput write has not started.');
     }
 
     await _backend.finalizePlayback(playbackId: playbackId);
-    _session = null;
+    _writeContext = null;
     _playbackId = null;
 
     return PlaybackAudioArtifact(
-      requestKey: session.requestKey,
-      audioSpec: session.audioSpec,
+      requestKey: writeContext.requestKey,
+      audioSpec: writeContext.audioSpec,
       playbackId: playbackId,
     );
   }
 
   @override
-  Future<void> onCancelSession(SynthesisControl control) async {
-    final session = _session;
+  Future<void> cancelWrite(SynthesisControl control) async {
+    final writeContext = _writeContext;
     final playbackId = _playbackId;
     if (playbackId != null) {
       final reason = control.cancelMessage ?? control.cancelReason?.name;
       await _backend.stopPlayback(playbackId: playbackId, reason: reason);
     }
-    if (session != null) {
-      _playbackIdsByRequest.remove(session.requestKey);
+    if (writeContext != null) {
+      _playbackIdsByRequest.remove(writeContext.requestKey);
     }
-    _session = null;
+    _writeContext = null;
     _playbackId = null;
   }
 
@@ -272,8 +274,8 @@ final class SpeakerOutput implements TtsOutput, PlaybackControllableOutput {
     final playbackId = _requirePlaybackId(requestKey);
     await _backend.stopPlayback(playbackId: playbackId, reason: 'stopPlayback');
     _playbackIdsByRequest.remove(requestKey);
-    if (_session?.requestKey == requestKey) {
-      _session = null;
+    if (_writeContext?.requestKey == requestKey) {
+      _writeContext = null;
       _playbackId = null;
     }
   }
@@ -288,7 +290,7 @@ final class SpeakerOutput implements TtsOutput, PlaybackControllableOutput {
       );
     }
     _playbackIdsByRequest.clear();
-    _session = null;
+    _writeContext = null;
     _playbackId = null;
     await _playbackCompletedSubscription.cancel();
     await _playbackFailedSubscription?.cancel();

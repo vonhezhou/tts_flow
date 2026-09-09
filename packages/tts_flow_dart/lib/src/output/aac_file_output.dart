@@ -10,7 +10,7 @@ import 'package:tts_flow_dart/src/core/synthesis_control.dart';
 import 'package:tts_flow_dart/src/core/tts_chunk.dart';
 import 'package:tts_flow_dart/src/core/tts_errors.dart';
 import 'package:tts_flow_dart/src/core/tts_output.dart';
-import 'package:tts_flow_dart/src/core/tts_output_session.dart';
+import 'package:tts_flow_dart/src/core/tts_output_write_context.dart';
 
 final _log = Logger('tts_flow_dart.AacFileOutput');
 
@@ -18,20 +18,20 @@ final _log = Logger('tts_flow_dart.AacFileOutput');
 ///
 /// Each chunk is expected to contain one or more AAC frames prefixed with
 /// standard 7-byte ADTS headers (no CRC, protection_absent = 1). Chunks are
-/// buffered in a temporary file during a session and merged into [filePath]
-/// at finalization. Existing files are never overwritten; new sessions always
+/// buffered in a temporary file during a write and merged into [filePath]
+/// at finalization. Existing files are never overwritten; new writes always
 /// append.
 ///
-/// If the newly written session uses a different sample rate or channel count
+/// If the newly written audio uses a different sample rate or channel count
 /// than the data already present in the target file, a warning is logged but
 /// the append proceeds—ADTS is a self-framing format and each frame carries
 /// its own header.
 final class AacFileOutput implements TtsOutput {
   AacFileOutput(this.filePath, {this.outputId = 'aac-file-output'})
-    : _state = _AacFileOutputSessionState();
+    : _state = _AacFileOutputWriteState();
 
   final String filePath;
-  final _AacFileOutputSessionState _state;
+  final _AacFileOutputWriteState _state;
 
   @override
   final String outputId;
@@ -43,12 +43,12 @@ final class AacFileOutput implements TtsOutput {
   Future<void> init() async {}
 
   @override
-  Future<void> initSession(TtsOutputSession session) async {
-    if (session.audioSpec.format != TtsAudioFormat.aac) {
+  Future<void> startWrite(TtsOutputWriteContext writeContext) async {
+    if (writeContext.audioSpec.format != TtsAudioFormat.aac) {
       throw TtsError(
         code: TtsErrorCode.unsupportedFormat,
         message: 'AacFileOutput only accepts AAC audio format.',
-        requestKey: session.requestKey,
+        requestKey: writeContext.requestKey,
       );
     }
 
@@ -63,21 +63,21 @@ final class AacFileOutput implements TtsOutput {
     }
 
     _state.init(
-      session: session,
+      writeContext: writeContext,
       tempFile: tempFile,
       lockedHeader: lockedHeader,
     );
   }
 
   @override
-  Future<void> consumeChunk(TtsChunk chunk) async {
-    final session = _state.session;
+  Future<void> writeChunk(TtsChunk chunk) async {
+    final writeContext = _state.writeContext;
     final sink = _state.sink;
-    if (session == null || sink == null) {
-      throw StateError('AacFileOutput session is not initialized.');
+    if (writeContext == null || sink == null) {
+      throw StateError('AacFileOutput write has not started.');
     }
-    if (chunk.requestKey != session.requestKey) {
-      throw StateError('Chunk requestKey does not match active session.');
+    if (chunk.requestKey != writeContext.requestKey) {
+      throw StateError('Chunk requestKey does not match active write.');
     }
 
     if (chunk is! TtsAudioChunk) {
@@ -91,27 +91,27 @@ final class AacFileOutput implements TtsOutput {
       throw TtsError(
         code: TtsErrorCode.outputWriteFailed,
         message: 'Failed writing chunk to AAC output file.',
-        requestKey: session.requestKey,
+        requestKey: writeContext.requestKey,
         cause: error,
       );
     }
   }
 
   @override
-  Future<AudioArtifact> finalizeSession() async {
-    final session = _state.session;
+  Future<AudioArtifact> finishWrite() async {
+    final writeContext = _state.writeContext;
     final tempFile = _state.tempFile;
-    if (session == null || tempFile == null) {
-      throw StateError('AacFileOutput session is not initialized.');
+    if (writeContext == null || tempFile == null) {
+      throw StateError('AacFileOutput write has not started.');
     }
 
     final targetFile = File(filePath);
     try {
       await _state.flushAndCloseSink();
 
-      final sessionHeader = await _readSessionHeader(
+      final incomingHeader = await _readIncomingHeader(
         tempFile,
-        requestKey: session.requestKey,
+        requestKey: writeContext.requestKey,
       );
       final currentTargetHeader = await _readTargetHeader(targetFile);
       final lockedHeader = _state.lockedHeader;
@@ -119,16 +119,16 @@ final class AacFileOutput implements TtsOutput {
       if (lockedHeader != null && currentTargetHeader != lockedHeader) {
         _log.warning(
           'AacFileOutput[$outputId]: target file metadata changed during '
-          'session — the existing ADTS header no longer matches what was '
-          'read at session start.',
+          'write — the existing ADTS header no longer matches what was read '
+          'when this write started.',
         );
       }
 
       if (currentTargetHeader != null) {
         _warnIfChanged(
           existing: currentTargetHeader,
-          incoming: sessionHeader,
-          requestKey: session.requestKey,
+          incoming: incomingHeader,
+          requestKey: writeContext.requestKey,
         );
       }
 
@@ -146,8 +146,8 @@ final class AacFileOutput implements TtsOutput {
       final fileSize = await targetFile.length();
 
       return FileAudioArtifact(
-        requestKey: session.requestKey,
-        audioSpec: session.audioSpec,
+        requestKey: writeContext.requestKey,
+        audioSpec: writeContext.audioSpec,
         filePath: targetFile.path,
         fileSizeBytes: fileSize,
       );
@@ -159,7 +159,7 @@ final class AacFileOutput implements TtsOutput {
       throw TtsError(
         code: TtsErrorCode.outputWriteFailed,
         message: 'Failed finalizing AAC output file.',
-        requestKey: session.requestKey,
+        requestKey: writeContext.requestKey,
         cause: error,
       );
     } finally {
@@ -168,7 +168,7 @@ final class AacFileOutput implements TtsOutput {
   }
 
   @override
-  Future<void> onCancelSession(SynthesisControl control) async {
+  Future<void> cancelWrite(SynthesisControl control) async {
     await _state.safeCleanupTemp();
     _state.clear();
   }
@@ -226,7 +226,7 @@ final class AacFileOutput implements TtsOutput {
     }
   }
 
-  Future<AdtsFrameHeader> _readSessionHeader(
+  Future<AdtsFrameHeader> _readIncomingHeader(
     File tempFile, {
     required String requestKey,
   }) async {
@@ -238,7 +238,7 @@ final class AacFileOutput implements TtsOutput {
     } on FormatException catch (error) {
       throw TtsError(
         code: TtsErrorCode.outputWriteFailed,
-        message: 'Session AAC output does not contain a valid ADTS header.',
+        message: 'Incoming AAC audio does not contain a valid ADTS header.',
         requestKey: requestKey,
         cause: error,
       );
@@ -246,18 +246,18 @@ final class AacFileOutput implements TtsOutput {
   }
 }
 
-final class _AacFileOutputSessionState {
-  TtsOutputSession? session;
+final class _AacFileOutputWriteState {
+  TtsOutputWriteContext? writeContext;
   File? tempFile;
   IOSink? sink;
   AdtsFrameHeader? lockedHeader;
 
   void init({
-    required TtsOutputSession session,
+    required TtsOutputWriteContext writeContext,
     required File tempFile,
     required AdtsFrameHeader? lockedHeader,
   }) {
-    this.session = session;
+    this.writeContext = writeContext;
     this.tempFile = tempFile;
     this.lockedHeader = lockedHeader;
     sink = tempFile.openWrite();
@@ -298,7 +298,7 @@ final class _AacFileOutputSessionState {
   }
 
   void clear() {
-    session = null;
+    writeContext = null;
     tempFile = null;
     sink = null;
     lockedHeader = null;

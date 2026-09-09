@@ -10,7 +10,7 @@ import 'package:tts_flow_dart/src/core/synthesis_control.dart';
 import 'package:tts_flow_dart/src/core/tts_chunk.dart';
 import 'package:tts_flow_dart/src/core/tts_errors.dart';
 import 'package:tts_flow_dart/src/core/tts_output.dart';
-import 'package:tts_flow_dart/src/core/tts_output_session.dart';
+import 'package:tts_flow_dart/src/core/tts_output_write_context.dart';
 
 const int _defaultWavSampleRateHz = 24000;
 const int _defaultWavBitsPerSample = 16;
@@ -18,10 +18,10 @@ const int _defaultWavChannels = 1;
 
 final class WavFileOutput implements TtsOutput {
   WavFileOutput(this.filePath, {this.outputId = 'wav-file-output'})
-    : _state = _WavFileOutputSessionState();
+    : _state = _WavFileOutputWriteState();
 
   final String filePath;
-  final _WavFileOutputSessionState _state;
+  final _WavFileOutputWriteState _state;
 
   @override
   final String outputId;
@@ -33,12 +33,12 @@ final class WavFileOutput implements TtsOutput {
   Future<void> init() async {}
 
   @override
-  Future<void> initSession(TtsOutputSession session) async {
-    if (session.audioSpec.format != TtsAudioFormat.pcm) {
+  Future<void> startWrite(TtsOutputWriteContext writeContext) async {
+    if (writeContext.audioSpec.format != TtsAudioFormat.pcm) {
       throw TtsError(
         code: TtsErrorCode.unsupportedFormat,
         message: 'WavFileOutput only accepts PCM audio format.',
-        requestKey: session.requestKey,
+        requestKey: writeContext.requestKey,
       );
     }
 
@@ -47,17 +47,17 @@ final class WavFileOutput implements TtsOutput {
 
     final lockedDescriptor = await _readLockedTargetDescriptor(
       target,
-      requestKey: session.requestKey,
+      requestKey: writeContext.requestKey,
     );
-    final declaredDescriptor = _resolveDeclaredSessionDescriptor(session);
+    final declaredDescriptor = _resolveDeclaredWriteDescriptor(writeContext);
     if (lockedDescriptor != null &&
         declaredDescriptor != null &&
         lockedDescriptor != declaredDescriptor) {
       throw TtsError(
         code: TtsErrorCode.invalidRequest,
         message:
-            'Session audio spec does not match the existing target WAV file.',
-        requestKey: session.requestKey,
+            'Incoming audio spec does not match the existing target WAV file.',
+        requestKey: writeContext.requestKey,
       );
     }
 
@@ -67,21 +67,21 @@ final class WavFileOutput implements TtsOutput {
     }
 
     _state.init(
-      session: session,
+      writeContext: writeContext,
       tempFile: tempFile,
       lockedDescriptor: lockedDescriptor,
     );
   }
 
   @override
-  Future<void> consumeChunk(TtsChunk chunk) async {
-    final session = _state.session;
+  Future<void> writeChunk(TtsChunk chunk) async {
+    final writeContext = _state.writeContext;
     final sink = _state.sink;
-    if (session == null || sink == null) {
-      throw StateError('WavFileOutput session is not initialized.');
+    if (writeContext == null || sink == null) {
+      throw StateError('WavFileOutput write has not started.');
     }
-    if (chunk.requestKey != session.requestKey) {
-      throw StateError('Chunk requestKey does not match active session.');
+    if (chunk.requestKey != writeContext.requestKey) {
+      throw StateError('Chunk requestKey does not match active write.');
     }
 
     if (chunk is! TtsAudioChunk) {
@@ -89,14 +89,14 @@ final class WavFileOutput implements TtsOutput {
     }
 
     try {
-      final parsed = _parseChunk(chunk, session: session);
+      final parsed = _parseChunk(chunk, writeContext: writeContext);
       final lockedDescriptor = _state.lockedDescriptor;
       if (lockedDescriptor != null && lockedDescriptor != parsed.descriptor) {
         throw TtsError(
           code: TtsErrorCode.invalidRequest,
           message:
               'Incoming chunk audio spec does not match the existing target WAV file.',
-          requestKey: session.requestKey,
+          requestKey: writeContext.requestKey,
         );
       }
 
@@ -106,8 +106,8 @@ final class WavFileOutput implements TtsOutput {
       } else if (existingDescriptor != parsed.descriptor) {
         throw TtsError(
           code: TtsErrorCode.outputWriteFailed,
-          message: 'WAV chunk descriptors are inconsistent within a session.',
-          requestKey: session.requestKey,
+          message: 'WAV chunk descriptors are inconsistent within a write.',
+          requestKey: writeContext.requestKey,
         );
       }
 
@@ -120,56 +120,56 @@ final class WavFileOutput implements TtsOutput {
       throw TtsError(
         code: TtsErrorCode.outputWriteFailed,
         message: 'Failed writing chunk to WAV output file.',
-        requestKey: session.requestKey,
+        requestKey: writeContext.requestKey,
         cause: error,
       );
     }
   }
 
   @override
-  Future<AudioArtifact> finalizeSession() async {
-    final session = _state.session;
+  Future<AudioArtifact> finishWrite() async {
+    final writeContext = _state.writeContext;
     final tempFile = _state.tempFile;
-    if (session == null || tempFile == null) {
-      throw StateError('WavFileOutput session is not initialized.');
+    if (writeContext == null || tempFile == null) {
+      throw StateError('WavFileOutput write has not started.');
     }
 
     final targetFile = File(filePath);
     try {
       await _state.flushAndCloseSink();
-      final descriptor = _resolveWavPcmDescriptor(session);
+      final descriptor = _resolveWavPcmDescriptor(writeContext);
       final lockedDescriptor = _state.lockedDescriptor;
       if (lockedDescriptor != null && lockedDescriptor != descriptor) {
         throw TtsError(
           code: TtsErrorCode.invalidRequest,
           message:
-              'Session audio spec does not match the existing target WAV file.',
-          requestKey: session.requestKey,
+              'Incoming audio spec does not match the existing target WAV file.',
+          requestKey: writeContext.requestKey,
         );
       }
 
       final existingTarget = await _readExistingTarget(
         targetFile,
-        requestKey: session.requestKey,
+        requestKey: writeContext.requestKey,
       );
       if (existingTarget != null && existingTarget.descriptor != descriptor) {
         throw TtsError(
           code: TtsErrorCode.invalidRequest,
           message:
-              'Existing target WAV file audio spec changed during the session.',
-          requestKey: session.requestKey,
+              'Existing target WAV file audio spec changed during the write.',
+          requestKey: writeContext.requestKey,
         );
       }
 
-      final sessionPayloadLength = await tempFile.length();
+      final writePayloadLength = await tempFile.length();
       final combinedPayloadLength = existingTarget == null
-          ? sessionPayloadLength
-          : existingTarget.payloadLengthBytes + sessionPayloadLength;
+          ? writePayloadLength
+          : existingTarget.payloadLengthBytes + writePayloadLength;
       if (combinedPayloadLength > 0xFFFFFFFF) {
         throw TtsError(
           code: TtsErrorCode.outputWriteFailed,
           message: 'WAV payload is too large for canonical header fields.',
-          requestKey: session.requestKey,
+          requestKey: writeContext.requestKey,
         );
       }
 
@@ -183,21 +183,21 @@ final class WavFileOutput implements TtsOutput {
               ).toBytes()
             : null,
         append: existingTarget != null,
-        requestKey: session.requestKey,
+        requestKey: writeContext.requestKey,
       );
 
       await _rewriteWavHeader(
         targetFile: targetFile,
         descriptor: descriptor,
         dataLengthBytes: combinedPayloadLength,
-        requestKey: session.requestKey,
+        requestKey: writeContext.requestKey,
       );
 
       await tempFile.delete();
       final fileSize = await targetFile.length();
 
       return FileAudioArtifact(
-        requestKey: session.requestKey,
+        requestKey: writeContext.requestKey,
         audioSpec: TtsAudioSpec.pcm(descriptor),
         filePath: targetFile.path,
         fileSizeBytes: fileSize,
@@ -210,7 +210,7 @@ final class WavFileOutput implements TtsOutput {
       throw TtsError(
         code: TtsErrorCode.outputWriteFailed,
         message: 'Failed finalizing WAV output file.',
-        requestKey: session.requestKey,
+        requestKey: writeContext.requestKey,
         cause: error,
       );
     } finally {
@@ -219,7 +219,7 @@ final class WavFileOutput implements TtsOutput {
   }
 
   @override
-  Future<void> onCancelSession(SynthesisControl control) async {
+  Future<void> cancelWrite(SynthesisControl control) async {
     await _state.safeCleanupTemp();
     _state.clear();
   }
@@ -230,7 +230,7 @@ final class WavFileOutput implements TtsOutput {
     _state.clear();
   }
 
-  PcmDescriptor _resolveWavPcmDescriptor(TtsOutputSession session) {
+  PcmDescriptor _resolveWavPcmDescriptor(TtsOutputWriteContext writeContext) {
     final chunkDescriptor = _state.descriptorFromChunks;
     if (chunkDescriptor != null) {
       return chunkDescriptor;
@@ -241,19 +241,19 @@ final class WavFileOutput implements TtsOutput {
       return lockedDescriptor;
     }
 
-    final descriptor = session.audioSpec.pcm;
+    final descriptor = writeContext.audioSpec.pcm;
     if (descriptor != null) {
       return descriptor;
     }
 
     final sampleRateHz =
-        session.options?.sampleRateHz ?? _defaultWavSampleRateHz;
+        writeContext.options?.sampleRateHz ?? _defaultWavSampleRateHz;
     if (sampleRateHz < wavMinSampleRateHz ||
         sampleRateHz > wavMaxSampleRateHz) {
       throw TtsError(
         code: TtsErrorCode.invalidRequest,
         message: 'Invalid sampleRateHz for WAV output: $sampleRateHz.',
-        requestKey: session.requestKey,
+        requestKey: writeContext.requestKey,
       );
     }
 
@@ -265,20 +265,22 @@ final class WavFileOutput implements TtsOutput {
     );
   }
 
-  PcmDescriptor? _resolveDeclaredSessionDescriptor(TtsOutputSession session) {
-    if (session.audioSpec.pcm != null) {
-      return session.audioSpec.pcm;
+  PcmDescriptor? _resolveDeclaredWriteDescriptor(
+    TtsOutputWriteContext writeContext,
+  ) {
+    if (writeContext.audioSpec.pcm != null) {
+      return writeContext.audioSpec.pcm;
     }
 
-    if (session.audioSpec.format == TtsAudioFormat.pcm) {
+    if (writeContext.audioSpec.format == TtsAudioFormat.pcm) {
       final sampleRateHz =
-          session.options?.sampleRateHz ?? _defaultWavSampleRateHz;
+          writeContext.options?.sampleRateHz ?? _defaultWavSampleRateHz;
       if (sampleRateHz < wavMinSampleRateHz ||
           sampleRateHz > wavMaxSampleRateHz) {
         throw TtsError(
           code: TtsErrorCode.invalidRequest,
           message: 'Invalid sampleRateHz for WAV output: $sampleRateHz.',
-          requestKey: session.requestKey,
+          requestKey: writeContext.requestKey,
         );
       }
 
@@ -327,7 +329,7 @@ final class WavFileOutput implements TtsOutput {
     } catch (error) {
       throw TtsError(
         code: TtsErrorCode.outputWriteFailed,
-        message: 'Failed appending WAV session payload to target file.',
+        message: 'Failed appending WAV write payload to target file.',
         requestKey: requestKey,
         cause: error,
       );
@@ -414,20 +416,20 @@ final class WavFileOutput implements TtsOutput {
 
   _ParsedWavChunk _parseChunk(
     TtsAudioChunk chunk, {
-    required TtsOutputSession session,
+    required TtsOutputWriteContext writeContext,
   }) {
     final chunkFormat = chunk.audioSpec.format;
     if (chunkFormat == TtsAudioFormat.pcm) {
       final descriptor =
           chunk.audioSpec.pcm ??
-          session.audioSpec.pcm ??
+          writeContext.audioSpec.pcm ??
           _state.descriptorFromChunks;
       if (descriptor == null) {
         throw TtsError(
           code: TtsErrorCode.invalidRequest,
           message:
-              'PCM chunks require a PcmDescriptor in chunk or session audioSpec.',
-          requestKey: session.requestKey,
+              'PCM chunks require a PcmDescriptor in chunk or write context audioSpec.',
+          requestKey: writeContext.requestKey,
         );
       }
       return _ParsedWavChunk(descriptor: descriptor, payload: chunk.bytes);
@@ -436,24 +438,24 @@ final class WavFileOutput implements TtsOutput {
     throw TtsError(
       code: TtsErrorCode.unsupportedFormat,
       message: 'WavFileOutput cannot consume $chunkFormat chunks.',
-      requestKey: session.requestKey,
+      requestKey: writeContext.requestKey,
     );
   }
 }
 
-final class _WavFileOutputSessionState {
-  TtsOutputSession? session;
+final class _WavFileOutputWriteState {
+  TtsOutputWriteContext? writeContext;
   File? tempFile;
   IOSink? sink;
   PcmDescriptor? descriptorFromChunks;
   PcmDescriptor? lockedDescriptor;
 
   void init({
-    required TtsOutputSession session,
+    required TtsOutputWriteContext writeContext,
     required File tempFile,
     required PcmDescriptor? lockedDescriptor,
   }) {
-    this.session = session;
+    this.writeContext = writeContext;
     this.tempFile = tempFile;
     this.lockedDescriptor = lockedDescriptor;
     sink = tempFile.openWrite();
@@ -494,7 +496,7 @@ final class _WavFileOutputSessionState {
   }
 
   void clear() {
-    session = null;
+    writeContext = null;
     tempFile = null;
     sink = null;
     descriptorFromChunks = null;

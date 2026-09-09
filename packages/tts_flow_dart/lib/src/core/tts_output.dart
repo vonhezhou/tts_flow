@@ -4,34 +4,34 @@ import 'package:tts_flow_dart/src/core/audio_spec.dart';
 import 'package:tts_flow_dart/src/core/synthesis_control.dart';
 import 'package:tts_flow_dart/src/core/tts_chunk.dart';
 import 'package:tts_flow_dart/src/core/tts_errors.dart';
-import 'package:tts_flow_dart/src/core/tts_output_session.dart';
+import 'package:tts_flow_dart/src/core/tts_output_write_context.dart';
 
-/// Output contract that consumes synthesized chunks and produces a final audio
-/// artifact.
+/// Output contract that writes synthesized chunks and produces an audio
+/// artifact after its input closes.
 ///
 /// Typical output lifecycle per request:
 /// 1. [init] is called once for output-wide setup.
-/// 2. [initSession] starts request-scoped state.
-/// 3. [consumeChunk] is called zero or more times in sequence order.
-/// 4. Complete with [finalizeSession] or abort via [onCancelSession].
+/// 2. [startWrite] opens one request's audio input.
+/// 3. [writeChunk] is called zero or more times in sequence order.
+/// 4. Complete with [finishWrite] or abort via [cancelWrite].
 /// 5. [dispose] releases output resources at shutdown.
 ///
 /// When an output is passed to [TtsFlow] as its default output or as a
 /// request-level override, that flow owns the output lifecycle. It initializes
-/// the output before its first session and disposes it when the flow is
+/// the output before its first write and disposes it when the flow is
 /// disposed. Do not share the same output instance between flows.
 ///
-/// For one flow, ingestion sessions are strictly serial: the flow will not
-/// call [initSession] for the next request until the current request has
-/// finished with [finalizeSession] or [onCancelSession]. An implementation only
-/// needs one active ingestion session; it does not need a concurrent session
-/// map or an audio-processing scheduler.
+/// For one flow, writes are strictly serial: the flow will not
+/// call [startWrite] for the next request until the current request has
+/// finished with [finishWrite] or [cancelWrite]. An implementation only
+/// needs one active write; it does not need a concurrent write map or an
+/// audio-processing scheduler.
 ///
 /// Implementer expectations:
-/// - Validate that each consumed chunk belongs to the active session.
+/// - Validate that each chunk belongs to the active write.
 /// - Preserve chunk order when writing bytes to a sink.
-/// - Reject a second [initSession] while the current session is active.
-/// - Ensure [onCancelSession] and [dispose] are safe after partial writes.
+/// - Reject a second [startWrite] while a write is active.
+/// - Ensure [cancelWrite] and [dispose] are safe after partial writes.
 abstract interface class TtsOutput {
   /// Stable identifier for this output implementation.
   String get outputId;
@@ -48,47 +48,47 @@ abstract interface class TtsOutput {
   /// reusable native handles.
   Future<void> init();
 
-  /// Starts a new request-scoped output session.
+  /// Opens this output for one request's audio input.
   ///
-  /// The preceding session is always terminal before this call. Implementations
+  /// The preceding write is always terminal before this call. Implementations
   /// should prepare one active sink for chunks that belong to
-  /// [session.requestKey].
-  Future<void> initSession(TtsOutputSession session);
+  /// [writeContext.requestKey].
+  Future<void> startWrite(TtsOutputWriteContext writeContext);
 
-  /// Consumes one synthesized [chunk] for the active session.
+  /// Writes one synthesized [chunk] to the active request input.
   ///
   /// Chunks are provided in sequence order and should be written in that same
   /// order to preserve audio integrity.
-  Future<void> consumeChunk(TtsChunk chunk);
+  Future<void> writeChunk(TtsChunk chunk);
 
-  /// Finalizes the active session and returns its resulting [AudioArtifact].
+  /// Closes the active request input and returns its [AudioArtifact].
   ///
-  /// After this call, session state should be closed and not accept additional
-  /// chunks.
-  Future<AudioArtifact> finalizeSession();
+  /// This means no more synthesis chunks will be written. It does not mean a
+  /// physical playback device has finished playing them.
+  Future<AudioArtifact> finishWrite();
 
-  /// Cancels the active session using [control] as cancellation context.
+  /// Aborts the active request input using [control] as cancellation context.
   ///
-  /// Implementations should stop writes promptly, release session resources,
-  /// and be resilient when no active session exists.
-  Future<void> onCancelSession(SynthesisControl control);
+  /// Implementations should stop writes promptly, release write resources, and
+  /// be resilient when no write is active.
+  Future<void> cancelWrite(SynthesisControl control);
 
-  /// Releases output resources and any active session state.
+  /// Releases output resources and any active write state.
   Future<void> dispose();
 }
 
 /// Optional output capability that emits physical playback completion events.
 ///
-/// Implement this on outputs that can distinguish ingestion completion from
-/// device playback completion.
+/// Implement this on outputs that can distinguish write completion from device
+/// playback completion.
 abstract interface class PlaybackAwareOutput {
   Stream<TtsOutputPlaybackCompletedEvent> get playbackCompletedEvents;
 }
 
 /// Optional output capability that emits physical playback failures.
 ///
-/// A playback failure is deliberately separate from synthesis/output ingestion
-/// failure: it can arrive after [TtsOutput.finalizeSession] has completed, and
+/// A playback failure is deliberately separate from synthesis/output writing
+/// failure: it can arrive after [TtsOutput.finishWrite] has completed, and
 /// must not retroactively turn a completed synthesis request into a failed one.
 abstract interface class PlaybackFailureAwareOutput {
   Stream<TtsOutputPlaybackFailedEvent> get playbackFailedEvents;
@@ -101,7 +101,7 @@ abstract interface class PlaybackFailureAwareOutput {
 /// completion and failure event capabilities so callers can observe terminal
 /// playback state. This capability does not require, or promise, concurrent
 /// speaker mixing: it only keeps control and observation available after the
-/// serial ingestion session has ended.
+/// serial write has ended.
 abstract interface class PlaybackControllableOutput
     implements PlaybackAwareOutput, PlaybackFailureAwareOutput {
   /// Whether [requestKey] still has physical playback that can be controlled.

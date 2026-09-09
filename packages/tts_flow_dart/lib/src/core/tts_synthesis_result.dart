@@ -1,7 +1,7 @@
 import 'package:tts_flow_dart/src/core/audio_artifact.dart';
 import 'package:tts_flow_dart/src/core/tts_errors.dart';
 
-/// Terminal result of one request's synthesis and output-ingestion lifecycle.
+/// Terminal result of one request's synthesis and output-writing lifecycle.
 ///
 /// This deliberately excludes physical playback completion. A speaker may
 /// still have queued device audio after a [TtsSynthesisCompletedResult] is
@@ -24,7 +24,7 @@ final class TtsSynthesisCompletedResult extends TtsSynthesisResult {
     required this.artifact,
   });
 
-  /// Artifact returned by [TtsOutput.finalizeSession].
+  /// Artifact returned by [TtsOutput.finishWrite].
   final AudioArtifact artifact;
 }
 
@@ -39,7 +39,7 @@ final class TtsSynthesisStoppedResult extends TtsSynthesisResult {
   final TtsSynthesisStopReason reason;
 }
 
-/// Synthesis or primary-output ingestion failed.
+/// Synthesis or primary-output writing failed.
 final class TtsSynthesisFailedResult extends TtsSynthesisResult {
   const TtsSynthesisFailedResult({
     required super.requestKey,

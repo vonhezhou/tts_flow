@@ -51,7 +51,7 @@ final class TtsRequestHandle extends StreamView<TtsChunk> {
   /// the caller subscribes. This is a single-subscription stream.
   final Stream<TtsRequestEvent> events;
 
-  /// Terminal synthesis and output-ingestion result for this request.
+  /// Terminal synthesis and output-writing result for this request.
   ///
   /// This future always completes with a [TtsSynthesisResult], including when
   /// synthesis stops or fails. It does not wait for physical speaker playback.

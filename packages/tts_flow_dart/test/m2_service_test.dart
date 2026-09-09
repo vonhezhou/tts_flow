@@ -38,38 +38,35 @@ void main() {
       await service.dispose();
     });
 
-    test(
-      'serializes output ingestion sessions across queued requests',
-      () async {
-        final output = _LifecycleTrackingOutput(outputId: 'serial-output');
-        final service = TtsFlow(
-          engine: SineTtsEngine(
-            engineId: 'fake-engine',
-            supportsStreaming: true,
-            chunkCount: 2,
-            chunkDelay: const Duration(milliseconds: 2),
-          ),
-          defaultOutput: output,
-        );
+    test('serializes output writes across queued requests', () async {
+      final output = _LifecycleTrackingOutput(outputId: 'serial-output');
+      final service = TtsFlow(
+        engine: SineTtsEngine(
+          engineId: 'fake-engine',
+          supportsStreaming: true,
+          chunkCount: 2,
+          chunkDelay: const Duration(milliseconds: 2),
+        ),
+        defaultOutput: output,
+      );
 
-        await service.init();
-        final first = service.speak('first output session');
-        final second = service.speak('second output session');
+      await service.init();
+      final first = service.speak('first output write');
+      final second = service.speak('second output write');
 
-        await first.toList();
-        await second.toList();
+      await first.toList();
+      await second.toList();
 
-        expect(output.overlappingSessionAttempted, isFalse);
-        expect(output.lifecycle, [
-          'init:${first.requestKey}',
-          'finalize:${first.requestKey}',
-          'init:${second.requestKey}',
-          'finalize:${second.requestKey}',
-        ]);
+      expect(output.overlappingSessionAttempted, isFalse);
+      expect(output.lifecycle, [
+        'init:${first.requestKey}',
+        'finalize:${first.requestKey}',
+        'init:${second.requestKey}',
+        'finalize:${second.requestKey}',
+      ]);
 
-        await service.dispose();
-      },
-    );
+      await service.dispose();
+    });
 
     test('reused utterance IDs retain distinct request handles', () async {
       final service = TtsFlow(
@@ -332,7 +329,7 @@ void main() {
       },
     );
 
-    test('initializes output session using first chunk audioSpec', () async {
+    test('starts output writing using first chunk audioSpec', () async {
       final output = _TrackingOutput(outputId: 'tracking-output');
       final service = TtsFlow(
         engine: _ChunkSpecEngine(
@@ -638,7 +635,7 @@ void main() {
     });
 
     test(
-      'requestSynthesisCompleted is ingestion-based and playback completion is separate',
+      'requestSynthesisCompleted is write-based and playback completion is separate',
       () async {
         final output = _PlaybackAwareTestOutput(
           outputId: 'playback-aware',
@@ -841,8 +838,8 @@ void main() {
           .drain();
 
       expect(overrideOutput.initCount, 1);
-      expect(overrideOutput.initSessionCount, 1);
-      expect(defaultOutput.initSessionCount, 0);
+      expect(overrideOutput.startWriteCount, 1);
+      expect(defaultOutput.startWriteCount, 0);
 
       await service.dispose();
 
@@ -869,7 +866,7 @@ void main() {
           .drain();
 
       expect(output.initCount, 1);
-      expect(output.initSessionCount, 2);
+      expect(output.startWriteCount, 2);
 
       await service.dispose();
       expect(output.disposeCount, 1);
@@ -913,7 +910,7 @@ void main() {
             .drain();
 
         expect(failingOutput.initCount, 1);
-        expect(succeedingOutput.initSessionCount, 1);
+        expect(succeedingOutput.startWriteCount, 1);
 
         await service.dispose();
         expect(failingOutput.disposeCount, 1);
@@ -994,10 +991,10 @@ final class _AlwaysFailOutput implements TtsOutput {
   Future<void> init() async {}
 
   @override
-  Future<void> initSession(TtsOutputSession session) async {}
+  Future<void> startWrite(TtsOutputWriteContext session) async {}
 
   @override
-  Future<void> consumeChunk(TtsChunk chunk) async {
+  Future<void> writeChunk(TtsChunk chunk) async {
     throw const TtsError(
       code: TtsErrorCode.outputWriteFailed,
       message: 'Injected output failure.',
@@ -1005,7 +1002,7 @@ final class _AlwaysFailOutput implements TtsOutput {
   }
 
   @override
-  Future<AudioArtifact> finalizeSession() async {
+  Future<AudioArtifact> finishWrite() async {
     throw const TtsError(
       code: TtsErrorCode.outputWriteFailed,
       message: 'Injected output failure.',
@@ -1013,7 +1010,7 @@ final class _AlwaysFailOutput implements TtsOutput {
   }
 
   @override
-  Future<void> onCancelSession(SynthesisControl control) async {}
+  Future<void> cancelWrite(SynthesisControl control) async {}
 
   @override
   Future<void> dispose() async {}
@@ -1027,7 +1024,7 @@ final class _FailFirstOutput implements TtsOutput {
   final String outputId;
 
   int _remainingFailures;
-  TtsOutputSession? _session;
+  TtsOutputWriteContext? _session;
 
   @override
   Set<AudioCapability> get inAudioCapabilities => {PcmCapability.wav()};
@@ -1036,12 +1033,12 @@ final class _FailFirstOutput implements TtsOutput {
   Future<void> init() async {}
 
   @override
-  Future<void> initSession(TtsOutputSession session) async {
+  Future<void> startWrite(TtsOutputWriteContext session) async {
     _session = session;
   }
 
   @override
-  Future<void> consumeChunk(TtsChunk chunk) async {
+  Future<void> writeChunk(TtsChunk chunk) async {
     final session = _session;
     if (session == null) {
       return;
@@ -1056,7 +1053,7 @@ final class _FailFirstOutput implements TtsOutput {
   }
 
   @override
-  Future<AudioArtifact> finalizeSession() async {
+  Future<AudioArtifact> finishWrite() async {
     final session = _session;
     if (session == null) {
       throw StateError('No active output session.');
@@ -1070,7 +1067,7 @@ final class _FailFirstOutput implements TtsOutput {
   }
 
   @override
-  Future<void> onCancelSession(SynthesisControl control) async {}
+  Future<void> cancelWrite(SynthesisControl control) async {}
 
   @override
   Future<void> dispose() async {
@@ -1080,7 +1077,7 @@ final class _FailFirstOutput implements TtsOutput {
 
 final class _CaptureCancelOutput implements TtsOutput {
   final BytesBuilder _buffer = BytesBuilder(copy: false);
-  TtsOutputSession? _session;
+  TtsOutputWriteContext? _session;
   CancelReason? lastCancelReason;
 
   @override
@@ -1096,13 +1093,13 @@ final class _CaptureCancelOutput implements TtsOutput {
   Future<void> init() async {}
 
   @override
-  Future<void> initSession(TtsOutputSession session) async {
+  Future<void> startWrite(TtsOutputWriteContext session) async {
     _session = session;
     _buffer.clear();
   }
 
   @override
-  Future<void> consumeChunk(TtsChunk chunk) async {
+  Future<void> writeChunk(TtsChunk chunk) async {
     if (chunk is! TtsAudioChunk) {
       return;
     }
@@ -1111,7 +1108,7 @@ final class _CaptureCancelOutput implements TtsOutput {
   }
 
   @override
-  Future<AudioArtifact> finalizeSession() async {
+  Future<AudioArtifact> finishWrite() async {
     final session = _session;
     if (session == null) {
       throw StateError('No active output session.');
@@ -1127,7 +1124,7 @@ final class _CaptureCancelOutput implements TtsOutput {
   }
 
   @override
-  Future<void> onCancelSession(SynthesisControl control) async {
+  Future<void> cancelWrite(SynthesisControl control) async {
     lastCancelReason = control.cancelReason;
     _session = null;
     _buffer.clear();
@@ -1148,7 +1145,7 @@ final class _PcmOnlyOutput implements TtsOutput {
   final String outputId;
 
   final Set<int> _sampleRatesHz;
-  TtsOutputSession? _session;
+  TtsOutputWriteContext? _session;
 
   @override
   Set<AudioCapability> get inAudioCapabilities => {
@@ -1164,15 +1161,15 @@ final class _PcmOnlyOutput implements TtsOutput {
   Future<void> init() async {}
 
   @override
-  Future<void> initSession(TtsOutputSession session) async {
+  Future<void> startWrite(TtsOutputWriteContext session) async {
     _session = session;
   }
 
   @override
-  Future<void> consumeChunk(TtsChunk chunk) async {}
+  Future<void> writeChunk(TtsChunk chunk) async {}
 
   @override
-  Future<AudioArtifact> finalizeSession() async {
+  Future<AudioArtifact> finishWrite() async {
     final session = _session;
     if (session == null) {
       throw StateError('No active output session.');
@@ -1186,7 +1183,7 @@ final class _PcmOnlyOutput implements TtsOutput {
   }
 
   @override
-  Future<void> onCancelSession(SynthesisControl control) async {
+  Future<void> cancelWrite(SynthesisControl control) async {
     _session = null;
   }
 
@@ -1203,7 +1200,7 @@ final class _TrackingOutput implements TtsOutput {
   final String outputId;
 
   final List<TtsChunk> consumedChunks = [];
-  TtsOutputSession? _session;
+  TtsOutputWriteContext? _session;
   TtsAudioSpec? lastInitAudioSpec;
 
   @override
@@ -1216,19 +1213,19 @@ final class _TrackingOutput implements TtsOutput {
   Future<void> init() async {}
 
   @override
-  Future<void> initSession(TtsOutputSession session) async {
+  Future<void> startWrite(TtsOutputWriteContext session) async {
     _session = session;
     lastInitAudioSpec = session.audioSpec;
     consumedChunks.clear();
   }
 
   @override
-  Future<void> consumeChunk(TtsChunk chunk) async {
+  Future<void> writeChunk(TtsChunk chunk) async {
     consumedChunks.add(chunk);
   }
 
   @override
-  Future<AudioArtifact> finalizeSession() async {
+  Future<AudioArtifact> finishWrite() async {
     final session = _session;
     if (session == null) throw StateError('No active session.');
     return InMemoryAudioArtifact(
@@ -1240,7 +1237,7 @@ final class _TrackingOutput implements TtsOutput {
   }
 
   @override
-  Future<void> onCancelSession(SynthesisControl control) async {
+  Future<void> cancelWrite(SynthesisControl control) async {
     _session = null;
   }
 
@@ -1260,12 +1257,12 @@ final class _LifecycleTrackingOutput implements TtsOutput {
   final bool throwOnInit;
 
   var initCount = 0;
-  var initSessionCount = 0;
+  var startWriteCount = 0;
   var disposeCount = 0;
   var overlappingSessionAttempted = false;
   final lifecycle = <String>[];
   var _initialized = false;
-  TtsOutputSession? _session;
+  TtsOutputWriteContext? _session;
 
   @override
   Set<AudioCapability> get inAudioCapabilities => {PcmCapability.wav()};
@@ -1280,7 +1277,7 @@ final class _LifecycleTrackingOutput implements TtsOutput {
   }
 
   @override
-  Future<void> initSession(TtsOutputSession session) async {
+  Future<void> startWrite(TtsOutputWriteContext session) async {
     if (!_initialized) {
       throw StateError('Output was not initialized.');
     }
@@ -1288,16 +1285,16 @@ final class _LifecycleTrackingOutput implements TtsOutput {
       overlappingSessionAttempted = true;
       throw StateError('Previous output session is still active.');
     }
-    initSessionCount++;
+    startWriteCount++;
     _session = session;
     lifecycle.add('init:${session.requestKey}');
   }
 
   @override
-  Future<void> consumeChunk(TtsChunk chunk) async {}
+  Future<void> writeChunk(TtsChunk chunk) async {}
 
   @override
-  Future<AudioArtifact> finalizeSession() async {
+  Future<AudioArtifact> finishWrite() async {
     final session = _session;
     if (session == null) {
       throw StateError('No active output session.');
@@ -1313,7 +1310,7 @@ final class _LifecycleTrackingOutput implements TtsOutput {
   }
 
   @override
-  Future<void> onCancelSession(SynthesisControl control) async {
+  Future<void> cancelWrite(SynthesisControl control) async {
     final requestKey = _session?.requestKey;
     _session = null;
     if (requestKey != null) {
@@ -1409,7 +1406,7 @@ final class _PlaybackAwareTestOutput
   _playbackFailedController =
       StreamController<TtsOutputPlaybackFailedEvent>.broadcast();
 
-  TtsOutputSession? _session;
+  TtsOutputWriteContext? _session;
   String? _playbackId;
   int _bytesCount = 0;
 
@@ -1431,14 +1428,14 @@ final class _PlaybackAwareTestOutput
   Future<void> init() async {}
 
   @override
-  Future<void> initSession(TtsOutputSession session) async {
+  Future<void> startWrite(TtsOutputWriteContext session) async {
     _session = session;
     _playbackId = 'playback-${session.requestKey}';
     _bytesCount = 0;
   }
 
   @override
-  Future<void> consumeChunk(TtsChunk chunk) async {
+  Future<void> writeChunk(TtsChunk chunk) async {
     if (chunk is! TtsAudioChunk) {
       return;
     }
@@ -1446,7 +1443,7 @@ final class _PlaybackAwareTestOutput
   }
 
   @override
-  Future<AudioArtifact> finalizeSession() async {
+  Future<AudioArtifact> finishWrite() async {
     final session = _session;
     final playbackId = _playbackId;
     if (session == null || playbackId == null) {
@@ -1500,7 +1497,7 @@ final class _PlaybackAwareTestOutput
   }
 
   @override
-  Future<void> onCancelSession(SynthesisControl control) async {
+  Future<void> cancelWrite(SynthesisControl control) async {
     _session = null;
     _playbackId = null;
   }
@@ -1525,7 +1522,7 @@ final class _PlaybackControllableTestOutput
       StreamController<TtsOutputPlaybackCompletedEvent>.broadcast();
   final _failed = StreamController<TtsOutputPlaybackFailedEvent>.broadcast();
   final Set<String> _activeRequestKeys = <String>{};
-  TtsOutputSession? _session;
+  TtsOutputWriteContext? _session;
   var pauseCount = 0;
   var resumeCount = 0;
   var stopCount = 0;
@@ -1545,16 +1542,16 @@ final class _PlaybackControllableTestOutput
   Future<void> init() async {}
 
   @override
-  Future<void> initSession(TtsOutputSession session) async {
+  Future<void> startWrite(TtsOutputWriteContext session) async {
     _session = session;
     _activeRequestKeys.add(session.requestKey);
   }
 
   @override
-  Future<void> consumeChunk(TtsChunk chunk) async {}
+  Future<void> writeChunk(TtsChunk chunk) async {}
 
   @override
-  Future<AudioArtifact> finalizeSession() async {
+  Future<AudioArtifact> finishWrite() async {
     final session = _session;
     if (session == null) {
       throw StateError('No active output session.');
@@ -1568,7 +1565,7 @@ final class _PlaybackControllableTestOutput
   }
 
   @override
-  Future<void> onCancelSession(SynthesisControl control) async {
+  Future<void> cancelWrite(SynthesisControl control) async {
     final requestKey = _session?.requestKey;
     if (requestKey != null) {
       _activeRequestKeys.remove(requestKey);

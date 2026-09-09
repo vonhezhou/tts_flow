@@ -66,7 +66,7 @@ final class Decoder implements TtsOutput {
     };
   }
 
-  TtsOutputSession? _session;
+  TtsOutputWriteContext? _writeContext;
   BytesBuilder? _buffer;
   TtsAudioSpec? _negotiatedSpec;
 
@@ -76,34 +76,34 @@ final class Decoder implements TtsOutput {
   }
 
   @override
-  Future<void> initSession(TtsOutputSession session) async {
-    _session = session;
+  Future<void> startWrite(TtsOutputWriteContext writeContext) async {
+    _writeContext = writeContext;
     _buffer = BytesBuilder(copy: false);
 
-    _negotiatedSpec = _resolveAudioSpec(requestKey: session.requestKey);
+    _negotiatedSpec = _resolveAudioSpec(requestKey: writeContext.requestKey);
 
-    final outputSession = session.copyWith(
+    final downstreamWriteContext = writeContext.copyWith(
       audioSpec: _negotiatedSpec,
     );
 
-    await output.initSession(outputSession);
+    await output.startWrite(downstreamWriteContext);
   }
 
   int _chunkSequenceNumber = 0;
 
   @override
-  Future<void> consumeChunk(TtsChunk chunk) async {
-    final session = _session;
+  Future<void> writeChunk(TtsChunk chunk) async {
+    final writeContext = _writeContext;
     final buffer = _buffer;
-    if (session == null || buffer == null) {
-      throw StateError('Decoder session is not initialized.');
+    if (writeContext == null || buffer == null) {
+      throw StateError('Decoder write has not started.');
     }
-    if (chunk.requestKey != session.requestKey) {
-      throw StateError('Chunk requestKey does not match active session.');
+    if (chunk.requestKey != writeContext.requestKey) {
+      throw StateError('Chunk requestKey does not match active write.');
     }
 
     if (chunk is! TtsAudioChunk) {
-      await output.consumeChunk(chunk);
+      await output.writeChunk(chunk);
       return;
     }
 
@@ -113,8 +113,8 @@ final class Decoder implements TtsOutput {
     }
 
     Uint8List decodedPcmBytes;
-    if (session.audioSpec.format == TtsAudioFormat.pcm) {
-      final inputPcm = session.audioSpec.requirePcm;
+    if (writeContext.audioSpec.format == TtsAudioFormat.pcm) {
+      final inputPcm = writeContext.audioSpec.requirePcm;
       final targetPcm = negotiatedSpec.requirePcm;
       final needsConversion =
           inputPcm.sampleRateHz != targetPcm.sampleRateHz ||
@@ -134,7 +134,7 @@ final class Decoder implements TtsOutput {
         decodedPcmBytes = chunk.bytes;
       }
     } else {
-      final formatHint = session.audioSpec.format.name;
+      final formatHint = writeContext.audioSpec.format.name;
       decodedPcmBytes = await AudioDecoder.convertToWavBytes(
         chunk.bytes,
         formatHint: formatHint,
@@ -146,7 +146,7 @@ final class Decoder implements TtsOutput {
     }
 
     final decodedChunk = TtsAudioChunk(
-      requestKey: session.requestKey,
+      requestKey: writeContext.requestKey,
       sequenceNumber: _chunkSequenceNumber++,
       bytes: decodedPcmBytes,
       audioSpec: negotiatedSpec,
@@ -154,23 +154,23 @@ final class Decoder implements TtsOutput {
       timestamp: DateTime.now(),
     );
 
-    await output.consumeChunk(decodedChunk);
+    await output.writeChunk(decodedChunk);
   }
 
   @override
-  Future<AudioArtifact> finalizeSession() async {
-    _session = null;
+  Future<AudioArtifact> finishWrite() async {
+    _writeContext = null;
     _buffer = null;
     _negotiatedSpec = null;
     _chunkSequenceNumber = 0;
 
-    return output.finalizeSession();
+    return output.finishWrite();
   }
 
   @override
-  Future<void> onCancelSession(SynthesisControl control) async {
-    await output.onCancelSession(control);
-    _session = null;
+  Future<void> cancelWrite(SynthesisControl control) async {
+    await output.cancelWrite(control);
+    _writeContext = null;
     _buffer = null;
     _negotiatedSpec = null;
     _chunkSequenceNumber = 0;
@@ -179,7 +179,7 @@ final class Decoder implements TtsOutput {
   @override
   Future<void> dispose() async {
     await output.dispose();
-    _session = null;
+    _writeContext = null;
     _buffer = null;
     _negotiatedSpec = null;
     _chunkSequenceNumber = 0;

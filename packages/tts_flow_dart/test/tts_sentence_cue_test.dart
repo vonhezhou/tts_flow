@@ -5,7 +5,7 @@ import 'package:tts_flow_dart/tts_flow_dart.dart';
 
 void main() {
   test(
-    'cue emitted before audio bypasses the uninitialized output session',
+    'cue emitted before audio bypasses the output before writing starts',
     () async {
       final flow = TtsFlow(
         engine: _CueFirstEngine(),

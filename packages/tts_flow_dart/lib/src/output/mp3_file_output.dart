@@ -10,16 +10,16 @@ import 'package:tts_flow_dart/src/core/synthesis_control.dart';
 import 'package:tts_flow_dart/src/core/tts_chunk.dart';
 import 'package:tts_flow_dart/src/core/tts_errors.dart';
 import 'package:tts_flow_dart/src/core/tts_output.dart';
-import 'package:tts_flow_dart/src/core/tts_output_session.dart';
+import 'package:tts_flow_dart/src/core/tts_output_write_context.dart';
 
 final _log = Logger('tts_flow_dart.Mp3FileOutput');
 
 final class Mp3FileOutput implements TtsOutput {
   Mp3FileOutput(this.filePath, {this.outputId = 'mp3-file-output'})
-    : _state = _Mp3FileOutputSessionState();
+    : _state = _Mp3FileOutputWriteState();
 
   final String filePath;
-  final _Mp3FileOutputSessionState _state;
+  final _Mp3FileOutputWriteState _state;
 
   @override
   final String outputId;
@@ -31,12 +31,12 @@ final class Mp3FileOutput implements TtsOutput {
   Future<void> init() async {}
 
   @override
-  Future<void> initSession(TtsOutputSession session) async {
-    if (session.audioSpec.format != TtsAudioFormat.mp3) {
+  Future<void> startWrite(TtsOutputWriteContext writeContext) async {
+    if (writeContext.audioSpec.format != TtsAudioFormat.mp3) {
       throw TtsError(
         code: TtsErrorCode.unsupportedFormat,
         message: 'Mp3FileOutput only accepts MP3 audio format.',
-        requestKey: session.requestKey,
+        requestKey: writeContext.requestKey,
       );
     }
 
@@ -45,7 +45,7 @@ final class Mp3FileOutput implements TtsOutput {
 
     final lockedHeader = await _readTargetHeader(
       target,
-      requestKey: session.requestKey,
+      requestKey: writeContext.requestKey,
     );
 
     final tempFile = File('$filePath.tmp');
@@ -54,21 +54,21 @@ final class Mp3FileOutput implements TtsOutput {
     }
 
     _state.init(
-      session: session,
+      writeContext: writeContext,
       tempFile: tempFile,
       lockedHeader: lockedHeader,
     );
   }
 
   @override
-  Future<void> consumeChunk(TtsChunk chunk) async {
-    final session = _state.session;
+  Future<void> writeChunk(TtsChunk chunk) async {
+    final writeContext = _state.writeContext;
     final sink = _state.sink;
-    if (session == null || sink == null) {
-      throw StateError('Mp3FileOutput session is not initialized.');
+    if (writeContext == null || sink == null) {
+      throw StateError('Mp3FileOutput write has not started.');
     }
-    if (chunk.requestKey != session.requestKey) {
-      throw StateError('Chunk requestKey does not match active session.');
+    if (chunk.requestKey != writeContext.requestKey) {
+      throw StateError('Chunk requestKey does not match active write.');
     }
 
     if (chunk is! TtsAudioChunk) {
@@ -82,30 +82,30 @@ final class Mp3FileOutput implements TtsOutput {
       throw TtsError(
         code: TtsErrorCode.outputWriteFailed,
         message: 'Failed writing chunk to MP3 output file.',
-        requestKey: session.requestKey,
+        requestKey: writeContext.requestKey,
         cause: error,
       );
     }
   }
 
   @override
-  Future<AudioArtifact> finalizeSession() async {
-    final session = _state.session;
+  Future<AudioArtifact> finishWrite() async {
+    final writeContext = _state.writeContext;
     final tempFile = _state.tempFile;
-    if (session == null || tempFile == null) {
-      throw StateError('Mp3FileOutput session is not initialized.');
+    if (writeContext == null || tempFile == null) {
+      throw StateError('Mp3FileOutput write has not started.');
     }
 
     final targetFile = File(filePath);
     try {
       await _state.flushAndCloseSink();
-      final sessionHeader = await _readSessionHeader(
+      final incomingHeader = await _readIncomingHeader(
         tempFile,
-        requestKey: session.requestKey,
+        requestKey: writeContext.requestKey,
       );
       final currentTargetHeader = await _readTargetHeader(
         targetFile,
-        requestKey: session.requestKey,
+        requestKey: writeContext.requestKey,
       );
       final lockedHeader = _state.lockedHeader;
 
@@ -113,36 +113,36 @@ final class Mp3FileOutput implements TtsOutput {
         throw TtsError(
           code: TtsErrorCode.invalidRequest,
           message:
-              'Existing target MP3 file metadata changed during the session.',
-          requestKey: session.requestKey,
+              'Existing target MP3 file metadata changed during the write.',
+          requestKey: writeContext.requestKey,
         );
       }
       if (currentTargetHeader != null) {
-        if (currentTargetHeader.version != sessionHeader.version ||
-            currentTargetHeader.layer != sessionHeader.layer) {
+        if (currentTargetHeader.version != incomingHeader.version ||
+            currentTargetHeader.layer != incomingHeader.layer) {
           throw TtsError(
             code: TtsErrorCode.invalidRequest,
             message:
-                'Session MP3 MPEG version/layer does not match the '
+                'Incoming MP3 MPEG version/layer does not match the '
                 'existing target file and cannot be safely appended.',
-            requestKey: session.requestKey,
+            requestKey: writeContext.requestKey,
           );
         }
-        if (currentTargetHeader.sampleRateHz != sessionHeader.sampleRateHz) {
+        if (currentTargetHeader.sampleRateHz != incomingHeader.sampleRateHz) {
           _log.warning(
             'Mp3FileOutput[$outputId]: sample rate changed from '
             '${currentTargetHeader.sampleRateHz} Hz to '
-            '${sessionHeader.sampleRateHz} Hz while appending to $filePath '
-            '(requestKey: ${session.requestKey}). The resulting file may '
+            '${incomingHeader.sampleRateHz} Hz while appending to $filePath '
+            '(requestKey: ${writeContext.requestKey}). The resulting file may '
             'play with jumps or glitches.',
           );
         }
-        if (currentTargetHeader.channelCount != sessionHeader.channelCount) {
+        if (currentTargetHeader.channelCount != incomingHeader.channelCount) {
           _log.warning(
             'Mp3FileOutput[$outputId]: channel count changed from '
             '${currentTargetHeader.channelCount} to '
-            '${sessionHeader.channelCount} while appending to $filePath '
-            '(requestKey: ${session.requestKey}). The resulting file may '
+            '${incomingHeader.channelCount} while appending to $filePath '
+            '(requestKey: ${writeContext.requestKey}). The resulting file may '
             'play with jumps or glitches.',
           );
         }
@@ -164,8 +164,8 @@ final class Mp3FileOutput implements TtsOutput {
       final fileSize = await targetFile.length();
 
       return FileAudioArtifact(
-        requestKey: session.requestKey,
-        audioSpec: session.audioSpec,
+        requestKey: writeContext.requestKey,
+        audioSpec: writeContext.audioSpec,
         filePath: targetFile.path,
         fileSizeBytes: fileSize,
       );
@@ -177,7 +177,7 @@ final class Mp3FileOutput implements TtsOutput {
       throw TtsError(
         code: TtsErrorCode.outputWriteFailed,
         message: 'Failed finalizing MP3 output file.',
-        requestKey: session.requestKey,
+        requestKey: writeContext.requestKey,
         cause: error,
       );
     } finally {
@@ -186,7 +186,7 @@ final class Mp3FileOutput implements TtsOutput {
   }
 
   @override
-  Future<void> onCancelSession(SynthesisControl control) async {
+  Future<void> cancelWrite(SynthesisControl control) async {
     await _state.safeCleanupTemp();
     _state.clear();
   }
@@ -218,7 +218,7 @@ final class Mp3FileOutput implements TtsOutput {
     }
   }
 
-  Future<Mp3FrameHeader> _readSessionHeader(
+  Future<Mp3FrameHeader> _readIncomingHeader(
     File tempFile, {
     required String requestKey,
   }) async {
@@ -227,7 +227,7 @@ final class Mp3FileOutput implements TtsOutput {
     } on FormatException catch (error) {
       throw TtsError(
         code: TtsErrorCode.invalidRequest,
-        message: 'Session MP3 output does not contain a valid frame header.',
+        message: 'Incoming MP3 audio does not contain a valid frame header.',
         requestKey: requestKey,
         cause: error,
       );
@@ -308,18 +308,18 @@ final class Mp3FileOutput implements TtsOutput {
   }
 }
 
-final class _Mp3FileOutputSessionState {
-  TtsOutputSession? session;
+final class _Mp3FileOutputWriteState {
+  TtsOutputWriteContext? writeContext;
   File? tempFile;
   IOSink? sink;
   Mp3FrameHeader? lockedHeader;
 
   void init({
-    required TtsOutputSession session,
+    required TtsOutputWriteContext writeContext,
     required File tempFile,
     required Mp3FrameHeader? lockedHeader,
   }) {
-    this.session = session;
+    this.writeContext = writeContext;
     this.tempFile = tempFile;
     this.lockedHeader = lockedHeader;
     sink = tempFile.openWrite();
@@ -360,7 +360,7 @@ final class _Mp3FileOutputSessionState {
   }
 
   void clear() {
-    session = null;
+    writeContext = null;
     tempFile = null;
     sink = null;
     lockedHeader = null;

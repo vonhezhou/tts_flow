@@ -6,7 +6,7 @@ import 'package:tts_flow_dart/src/core/synthesis_control.dart';
 import 'package:tts_flow_dart/src/core/tts_auxiliary_output.dart';
 import 'package:tts_flow_dart/src/core/tts_chunk.dart';
 import 'package:tts_flow_dart/src/core/tts_output.dart';
-import 'package:tts_flow_dart/src/core/tts_output_session.dart';
+import 'package:tts_flow_dart/src/core/tts_output_write_context.dart';
 
 /// A [TtsOutput] with one backpressure-participating primary output and
 /// optional non-blocking auxiliary observers.
@@ -59,7 +59,7 @@ final class PrioritizedOutput implements TtsOutput, PlaybackControllableOutput {
 
   final List<TtsAuxiliaryOutput> _auxiliaries;
 
-  /// Non-blocking observers of the primary output session.
+  /// Non-blocking observers of the primary output write.
   List<TtsAuxiliaryOutput> get auxiliaries => _auxiliaries;
 
   @override
@@ -74,7 +74,7 @@ final class PrioritizedOutput implements TtsOutput, PlaybackControllableOutput {
   _playbackCompletedSubscription;
   StreamSubscription<TtsOutputPlaybackFailedEvent>? _playbackFailedSubscription;
 
-  TtsOutputSession? _session;
+  TtsOutputWriteContext? _writeContext;
 
   @override
   Set<AudioCapability> get inAudioCapabilities => primary.inAudioCapabilities;
@@ -101,51 +101,51 @@ final class PrioritizedOutput implements TtsOutput, PlaybackControllableOutput {
   }
 
   @override
-  Future<void> initSession(TtsOutputSession session) async {
-    await primary.initSession(session);
-    _session = session;
+  Future<void> startWrite(TtsOutputWriteContext writeContext) async {
+    await primary.startWrite(writeContext);
+    _writeContext = writeContext;
     _notifyAll(
-      TtsAuxiliaryOutputStage.initSession,
-      (auxiliary) => auxiliary.initSession(session),
+      TtsAuxiliaryOutputStage.startWrite,
+      (auxiliary) => auxiliary.startWrite(writeContext),
     );
   }
 
   @override
-  Future<void> consumeChunk(TtsChunk chunk) async {
-    final session = _requireSession();
-    if (chunk.requestKey != session.requestKey) {
-      throw StateError('Chunk requestKey does not match active session.');
+  Future<void> writeChunk(TtsChunk chunk) async {
+    final writeContext = _requireWriteContext();
+    if (chunk.requestKey != writeContext.requestKey) {
+      throw StateError('Chunk requestKey does not match active write.');
     }
 
-    await primary.consumeChunk(chunk);
+    await primary.writeChunk(chunk);
     _notifyAll(
-      TtsAuxiliaryOutputStage.consumeChunk,
-      (auxiliary) => auxiliary.consumeChunk(chunk),
+      TtsAuxiliaryOutputStage.writeChunk,
+      (auxiliary) => auxiliary.writeChunk(chunk),
     );
   }
 
   @override
-  Future<AudioArtifact> finalizeSession() async {
-    _requireSession();
-    final artifact = await primary.finalizeSession();
+  Future<AudioArtifact> finishWrite() async {
+    _requireWriteContext();
+    final artifact = await primary.finishWrite();
     _notifyAll(
-      TtsAuxiliaryOutputStage.finalizeSession,
-      (auxiliary) => auxiliary.finalizeSession(),
+      TtsAuxiliaryOutputStage.finishWrite,
+      (auxiliary) => auxiliary.finishWrite(),
     );
-    _session = null;
+    _writeContext = null;
     return artifact;
   }
 
   @override
-  Future<void> onCancelSession(SynthesisControl control) async {
+  Future<void> cancelWrite(SynthesisControl control) async {
     try {
-      await primary.onCancelSession(control);
+      await primary.cancelWrite(control);
     } finally {
       _notifyAll(
-        TtsAuxiliaryOutputStage.cancelSession,
-        (auxiliary) => auxiliary.onCancelSession(control),
+        TtsAuxiliaryOutputStage.cancelWrite,
+        (auxiliary) => auxiliary.cancelWrite(control),
       );
-      _session = null;
+      _writeContext = null;
     }
   }
 
@@ -184,7 +184,7 @@ final class PrioritizedOutput implements TtsOutput, PlaybackControllableOutput {
         TtsAuxiliaryOutputStage.dispose,
         (auxiliary) => auxiliary.dispose(),
       );
-      _session = null;
+      _writeContext = null;
       await _playbackCompletedSubscription?.cancel();
       await _playbackFailedSubscription?.cancel();
       await _playbackCompletedController.close();
@@ -193,12 +193,12 @@ final class PrioritizedOutput implements TtsOutput, PlaybackControllableOutput {
     }
   }
 
-  TtsOutputSession _requireSession() {
-    final session = _session;
-    if (session == null) {
-      throw StateError('PrioritizedOutput session is not initialized.');
+  TtsOutputWriteContext _requireWriteContext() {
+    final writeContext = _writeContext;
+    if (writeContext == null) {
+      throw StateError('PrioritizedOutput write has not started.');
     }
-    return session;
+    return writeContext;
   }
 
   PlaybackControllableOutput _requirePlaybackOutput() {
@@ -223,7 +223,7 @@ final class PrioritizedOutput implements TtsOutput, PlaybackControllableOutput {
             stage: stage,
             error: error,
             stackTrace: stackTrace,
-            requestKey: _session?.requestKey,
+            requestKey: _writeContext?.requestKey,
           ),
         );
       }

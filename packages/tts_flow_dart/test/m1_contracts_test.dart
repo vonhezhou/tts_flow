@@ -90,15 +90,15 @@ void main() {
       'null output discards bytes while preserving resolved format',
       () async {
         final output = NullOutput();
-        const session = TtsOutputSession(
+        const session = TtsOutputWriteContext(
           requestKey: 'r3',
           audioSpec: _pcmSpec,
           voice: null,
           options: null,
         );
 
-        await output.initSession(session);
-        await output.consumeChunk(
+        await output.startWrite(session);
+        await output.writeChunk(
           TtsAudioChunk(
             requestKey: 'r3',
             sequenceNumber: 0,
@@ -109,7 +109,7 @@ void main() {
           ),
         );
 
-        final artifact = await output.finalizeSession();
+        final artifact = await output.finishWrite();
         expect(artifact, isA<InMemoryAudioArtifact>());
 
         final memoryArtifact = artifact as InMemoryAudioArtifact;

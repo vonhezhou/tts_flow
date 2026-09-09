@@ -19,18 +19,18 @@ void main() {
       final backend = _FakeSpeakerBackend();
       final output = SpeakerOutput(backend: backend);
 
-      await output.initSession(
-        const TtsOutputSession(
+      await output.startWrite(
+        const TtsOutputWriteContext(
           requestKey: 'spk-1',
           audioSpec: _mp3Spec,
           voice: null,
           options: null,
         ),
       );
-      await output.consumeChunk(_chunk('spk-1', [1, 2], TtsAudioFormat.mp3));
-      await output.consumeChunk(_chunk('spk-1', [3], TtsAudioFormat.mp3));
+      await output.writeChunk(_chunk('spk-1', [1, 2], TtsAudioFormat.mp3));
+      await output.writeChunk(_chunk('spk-1', [3], TtsAudioFormat.mp3));
 
-      final artifact = await output.finalizeSession();
+      final artifact = await output.finishWrite();
       expect(artifact, isA<PlaybackAudioArtifact>());
 
       final speaker = artifact as PlaybackAudioArtifact;
@@ -44,22 +44,22 @@ void main() {
       );
     });
 
-    test('onCancelSession stops active playback', () async {
+    test('cancelWrite stops active playback', () async {
       final backend = _FakeSpeakerBackend();
       final output = SpeakerOutput(backend: backend);
 
-      await output.initSession(
-        const TtsOutputSession(
+      await output.startWrite(
+        const TtsOutputWriteContext(
           requestKey: 'spk-2',
           audioSpec: _pcmSpec,
           voice: null,
           options: null,
         ),
       );
-      await output.consumeChunk(_chunk('spk-2', [9], TtsAudioFormat.pcm));
+      await output.writeChunk(_chunk('spk-2', [9], TtsAudioFormat.pcm));
       final control = SynthesisControl()
         ..cancel(CancelReason.stopCurrent, message: 'manual-stop');
-      await output.onCancelSession(control);
+      await output.cancelWrite(control);
 
       expect(backend.stoppedPlaybackIds, contains('playback-spk-2'));
       expect(backend.stopReasons['playback-spk-2'], 'manual-stop');
@@ -69,27 +69,27 @@ void main() {
       final backend = _FakeSpeakerBackend();
       final output = SpeakerOutput(backend: backend);
 
-      await output.initSession(
-        const TtsOutputSession(
+      await output.startWrite(
+        const TtsOutputWriteContext(
           requestKey: 'spk-a',
           audioSpec: _mp3Spec,
           voice: null,
           options: null,
         ),
       );
-      await output.consumeChunk(_chunk('spk-a', [4], TtsAudioFormat.mp3));
-      await output.finalizeSession();
+      await output.writeChunk(_chunk('spk-a', [4], TtsAudioFormat.mp3));
+      await output.finishWrite();
 
-      await output.initSession(
-        const TtsOutputSession(
+      await output.startWrite(
+        const TtsOutputWriteContext(
           requestKey: 'spk-b',
           audioSpec: _pcmSpec,
           voice: null,
           options: null,
         ),
       );
-      await output.consumeChunk(_chunk('spk-b', [7, 8], TtsAudioFormat.pcm));
-      await output.finalizeSession();
+      await output.writeChunk(_chunk('spk-b', [7, 8], TtsAudioFormat.pcm));
+      await output.finishWrite();
 
       expect(backend.writtenBytes['playback-spk-a'], [4]);
       expect(backend.writtenBytes['playback-spk-b'], [7, 8]);
@@ -99,15 +99,15 @@ void main() {
       final backend = _FakeSpeakerBackend();
       final output = SpeakerOutput(backend: backend);
 
-      await output.initSession(
-        const TtsOutputSession(
+      await output.startWrite(
+        const TtsOutputWriteContext(
           requestKey: 'spk-control',
           audioSpec: _mp3Spec,
           voice: null,
           options: null,
         ),
       );
-      await output.finalizeSession();
+      await output.finishWrite();
 
       expect(output.hasActivePlayback('spk-control'), isTrue);
       await output.pausePlayback('spk-control');
@@ -128,15 +128,15 @@ void main() {
         outputs: [SpeakerOutput(backend: backend)],
       );
 
-      await output.initSession(
-        const TtsOutputSession(
+      await output.startWrite(
+        const TtsOutputWriteContext(
           requestKey: 'spk-multicast-control',
           audioSpec: _mp3Spec,
           voice: null,
           options: null,
         ),
       );
-      await output.finalizeSession();
+      await output.finishWrite();
 
       expect(output.hasActivePlayback('spk-multicast-control'), isTrue);
       await output.pausePlayback('spk-multicast-control');

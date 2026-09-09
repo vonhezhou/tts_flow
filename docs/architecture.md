@@ -45,13 +45,13 @@
 
 ### Output 生命周期
 
-传给 `TtsFlow` 的默认 Output 与请求级 Output 都由该 Flow 管理：Flow 会在某个 Output 首次开始 session 前初始化它，并在 Flow 销毁时释放它。一个 Output 实例不应同时交给多个 Flow 使用。
+传给 `TtsFlow` 的默认 Output 与请求级 Output 都由该 Flow 管理：Flow 会在某个 Output 首次开始写入前初始化它，并在 Flow 销毁时释放它。一个 Output 实例不应同时交给多个 Flow 使用。
 
 请求级 Output 的惰性初始化使调用方可以按请求选择单路或多路输出，而不用手动拼接 Output 的初始化时机。
 
-同一个 Flow 对同一个 `TtsOutput` 的摄入 session 严格串行：前一个请求必须完成 `finalizeSession()` 或 `onCancelSession()`，下一个请求才会调用 `initSession()`。因此 `TtsOutput` 只需维护一个活跃摄入 session，不承担并行合成、并行写入或音频图调度。
+同一个 Flow 对同一个 `TtsOutput` 的写入严格串行：前一个请求必须完成 `finishWrite()` 或 `cancelWrite()`，下一个请求才会调用 `startWrite()`。因此 `TtsOutput` 只需维护一个活跃写入，不承担并行合成、并行写入或音频图调度。
 
-这不等同于“设备上没有任何旧音频仍在播放”。`SpeakerOutput` 等播放 Output 可以在摄入结束后保留某个 request 的物理播放控制与事件关联；该能力只用于观测和控制已交给设备的音频，不承诺多个请求混播。
+这不等同于“设备上没有任何旧音频仍在播放”。`SpeakerOutput` 等播放 Output 可以在写入结束后保留某个 request 的物理播放控制与事件关联；该能力只用于观测和控制已交给设备的音频，不承诺多个请求混播。
 
 ## 低延迟原则
 
@@ -126,9 +126,9 @@
 
 队列/合成控制与物理播放控制也必须分离。队列暂停只影响后续合成请求的启动；已交给设备的音频由 `TtsRequestHandle.pausePlayback()`、`resumePlayback()` 与 `stopPlayback()` 控制。可控制播放的 Output 必须在音频提交完成后继续保留 request 到 playback 的关联，直到物理播放终止。
 
-`TtsRequestHandle.synthesisResult` 是请求合成与 Output 摄入的终态结果：成功时携带 `TtsOutput.finalizeSession()` 返回的 `AudioArtifact`，停止或失败时携带对应原因。它始终正常完成，避免仅播放的调用方因未监听 result 而得到未处理的 Future 错误。它不等待设备实际播完；物理播放仍通过 playback 事件和控制接口表达。
+`TtsRequestHandle.synthesisResult` 是请求合成与 Output 写入的终态结果：成功时携带 `TtsOutput.finishWrite()` 返回的 `AudioArtifact`，停止或失败时携带对应原因。它始终正常完成，避免仅播放的调用方因未监听 result 而得到未处理的 Future 错误。它不等待设备实际播完；物理播放仍通过 playback 事件和控制接口表达。
 
-每次 `speak()` 都由 Flow 生成唯一、不透明的 `requestKey`，它是 engine、chunk、output session 和物理播放路由的唯一键。调用方可传入 Android 风格的 `utteranceId`，它只用于业务关联并随 Flow 事件与请求句柄公开；该值允许重复，绝不能参与底层会话寻址。
+每次 `speak()` 都由 Flow 生成唯一、不透明的 `requestKey`，它是 engine、chunk、output write 和物理播放路由的唯一键。调用方可传入 Android 风格的 `utteranceId`，它只用于业务关联并随 Flow 事件与请求句柄公开；该值允许重复，绝不能参与底层会话寻址。
 - 可选的、按请求连续的物理播放时间轴；支持该能力的 backend 可用于
   句子级字幕或阅读高亮，但它不是所有 backend 的强制职责。
 

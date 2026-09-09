@@ -710,36 +710,36 @@ final class _WavRecordingAuxiliaryOutput implements TtsAuxiliaryOutput {
   }
 
   @override
-  void initSession(TtsOutputSession session) {
+  void startWrite(TtsOutputWriteContext writeContext) {
     _hasSession = true;
-    _enqueue('initSession', () => output.initSession(session));
+    _enqueue('startWrite', () => output.startWrite(writeContext));
   }
 
   @override
-  void consumeChunk(TtsChunk chunk) {
+  void writeChunk(TtsChunk chunk) {
     if (_hasSession) {
-      _enqueue('consumeChunk', () => output.consumeChunk(chunk));
+      _enqueue('writeChunk', () => output.writeChunk(chunk));
     }
   }
 
   @override
-  void finalizeSession() {
+  void finishWrite() {
     if (!_hasSession) {
       return;
     }
     _hasSession = false;
-    _enqueue('finalizeSession', () async {
-      await output.finalizeSession();
+    _enqueue('finishWrite', () async {
+      await output.finishWrite();
     });
   }
 
   @override
-  void onCancelSession(SynthesisControl control) {
+  void cancelWrite(SynthesisControl control) {
     if (!_hasSession) {
       return;
     }
     _hasSession = false;
-    _enqueue('onCancelSession', () => output.onCancelSession(control));
+    _enqueue('cancelWrite', () => output.cancelWrite(control));
   }
 
   @override

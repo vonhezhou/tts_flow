@@ -104,7 +104,7 @@ void main() {
       });
     });
 
-    group('consumeChunk', () {
+    group('writeChunk', () {
       test('throws when session not initialized', () async {
         final chunk = TtsAudioChunk(
           requestKey: 'test-request',
@@ -116,23 +116,23 @@ void main() {
         );
 
         expect(
-          () => decoder.consumeChunk(chunk),
+          () => decoder.writeChunk(chunk),
           throwsStateError,
         );
       });
     });
 
-    group('onCancelSession', () {
-      test('calls output.onCancelSession and clears state', () async {
+    group('cancelWrite', () {
+      test('calls output.cancelWrite and clears state', () async {
         final control = SynthesisControl();
 
         when(
-          () => mockOutput.onCancelSession(control),
+          () => mockOutput.cancelWrite(control),
         ).thenAnswer((_) async {});
 
-        await decoder.onCancelSession(control);
+        await decoder.cancelWrite(control);
 
-        verify(() => mockOutput.onCancelSession(control)).called(1);
+        verify(() => mockOutput.cancelWrite(control)).called(1);
       });
     });
 

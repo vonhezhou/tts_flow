@@ -6,7 +6,7 @@ import 'package:tts_flow_dart/src/core/synthesis_control.dart';
 import 'package:tts_flow_dart/src/core/tts_chunk.dart';
 import 'package:tts_flow_dart/src/core/tts_errors.dart';
 import 'package:tts_flow_dart/src/core/tts_output.dart';
-import 'package:tts_flow_dart/src/core/tts_output_session.dart';
+import 'package:tts_flow_dart/src/core/tts_output_write_context.dart';
 import 'package:tts_flow_dart/src/core/tts_policy.dart';
 import 'package:tts_flow_dart/src/output/capability_intersection.dart';
 
@@ -83,7 +83,7 @@ final class MulticastOutput implements TtsOutput, PlaybackControllableOutput {
   _playbackFailedSubscriptions =
       <StreamSubscription<TtsOutputPlaybackFailedEvent>>[];
 
-  TtsOutputSession? _session;
+  TtsOutputWriteContext? _writeContext;
   final Map<String, TtsOutput> _activeOutputs = <String, TtsOutput>{};
   final Map<String, TtsError> _outputErrors = <String, TtsError>{};
   final Map<String, Set<PlaybackControllableOutput>>
@@ -136,19 +136,19 @@ final class MulticastOutput implements TtsOutput, PlaybackControllableOutput {
   }
 
   @override
-  Future<void> initSession(TtsOutputSession session) async {
-    _session = session;
+  Future<void> startWrite(TtsOutputWriteContext writeContext) async {
+    _writeContext = writeContext;
     _activeOutputs.clear();
     _outputErrors.clear();
 
     for (final output in _outputs) {
       try {
-        await output.initSession(session);
+        await output.startWrite(writeContext);
         _activeOutputs[output.outputId] = output;
         if (output case final PlaybackControllableOutput playbackOutput) {
           _playbackControlsByRequest
               .putIfAbsent(
-                session.requestKey,
+                writeContext.requestKey,
                 () => <PlaybackControllableOutput>{},
               )
               .add(playbackOutput);
@@ -156,16 +156,16 @@ final class MulticastOutput implements TtsOutput, PlaybackControllableOutput {
       } catch (error) {
         final converted = _toOutputError(
           error,
-          requestKey: session.requestKey,
-          stage: 'initSession',
+          requestKey: writeContext.requestKey,
+          stage: 'startWrite',
           outputId: output.outputId,
         );
         _outputErrors[output.outputId] = converted;
         if (errorPolicy == MulticastOutputErrorPolicy.failFast) {
           await _rollbackOutputs(
             entries: _activeOutputs.entries.toList(),
-            requestKey: session.requestKey,
-            stage: 'initSession',
+            requestKey: writeContext.requestKey,
+            stage: 'startWrite',
             failingOutputId: output.outputId,
           );
           _clearSession();
@@ -174,27 +174,27 @@ final class MulticastOutput implements TtsOutput, PlaybackControllableOutput {
       }
     }
 
-    _ensureAtLeastOneOutput(requestKey: session.requestKey);
+    _ensureAtLeastOneOutput(requestKey: writeContext.requestKey);
   }
 
   @override
-  Future<void> consumeChunk(TtsChunk chunk) async {
-    final session = _session;
-    if (session == null) {
-      throw StateError('MulticastOutput session is not initialized.');
+  Future<void> writeChunk(TtsChunk chunk) async {
+    final writeContext = _writeContext;
+    if (writeContext == null) {
+      throw StateError('MulticastOutput write has not started.');
     }
-    if (chunk.requestKey != session.requestKey) {
-      throw StateError('Chunk requestKey does not match active session.');
+    if (chunk.requestKey != writeContext.requestKey) {
+      throw StateError('Chunk requestKey does not match active write.');
     }
 
     for (final entry in _activeOutputs.entries.toList()) {
       try {
-        await entry.value.consumeChunk(chunk);
+        await entry.value.writeChunk(chunk);
       } catch (error) {
         final converted = _toOutputError(
           error,
-          requestKey: session.requestKey,
-          stage: 'consumeChunk',
+          requestKey: writeContext.requestKey,
+          stage: 'writeChunk',
           outputId: entry.key,
         );
         _outputErrors[entry.key] = converted;
@@ -202,8 +202,8 @@ final class MulticastOutput implements TtsOutput, PlaybackControllableOutput {
         if (errorPolicy == MulticastOutputErrorPolicy.failFast) {
           await _rollbackOutputs(
             entries: _activeOutputs.entries.toList(),
-            requestKey: session.requestKey,
-            stage: 'consumeChunk',
+            requestKey: writeContext.requestKey,
+            stage: 'writeChunk',
             failingOutputId: entry.key,
           );
           _clearSession();
@@ -212,26 +212,26 @@ final class MulticastOutput implements TtsOutput, PlaybackControllableOutput {
       }
     }
 
-    _ensureAtLeastOneOutput(requestKey: session.requestKey);
+    _ensureAtLeastOneOutput(requestKey: writeContext.requestKey);
   }
 
   @override
-  Future<AudioArtifact> finalizeSession() async {
-    final session = _session;
-    if (session == null) {
-      throw StateError('MulticastOutput session is not initialized.');
+  Future<AudioArtifact> finishWrite() async {
+    final writeContext = _writeContext;
+    if (writeContext == null) {
+      throw StateError('MulticastOutput write has not started.');
     }
 
     final artifacts = <String, AudioArtifact>{};
     for (final entry in _activeOutputs.entries.toList()) {
       try {
-        final artifact = await entry.value.finalizeSession();
+        final artifact = await entry.value.finishWrite();
         artifacts[entry.key] = artifact;
       } catch (error) {
         final converted = _toOutputError(
           error,
-          requestKey: session.requestKey,
-          stage: 'finalizeSession',
+          requestKey: writeContext.requestKey,
+          stage: 'finishWrite',
           outputId: entry.key,
         );
         _outputErrors[entry.key] = converted;
@@ -239,8 +239,8 @@ final class MulticastOutput implements TtsOutput, PlaybackControllableOutput {
         if (errorPolicy == MulticastOutputErrorPolicy.failFast) {
           await _rollbackOutputs(
             entries: _activeOutputs.entries.toList(),
-            requestKey: session.requestKey,
-            stage: 'finalizeSession',
+            requestKey: writeContext.requestKey,
+            stage: 'finishWrite',
             failingOutputId: entry.key,
           );
           _clearSession();
@@ -256,8 +256,8 @@ final class MulticastOutput implements TtsOutput, PlaybackControllableOutput {
     }
 
     final artifact = MulticastAudioArtifact(
-      requestKey: session.requestKey,
-      audioSpec: session.audioSpec,
+      requestKey: writeContext.requestKey,
+      audioSpec: writeContext.audioSpec,
       artifacts: artifacts,
       outputErrors: _outputErrors,
     );
@@ -266,18 +266,18 @@ final class MulticastOutput implements TtsOutput, PlaybackControllableOutput {
   }
 
   @override
-  Future<void> onCancelSession(SynthesisControl control) async {
-    final requestKey = _session?.requestKey;
+  Future<void> cancelWrite(SynthesisControl control) async {
+    final requestKey = _writeContext?.requestKey;
     final activeEntries = _activeOutputs.entries.toList();
     for (final entry in activeEntries) {
       try {
-        await entry.value.onCancelSession(control);
+        await entry.value.cancelWrite(control);
       } catch (error) {
-        final requestKey = _session?.requestKey;
+        final requestKey = _writeContext?.requestKey;
         final converted = _toOutputError(
           error,
           requestKey: requestKey,
-          stage: 'onCancelSession',
+          stage: 'cancelWrite',
           outputId: entry.key,
         );
         _outputErrors[entry.key] = converted;
@@ -333,7 +333,7 @@ final class MulticastOutput implements TtsOutput, PlaybackControllableOutput {
       } catch (error) {
         final converted = _toOutputError(
           error,
-          requestKey: _session?.requestKey,
+          requestKey: _writeContext?.requestKey,
           stage: 'dispose',
           outputId: output.outputId,
         );
@@ -395,7 +395,7 @@ final class MulticastOutput implements TtsOutput, PlaybackControllableOutput {
   }
 
   void _clearSession() {
-    _session = null;
+    _writeContext = null;
     _activeOutputs.clear();
   }
 
@@ -461,12 +461,12 @@ final class MulticastOutput implements TtsOutput, PlaybackControllableOutput {
 
     for (final entry in entries) {
       try {
-        await entry.value.onCancelSession(rollbackControl);
+        await entry.value.cancelWrite(rollbackControl);
       } catch (error) {
         final converted = _toOutputError(
           error,
           requestKey: requestKey,
-          stage: '$stage.rollback.onCancelSession',
+          stage: '$stage.rollback.cancelWrite',
           outputId: entry.key,
         );
         _outputErrors[entry.key] = converted;

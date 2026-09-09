@@ -2,8 +2,9 @@ import 'package:tts_flow_dart/src/core/audio_spec.dart';
 import 'package:tts_flow_dart/src/core/tts_request.dart';
 import 'package:tts_flow_dart/src/core/tts_voice.dart';
 
-final class TtsOutputSession {
-  const TtsOutputSession({
+/// Request metadata supplied when [TtsOutput.startWrite] opens an output.
+final class TtsOutputWriteContext {
+  const TtsOutputWriteContext({
     required this.requestKey,
     required this.audioSpec,
     required this.voice,
@@ -11,13 +12,13 @@ final class TtsOutputSession {
     this.params = const {},
   });
 
-  TtsOutputSession copyWith({
+  TtsOutputWriteContext copyWith({
     String? requestKey,
     TtsAudioSpec? audioSpec,
     TtsVoice? voice,
     TtsOptions? options,
     Map<String, Object>? params,
-  }) => TtsOutputSession(
+  }) => TtsOutputWriteContext(
     requestKey: requestKey ?? this.requestKey,
     audioSpec: audioSpec ?? this.audioSpec,
     voice: voice ?? this.voice,
