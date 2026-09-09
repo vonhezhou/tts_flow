@@ -91,17 +91,12 @@ class _TtsFlowExamplePageState extends State<TtsFlowExamplePage> {
 
     final service = TtsFlow(
       engine: engine,
-      defaultOutput: MulticastOutput(
-        outputs: [
-          SpeakerOutput(backend: _backend),
-          Decoder(
-            outputId: 'decoder',
+      defaultOutput: PrioritizedOutput(
+        primary: SpeakerOutput(backend: _backend),
+        auxiliaries: [
+          _WavRecordingAuxiliaryOutput(
             output: WavFileOutput(outputWavPath),
-            pcmFormat: const PcmDescriptor(
-              sampleRateHz: 32000,
-              channels: 1,
-              bitsPerSample: 16,
-            ),
+            log: _log,
           ),
         ],
       ),
@@ -171,7 +166,7 @@ class _TtsFlowExamplePageState extends State<TtsFlowExamplePage> {
         _voices = voices;
         _selectedVoiceId = selectedVoiceId;
         _status =
-            'Ready using $_engineLabel. Tap "Speak" to play it through the device speaker. Decoded WAV: $outputWavPath';
+            'Ready using $_engineLabel. Tap "Speak" to play it through the device speaker. Auxiliary WAV: $outputWavPath';
       });
     } catch (error, stackTrace) {
       _log.severe('Failed to initialize TtsFlow.', error, stackTrace);
@@ -691,5 +686,80 @@ class _TtsFlowExamplePageState extends State<TtsFlowExamplePage> {
         ),
       ),
     );
+  }
+}
+
+/// Example-side recording observer for [PrioritizedOutput].
+///
+/// It owns serial file delivery itself, which is deliberately not a
+/// responsibility of tts_flow's primary/auxiliary output wrapper.
+final class _WavRecordingAuxiliaryOutput implements TtsAuxiliaryOutput {
+  _WavRecordingAuxiliaryOutput({required this.output, required this.log});
+
+  final WavFileOutput output;
+  final Logger log;
+  Future<void> _pending = Future<void>.value();
+  var _hasSession = false;
+
+  @override
+  String get outputId => 'example-wav-recorder';
+
+  @override
+  void init() {
+    _enqueue('init', output.init);
+  }
+
+  @override
+  void initSession(TtsOutputSession session) {
+    _hasSession = true;
+    _enqueue('initSession', () => output.initSession(session));
+  }
+
+  @override
+  void consumeChunk(TtsChunk chunk) {
+    if (_hasSession) {
+      _enqueue('consumeChunk', () => output.consumeChunk(chunk));
+    }
+  }
+
+  @override
+  void finalizeSession() {
+    if (!_hasSession) {
+      return;
+    }
+    _hasSession = false;
+    _enqueue('finalizeSession', () async {
+      await output.finalizeSession();
+    });
+  }
+
+  @override
+  void onCancelSession(SynthesisControl control) {
+    if (!_hasSession) {
+      return;
+    }
+    _hasSession = false;
+    _enqueue('onCancelSession', () => output.onCancelSession(control));
+  }
+
+  @override
+  void dispose() {
+    _hasSession = false;
+    _enqueue('dispose', output.dispose);
+  }
+
+  void _enqueue(String operation, Future<void> Function() action) {
+    _pending = _pending
+        .catchError((Object error, StackTrace stackTrace) {
+          log.warning('Auxiliary WAV recorder failed.', error, stackTrace);
+        })
+        .then<void>((_) => action())
+        .catchError((Object error, StackTrace stackTrace) {
+          log.warning(
+            'Auxiliary WAV recorder failed during $operation.',
+            error,
+            stackTrace,
+          );
+        });
   }
 }

@@ -11,6 +11,10 @@
 
 ## Unreleased
 
+- Added `PrioritizedOutput` and `TtsAuxiliaryOutput` for playback-first
+  fanout. Only the primary output participates in backpressure and format
+  negotiation; auxiliary observers are synchronous notifications that own any
+  asynchronous delivery, buffering, and failure policy themselves.
 - Breaking: `speak(text, utteranceId: ...)` now returns a `TtsRequestHandle`.
   The flow generates an opaque `requestKey` for all engine/output/playback
   routing; application-supplied `utteranceId` is retained for event correlation

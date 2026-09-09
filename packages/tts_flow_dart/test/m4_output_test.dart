@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:io';
 import 'dart:typed_data';
 
@@ -1000,6 +1001,178 @@ void main() {
       expect(successfulThenRolledBack.cancelCalls, 1);
     });
   });
+
+  group('PrioritizedOutput', () {
+    test(
+      'waits for primary but never waits for asynchronous auxiliary work',
+      () async {
+        final auxiliary = _AsyncTestAuxiliaryOutput(outputId: 'recorder');
+        final output = PrioritizedOutput(
+          primary: MemoryOutput(outputId: 'speaker'),
+          auxiliaries: [auxiliary],
+        );
+        const session = TtsOutputSession(
+          requestKey: 'prioritized-1',
+          audioSpec: _pcmSpec,
+          voice: null,
+          options: null,
+        );
+
+        await output.init();
+        await output.initSession(session);
+        await output.consumeChunk(
+          _chunk('prioritized-1', 0, [1, 2, 3], TtsAudioFormat.pcm),
+        );
+
+        expect(auxiliary.startedChunks, [0]);
+        expect(auxiliary.completedChunks, isEmpty);
+
+        await output.finalizeSession();
+        expect(auxiliary.finalizeCalls, 1);
+        expect(auxiliary.completedChunks, isEmpty);
+
+        auxiliary.release();
+        await auxiliary.completed;
+        expect(auxiliary.completedChunks, [0]);
+        await output.dispose();
+      },
+    );
+
+    test(
+      'reports synchronous auxiliary failures without failing primary',
+      () async {
+        final output = PrioritizedOutput(
+          primary: MemoryOutput(outputId: 'speaker'),
+          auxiliaries: [_ThrowingTestAuxiliaryOutput(outputId: 'metrics')],
+        );
+        const session = TtsOutputSession(
+          requestKey: 'prioritized-2',
+          audioSpec: _pcmSpec,
+          voice: null,
+          options: null,
+        );
+        final error = output.auxiliaryErrors.first;
+
+        await output.init();
+        await output.initSession(session);
+        await output.consumeChunk(
+          _chunk('prioritized-2', 0, [7], TtsAudioFormat.pcm, isLast: true),
+        );
+        final artifact = await output.finalizeSession();
+
+        expect(artifact, isA<InMemoryAudioArtifact>());
+        await expectLater(
+          error,
+          completion(
+            isA<TtsAuxiliaryOutputError>()
+                .having((event) => event.outputId, 'outputId', 'metrics')
+                .having(
+                  (event) => event.stage,
+                  'stage',
+                  TtsAuxiliaryOutputStage.consumeChunk,
+                )
+                .having(
+                  (event) => event.requestKey,
+                  'requestKey',
+                  'prioritized-2',
+                ),
+          ),
+        );
+        await output.dispose();
+      },
+    );
+
+    test('uses only the primary output capabilities', () {
+      final output = PrioritizedOutput(
+        primary: _PcmConstraintOutput(
+          outputId: 'speaker',
+          sampleRatesHz: {24000},
+        ),
+        auxiliaries: [_AsyncTestAuxiliaryOutput(outputId: 'recorder')],
+      );
+
+      expect(
+        output.inAudioCapabilities.single,
+        isA<PcmCapability>().having(
+          (capability) => capability.sampleRatesHz,
+          'sampleRatesHz',
+          {24000},
+        ),
+      );
+    });
+  });
+}
+
+final class _AsyncTestAuxiliaryOutput implements TtsAuxiliaryOutput {
+  _AsyncTestAuxiliaryOutput({required this.outputId});
+
+  @override
+  final String outputId;
+  final _release = Completer<void>();
+  final _completed = Completer<void>();
+  final List<int> startedChunks = <int>[];
+  final List<int> completedChunks = <int>[];
+  int finalizeCalls = 0;
+
+  Future<void> get completed => _completed.future;
+
+  @override
+  void consumeChunk(TtsChunk chunk) {
+    startedChunks.add(chunk.sequenceNumber);
+    _completeLater(chunk.sequenceNumber);
+  }
+
+  @override
+  void dispose() {}
+
+  @override
+  void finalizeSession() {
+    finalizeCalls += 1;
+  }
+
+  @override
+  void init() {}
+
+  @override
+  void initSession(TtsOutputSession session) {}
+
+  @override
+  void onCancelSession(SynthesisControl control) {}
+
+  void release() => _release.complete();
+
+  Future<void> _completeLater(int sequenceNumber) async {
+    await _release.future;
+    completedChunks.add(sequenceNumber);
+    _completed.complete();
+  }
+}
+
+final class _ThrowingTestAuxiliaryOutput implements TtsAuxiliaryOutput {
+  _ThrowingTestAuxiliaryOutput({required this.outputId});
+
+  @override
+  final String outputId;
+
+  @override
+  void consumeChunk(TtsChunk chunk) {
+    throw StateError('Injected auxiliary failure.');
+  }
+
+  @override
+  void dispose() {}
+
+  @override
+  void finalizeSession() {}
+
+  @override
+  void init() {}
+
+  @override
+  void initSession(TtsOutputSession session) {}
+
+  @override
+  void onCancelSession(SynthesisControl control) {}
 }
 
 final class _FailingTestOutput implements TtsOutput {

@@ -40,6 +40,7 @@ inputs) to speed up integration debugging.
   - MemoryOutput
   - Mp3/Wav/AacFileOutput
   - MulticastOutput (fanout to multiple outputs)
+  - PrioritizedOutput (low-latency primary output with non-blocking observers)
   - SpeakerOutput (backend abstraction baseline)
 - Built-in adapters/utilities:
   - TtsFormatNegotiator
@@ -294,6 +295,33 @@ Policy options:
 
 Tip: use `failFast` when all outputs are required for correctness. Use
 `bestEffort` for resilient production fanout where partial output is acceptable.
+
+## PrioritizedOutput (Playback-First Fanout)
+
+Use `PrioritizedOutput` when a latency-critical output, typically a speaker,
+must not wait for recording, analytics, or application-owned processing:
+
+```dart
+final output = PrioritizedOutput(
+  primary: SpeakerOutput(backend: backend),
+  auxiliaries: [
+    appRecorder,
+    playbackMetrics,
+  ],
+);
+```
+
+`primary` is the only child whose lifecycle futures are awaited and whose
+capabilities take part in format negotiation. Each auxiliary implements
+`TtsAuxiliaryOutput`, whose methods are synchronous notifications. It must
+start any asynchronous work itself and own its ordering, buffering, error
+handling, and finalization. `PrioritizedOutput` intentionally has no auxiliary
+queue or drop policy.
+
+Use `MulticastOutput` instead when every output must receive a complete,
+backpressure-coupled stream. For a full external processing pipeline, consume
+`TtsRequestHandle.chunks` in the application rather than expanding this
+package into a media graph.
 
 ## SpeakerBackend Implementation Checklist
 
