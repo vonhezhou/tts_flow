@@ -33,6 +33,16 @@ final class TtsRequestHandle extends StreamView<TtsChunk> {
   final String utteranceId;
 
   /// Chunks produced by synthesis for this request.
+  ///
+  /// This is a single-subscription stream. The handle itself is a view of the
+  /// same stream, so listen through either this property or the handle, never
+  /// both. Attach one listener promptly after [TtsFlow.speak] when handing the
+  /// request to an application-owned realtime processing system.
+  ///
+  /// This stream deliberately is not an application-level fanout API. Use
+  /// [MulticastOutput] for backpressure-coupled outputs, [PrioritizedOutput]
+  /// for playback-first auxiliary observers, or implement application-owned
+  /// fanout with its own buffering and delivery policy.
   final Stream<TtsChunk> chunks;
 
   /// Lifecycle events for this request only, including events emitted before

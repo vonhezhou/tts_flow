@@ -94,6 +94,28 @@ void main() {
       await service.dispose();
     });
 
+    test('request chunks have one explicit consumer', () async {
+      final service = TtsFlow(
+        engine: SineTtsEngine(
+          engineId: 'fake-engine',
+          supportsStreaming: true,
+          chunkCount: 1,
+        ),
+        defaultOutput: NullOutput(),
+      );
+
+      await service.init();
+      final handle = service.speak('single stream consumer');
+
+      expect(handle.isBroadcast, isFalse);
+      expect(handle.chunks.isBroadcast, isFalse);
+      final chunks = await handle.toList();
+      expect(chunks, isNotEmpty);
+      expect(() => handle.chunks.listen((_) {}), throwsA(isA<StateError>()));
+
+      await service.dispose();
+    });
+
     test('clearQueue cancels pending requests only', () async {
       final service = TtsFlow(
         engine: SineTtsEngine(

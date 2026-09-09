@@ -323,6 +323,20 @@ backpressure-coupled stream. For a full external processing pipeline, consume
 `TtsRequestHandle.chunks` in the application rather than expanding this
 package into a media graph.
 
+## TtsRequestHandle.chunks (Application Processing Handoff)
+
+`TtsRequestHandle.chunks` is a single-subscription stream. The request handle
+itself is a view of that same stream, so use either `handle.listen(...)` or
+`handle.chunks.listen(...)`, not both. Attach the one consumer immediately
+after `speak()` when transferring a request to an application-owned realtime
+processing system.
+
+This is intentionally not a broadcast or implicit fanout API. If that system
+needs multiple downstream consumers, it owns their buffering, ordering, drop,
+retry, and failure policy. Prefer `MulticastOutput` for core-managed,
+backpressure-coupled outputs and `PrioritizedOutput` for a primary output with
+non-blocking observers.
+
 ## SpeakerBackend Implementation Checklist
 
 Use this when implementing a custom backend for `SpeakerOutput`.

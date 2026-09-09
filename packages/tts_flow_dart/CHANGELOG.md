@@ -15,6 +15,8 @@
   fanout. Only the primary output participates in backpressure and format
   negotiation; auxiliary observers are synchronous notifications that own any
   asynchronous delivery, buffering, and failure policy themselves.
+- Documented and tested `TtsRequestHandle.chunks` as a single-subscription
+  application-processing handoff, rather than a core-managed fanout stream.
 - Breaking: `speak(text, utteranceId: ...)` now returns a `TtsRequestHandle`.
   The flow generates an opaque `requestKey` for all engine/output/playback
   routing; application-supplied `utteranceId` is retained for event correlation
