@@ -74,8 +74,13 @@ final class ReadingSession {
   }
 
   Future<void> stop() async {
-    await _flow.stopCurrent();
+    await _flow.stopActiveSynthesis();
     await _flow.clearQueue();
+    for (final requestId in _requests.keys) {
+      if (_flow.hasActivePlayback(requestId)) {
+        await _flow.stopPlayback(requestId);
+      }
+    }
     for (final subscription in _synthesisSubscriptions) {
       await subscription.cancel();
     }

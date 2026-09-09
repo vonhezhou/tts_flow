@@ -37,6 +37,12 @@ mixin TtsUtteranceQueueMixin on TtsFlowEventBus {
   Future<void> ensureOutputInitialized(TtsOutput output);
 
   @protected
+  void registerPlaybackControl(String requestId, TtsOutput output);
+
+  @protected
+  void unregisterPlaybackControl(String requestId);
+
+  @protected
   final formatNegotiator = const TtsFormatNegotiator();
 
   @protected
@@ -164,6 +170,7 @@ mixin TtsUtteranceQueueMixin on TtsFlowEventBus {
             params: request.params,
           ),
         );
+        registerPlaybackControl(request.requestId, effectiveOutput);
         activeAudioSpec = spec;
         outputSessionInitialized = true;
       }
@@ -216,8 +223,9 @@ mixin TtsUtteranceQueueMixin on TtsFlowEventBus {
           await effectiveOutput.onCancelSession(control);
         }
         await _cancelPlaybackEventListenersForRequest(request.requestId);
+        unregisterPlaybackControl(request.requestId);
         emitRequestEvent(
-          TtsRequestEventType.requestStopped,
+          TtsRequestEventType.requestSynthesisStopped,
           requestId: request.requestId,
           state: TtsRequestState.stopped,
         );
@@ -227,7 +235,7 @@ mixin TtsUtteranceQueueMixin on TtsFlowEventBus {
         }
         await effectiveOutput.finalizeSession();
         emitRequestEvent(
-          TtsRequestEventType.requestCompleted,
+          TtsRequestEventType.requestSynthesisCompleted,
           requestId: request.requestId,
           state: TtsRequestState.completed,
         );
@@ -238,8 +246,9 @@ mixin TtsUtteranceQueueMixin on TtsFlowEventBus {
     } catch (error) {
       final failure = _mapRequestFailure(error, request);
       await _cancelPlaybackEventListenersForRequest(request.requestId);
+      unregisterPlaybackControl(request.requestId);
       emitRequestEvent(
-        TtsRequestEventType.requestFailed,
+        TtsRequestEventType.requestSynthesisFailed,
         requestId: request.requestId,
         state: TtsRequestState.failed,
         error: failure.ttsError,
@@ -360,17 +369,33 @@ mixin TtsUtteranceQueueMixin on TtsFlowEventBus {
     }
   }
 
+  /// Stops forwarding physical-playback terminal events for [requestId].
+  ///
+  /// A caller that explicitly stops playback has already established its
+  /// terminal state, so retaining these subscriptions can otherwise leave a
+  /// stale listener behind when a backend does not publish a terminal event.
+  @protected
+  Future<void> cancelPlaybackEventListenersForRequest(String requestId) {
+    return _cancelPlaybackEventListenersForRequest(requestId);
+  }
+
   Future<void> _registerPlaybackEventListeners({
     required String requestId,
     required TtsOutput output,
   }) async {
     await _cancelPlaybackEventListenersForRequest(requestId);
 
+    final PlaybackControllableOutput? controllableOutput =
+        output is PlaybackControllableOutput
+        ? output as PlaybackControllableOutput
+        : null;
+
     if (output case final PlaybackAwareOutput playbackAwareOutput) {
-      final subscription = playbackAwareOutput.playbackCompletedEvents
-          .where((event) => event.requestId == requestId)
-          .take(1)
-          .listen(
+      final events = playbackAwareOutput.playbackCompletedEvents.where(
+        (event) => event.requestId == requestId,
+      );
+      final subscription =
+          (controllableOutput == null ? events.take(1) : events).listen(
             (event) {
               emitRequestEvent(
                 TtsRequestEventType.requestPlaybackCompleted,
@@ -380,7 +405,11 @@ mixin TtsUtteranceQueueMixin on TtsFlowEventBus {
                 playbackId: event.playbackId,
                 playedDuration: event.playedDuration,
               );
-              unawaited(_cancelPlaybackFailureListenerForRequest(requestId));
+              if (controllableOutput == null ||
+                  !controllableOutput.hasActivePlayback(requestId)) {
+                unregisterPlaybackControl(requestId);
+                unawaited(_cancelPlaybackEventListenersForRequest(requestId));
+              }
             },
             onDone: () {
               _playbackCompletionSubscriptions.remove(requestId);
@@ -390,12 +419,13 @@ mixin TtsUtteranceQueueMixin on TtsFlowEventBus {
     }
 
     if (output case final PlaybackFailureAwareOutput failureAwareOutput) {
-      final subscription = failureAwareOutput.playbackFailedEvents
-          .where((event) => event.requestId == requestId)
-          .take(1)
-          .listen(
+      final events = failureAwareOutput.playbackFailedEvents.where(
+        (event) => event.requestId == requestId,
+      );
+      final subscription =
+          (controllableOutput == null ? events.take(1) : events).listen(
             (event) {
-              // Physical playback can fail after requestCompleted has already
+              // Physical playback can fail after synthesis has already
               // been emitted. This is an independent terminal playback event,
               // not a retroactive synthesis/request state transition.
               emitRequestEvent(
@@ -405,7 +435,11 @@ mixin TtsUtteranceQueueMixin on TtsFlowEventBus {
                 playbackId: event.playbackId,
                 error: event.error,
               );
-              unawaited(_cancelPlaybackCompletionListenerForRequest(requestId));
+              if (controllableOutput == null ||
+                  !controllableOutput.hasActivePlayback(requestId)) {
+                unregisterPlaybackControl(requestId);
+                unawaited(_cancelPlaybackEventListenersForRequest(requestId));
+              }
             },
             onDone: () {
               _playbackFailureSubscriptions.remove(requestId);

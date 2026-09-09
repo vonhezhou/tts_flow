@@ -23,8 +23,7 @@ enum MulticastOutputErrorPolicy {
 
 /// A TtsOutput that wraps multiple child outputs
 /// and forwards all calls to them.
-final class MulticastOutput
-    implements TtsOutput, PlaybackAwareOutput, PlaybackFailureAwareOutput {
+final class MulticastOutput implements TtsOutput, PlaybackControllableOutput {
   MulticastOutput({
     required List<TtsOutput> outputs,
     this.outputId = 'multicast-output',
@@ -53,14 +52,14 @@ final class MulticastOutput
       if (output case final PlaybackAwareOutput playbackAwareOutput) {
         _playbackCompletedSubscriptions.add(
           playbackAwareOutput.playbackCompletedEvents.listen(
-            _playbackCompletedController.add,
+            (event) => _forwardPlaybackCompleted(output, event),
           ),
         );
       }
       if (output case final PlaybackFailureAwareOutput failureAwareOutput) {
         _playbackFailedSubscriptions.add(
           failureAwareOutput.playbackFailedEvents.listen(
-            _playbackFailedController.add,
+            (event) => _forwardPlaybackFailed(output, event),
           ),
         );
       }
@@ -87,6 +86,8 @@ final class MulticastOutput
   TtsOutputSession? _session;
   final Map<String, TtsOutput> _activeOutputs = <String, TtsOutput>{};
   final Map<String, TtsError> _outputErrors = <String, TtsError>{};
+  final Map<String, Set<PlaybackControllableOutput>>
+  _playbackControlsByRequest = <String, Set<PlaybackControllableOutput>>{};
 
   @override
   Stream<TtsOutputPlaybackCompletedEvent> get playbackCompletedEvents =>
@@ -144,6 +145,14 @@ final class MulticastOutput
       try {
         await output.initSession(session);
         _activeOutputs[output.outputId] = output;
+        if (output case final PlaybackControllableOutput playbackOutput) {
+          _playbackControlsByRequest
+              .putIfAbsent(
+                session.requestId,
+                () => <PlaybackControllableOutput>{},
+              )
+              .add(playbackOutput);
+        }
       } catch (error) {
         final converted = _toOutputError(
           error,
@@ -258,6 +267,7 @@ final class MulticastOutput
 
   @override
   Future<void> onCancelSession(SynthesisControl control) async {
+    final requestId = _session?.requestId;
     final activeEntries = _activeOutputs.entries.toList();
     for (final entry in activeEntries) {
       try {
@@ -277,7 +287,41 @@ final class MulticastOutput
         }
       }
     }
+    if (requestId != null) {
+      _playbackControlsByRequest.remove(requestId);
+    }
     _clearSession();
+  }
+
+  @override
+  bool hasActivePlayback(String requestId) {
+    final controls = _playbackControlsByRequest[requestId];
+    return controls != null && controls.isNotEmpty;
+  }
+
+  @override
+  Future<void> pausePlayback(String requestId) {
+    return _controlPlayback(
+      requestId,
+      (output) => output.pausePlayback(requestId),
+    );
+  }
+
+  @override
+  Future<void> resumePlayback(String requestId) {
+    return _controlPlayback(
+      requestId,
+      (output) => output.resumePlayback(requestId),
+    );
+  }
+
+  @override
+  Future<void> stopPlayback(String requestId) async {
+    await _controlPlayback(
+      requestId,
+      (output) => output.stopPlayback(requestId),
+    );
+    _playbackControlsByRequest.remove(requestId);
   }
 
   @override
@@ -301,6 +345,7 @@ final class MulticastOutput
       }
     }
     _clearSession();
+    _playbackControlsByRequest.clear();
     for (final subscription in _playbackCompletedSubscriptions) {
       await subscription.cancel();
     }
@@ -352,6 +397,53 @@ final class MulticastOutput
   void _clearSession() {
     _session = null;
     _activeOutputs.clear();
+  }
+
+  Future<void> _controlPlayback(
+    String requestId,
+    Future<void> Function(PlaybackControllableOutput output) operation,
+  ) async {
+    final controls = _playbackControlsByRequest[requestId];
+    if (controls == null || controls.isEmpty) {
+      throw StateError('No active playback for "$requestId".');
+    }
+    for (final output in controls.toList()) {
+      await operation(output);
+    }
+  }
+
+  void _forwardPlaybackCompleted(
+    TtsOutput source,
+    TtsOutputPlaybackCompletedEvent event,
+  ) {
+    _removePlaybackControl(source, event.requestId);
+    _playbackCompletedController.add(event);
+  }
+
+  void _forwardPlaybackFailed(
+    TtsOutput source,
+    TtsOutputPlaybackFailedEvent event,
+  ) {
+    _removePlaybackControl(source, event.requestId);
+    _playbackFailedController.add(event);
+  }
+
+  void _removePlaybackControl(TtsOutput source, String requestId) {
+    final PlaybackControllableOutput? playbackControl =
+        source is PlaybackControllableOutput
+        ? source as PlaybackControllableOutput
+        : null;
+    if (playbackControl == null) {
+      return;
+    }
+    final controls = _playbackControlsByRequest[requestId];
+    if (controls == null) {
+      return;
+    }
+    controls.remove(playbackControl);
+    if (controls.isEmpty) {
+      _playbackControlsByRequest.remove(requestId);
+    }
   }
 
   Future<void> _rollbackOutputs({

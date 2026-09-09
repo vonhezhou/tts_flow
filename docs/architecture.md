@@ -103,6 +103,8 @@
 - 结束、失败和取消；
 - 格式能力；
 - 合成完成与物理播放完成的不同事件。
+
+队列/合成控制与物理播放控制也必须分离。队列暂停只影响后续合成请求的启动；已交给设备的音频由 `pausePlayback(requestId)`、`resumePlayback(requestId)` 与 `stopPlayback(requestId)` 控制。可控制播放的 Output 必须在音频提交完成后继续保留 request 到 playback 的关联，直到物理播放终止。
 - 可选的、按请求连续的物理播放时间轴；支持该能力的 backend 可用于
   句子级字幕或阅读高亮，但它不是所有 backend 的强制职责。
 

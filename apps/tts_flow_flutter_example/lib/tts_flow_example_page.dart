@@ -38,6 +38,7 @@ class _TtsFlowExamplePageState extends State<TtsFlowExamplePage> {
   var _isBusy = false;
   var _isPaused = false;
   var _requestCounter = 0;
+  String? _playbackRequestId;
   var _status = 'Initializing TtsFlow...';
 
   Duration _backendPos = Duration.zero;
@@ -222,6 +223,13 @@ class _TtsFlowExamplePageState extends State<TtsFlowExamplePage> {
     _pushEvent(
       'request ${event.type.name} req=${event.requestId} playback=${event.playbackId ?? '-'}',
     );
+    if (event.requestId == _playbackRequestId &&
+        (event.type == TtsRequestEventType.requestPlaybackCompleted ||
+            event.type == TtsRequestEventType.requestPlaybackFailed ||
+            event.type == TtsRequestEventType.requestPlaybackStopped ||
+            event.type == TtsRequestEventType.requestSynthesisStopped)) {
+      _playbackRequestId = null;
+    }
   }
 
   Future<void> _speak() async {
@@ -237,6 +245,7 @@ class _TtsFlowExamplePageState extends State<TtsFlowExamplePage> {
     });
 
     final requestId = 'flutter-example-${++_requestCounter}';
+    _playbackRequestId = requestId;
     _log.info('Starting speech request $requestId with ${text.length} chars.');
 
     try {
@@ -272,7 +281,11 @@ class _TtsFlowExamplePageState extends State<TtsFlowExamplePage> {
       return;
     }
     _log.info('Stopping current request.');
-    await service.stopCurrent();
+    final requestId = _playbackRequestId;
+    if (requestId != null && service.hasActivePlayback(requestId)) {
+      await service.stopPlayback(requestId);
+    }
+    await service.stopActiveSynthesis();
     if (!mounted) {
       return;
     }
@@ -288,7 +301,14 @@ class _TtsFlowExamplePageState extends State<TtsFlowExamplePage> {
       return;
     }
 
-    await _service?.pause();
+    final service = _service;
+    final requestId = _playbackRequestId;
+    if (service == null ||
+        requestId == null ||
+        !service.hasActivePlayback(requestId)) {
+      return;
+    }
+    await service.pausePlayback(requestId);
     if (!mounted) {
       return;
     }
@@ -303,7 +323,14 @@ class _TtsFlowExamplePageState extends State<TtsFlowExamplePage> {
       return;
     }
 
-    await _service?.resume();
+    final service = _service;
+    final requestId = _playbackRequestId;
+    if (service == null ||
+        requestId == null ||
+        !service.hasActivePlayback(requestId)) {
+      return;
+    }
+    await service.resumePlayback(requestId);
     if (!mounted) {
       return;
     }

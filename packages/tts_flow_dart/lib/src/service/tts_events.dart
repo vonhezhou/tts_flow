@@ -13,11 +13,14 @@ enum TtsRequestEventType {
   requestQueued,
   requestStarted,
   requestChunkReceived,
-  requestCompleted,
+  requestSynthesisCompleted,
   requestPlaybackCompleted,
   requestPlaybackFailed,
-  requestFailed,
-  requestStopped,
+  requestSynthesisFailed,
+  requestSynthesisStopped,
+  requestPlaybackPaused,
+  requestPlaybackResumed,
+  requestPlaybackStopped,
   requestCanceled,
 }
 

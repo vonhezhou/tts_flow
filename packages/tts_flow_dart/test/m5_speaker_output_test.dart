@@ -95,6 +95,62 @@ void main() {
       expect(backend.writtenBytes['playback-spk-b'], [7, 8]);
     });
 
+    test('controls finalized playback until it is stopped', () async {
+      final backend = _FakeSpeakerBackend();
+      final output = SpeakerOutput(backend: backend);
+
+      await output.initSession(
+        const TtsOutputSession(
+          requestId: 'spk-control',
+          audioSpec: _mp3Spec,
+          voice: null,
+          options: null,
+        ),
+      );
+      await output.finalizeSession();
+
+      expect(output.hasActivePlayback('spk-control'), isTrue);
+      await output.pausePlayback('spk-control');
+      await output.resumePlayback('spk-control');
+      await output.stopPlayback('spk-control');
+
+      expect(backend.pausedPlaybackIds, ['playback-spk-control']);
+      expect(backend.resumedPlaybackIds, ['playback-spk-control']);
+      expect(backend.stoppedPlaybackIds, ['playback-spk-control']);
+      expect(output.hasActivePlayback('spk-control'), isFalse);
+
+      await output.dispose();
+    });
+
+    test('MulticastOutput forwards physical playback controls', () async {
+      final backend = _FakeSpeakerBackend();
+      final output = MulticastOutput(
+        outputs: [SpeakerOutput(backend: backend)],
+      );
+
+      await output.initSession(
+        const TtsOutputSession(
+          requestId: 'spk-multicast-control',
+          audioSpec: _mp3Spec,
+          voice: null,
+          options: null,
+        ),
+      );
+      await output.finalizeSession();
+
+      expect(output.hasActivePlayback('spk-multicast-control'), isTrue);
+      await output.pausePlayback('spk-multicast-control');
+      await output.resumePlayback('spk-multicast-control');
+      await output.stopPlayback('spk-multicast-control');
+
+      expect(backend.pausedPlaybackIds, ['playback-spk-multicast-control']);
+      expect(backend.resumedPlaybackIds, ['playback-spk-multicast-control']);
+      expect(backend.stoppedPlaybackIds, ['playback-spk-multicast-control']);
+      expect(output.hasActivePlayback('spk-multicast-control'), isFalse);
+
+      await output.dispose();
+    });
+
     test('forwards an optional backend playback failure', () async {
       final backend = _FakeSpeakerBackend();
       final output = SpeakerOutput(backend: backend, outputId: 'speaker');
@@ -211,6 +267,8 @@ final class _FakeSpeakerBackend
         PlaybackTimelineReporter {
   final Map<String, List<int>> writtenBytes = <String, List<int>>{};
   final List<String> stoppedPlaybackIds = <String>[];
+  final List<String> pausedPlaybackIds = <String>[];
+  final List<String> resumedPlaybackIds = <String>[];
   final Map<String, String?> stopReasons = <String, String?>{};
   final playbackFailedController =
       StreamController<SpeakerPlaybackFailedEvent>.broadcast();
@@ -276,10 +334,14 @@ final class _FakeSpeakerBackend
   }
 
   @override
-  Future<void> pausePlayback({required String playbackId}) async {}
+  Future<void> pausePlayback({required String playbackId}) async {
+    pausedPlaybackIds.add(playbackId);
+  }
 
   @override
-  Future<void> resumePlayback({required String playbackId}) async {}
+  Future<void> resumePlayback({required String playbackId}) async {
+    resumedPlaybackIds.add(playbackId);
+  }
 
   @override
   Future<void> dispose() async {

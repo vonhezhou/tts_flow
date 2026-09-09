@@ -89,7 +89,7 @@ void main() {
         final nextStream = service.speak('next', 'next request');
 
         await Future<void>.delayed(const Duration(milliseconds: 12));
-        await service.stopCurrent();
+        await service.stopActiveSynthesis();
 
         await longStream.toList();
         await nextStream.toList();
@@ -98,7 +98,7 @@ void main() {
           events.any(
             (event) =>
                 event.requestId == 'long' &&
-                event.type == TtsRequestEventType.requestStopped,
+                event.type == TtsRequestEventType.requestSynthesisStopped,
           ),
           isTrue,
         );
@@ -115,45 +115,48 @@ void main() {
       },
     );
 
-    test('requestFailed event includes output failure details', () async {
-      final service = TtsFlow(
-        engine: SineTtsEngine(
-          engineId: 'fake-engine',
-          supportsStreaming: true,
-          chunkCount: 2,
-          chunkDelay: const Duration(milliseconds: 2),
-        ),
-        defaultOutput: MulticastOutput(
-          outputs: [
-            MemoryOutput(outputId: 'memory'),
-            _AlwaysFailOutput(outputId: 'fail-output'),
-          ],
-          errorPolicy: MulticastOutputErrorPolicy.failFast,
-        ),
-      );
+    test(
+      'requestSynthesisFailed event includes output failure details',
+      () async {
+        final service = TtsFlow(
+          engine: SineTtsEngine(
+            engineId: 'fake-engine',
+            supportsStreaming: true,
+            chunkCount: 2,
+            chunkDelay: const Duration(milliseconds: 2),
+          ),
+          defaultOutput: MulticastOutput(
+            outputs: [
+              MemoryOutput(outputId: 'memory'),
+              _AlwaysFailOutput(outputId: 'fail-output'),
+            ],
+            errorPolicy: MulticastOutputErrorPolicy.failFast,
+          ),
+        );
 
-      TtsRequestEvent? failedEvent;
-      final sub = service.requestEvents.listen((event) {
-        if (event.type == TtsRequestEventType.requestFailed) {
-          failedEvent = event;
-        }
-      });
+        TtsRequestEvent? failedEvent;
+        final sub = service.requestEvents.listen((event) {
+          if (event.type == TtsRequestEventType.requestSynthesisFailed) {
+            failedEvent = event;
+          }
+        });
 
-      await service.init();
+        await service.init();
 
-      final stream = service.speak('output-fail', 'fail through output');
+        final stream = service.speak('output-fail', 'fail through output');
 
-      await expectLater(stream.toList(), throwsA(isA<TtsError>()));
-      await Future<void>.delayed(const Duration(milliseconds: 20));
+        await expectLater(stream.toList(), throwsA(isA<TtsError>()));
+        await Future<void>.delayed(const Duration(milliseconds: 20));
 
-      expect(failedEvent, isNotNull);
-      expect(failedEvent!.outputId, 'fail-output');
-      expect(failedEvent!.outputError, isNotNull);
-      expect(failedEvent!.outputError!.code, TtsErrorCode.outputWriteFailed);
+        expect(failedEvent, isNotNull);
+        expect(failedEvent!.outputId, 'fail-output');
+        expect(failedEvent!.outputError, isNotNull);
+        expect(failedEvent!.outputError!.code, TtsErrorCode.outputWriteFailed);
 
-      await sub.cancel();
-      await service.dispose();
-    });
+        await sub.cancel();
+        await service.dispose();
+      },
+    );
 
     test('initializes output session using first chunk audioSpec', () async {
       final output = _TrackingOutput(outputId: 'tracking-output');
@@ -253,7 +256,7 @@ void main() {
         events.any(
           (event) =>
               event.requestId == 'second' &&
-              event.type == TtsRequestEventType.requestCompleted,
+              event.type == TtsRequestEventType.requestSynthesisCompleted,
         ),
         isTrue,
       );
@@ -282,8 +285,8 @@ void main() {
 
       await service.init();
 
-      await service.pause();
-      expect(service.isPaused, isTrue);
+      await service.pauseQueue();
+      expect(service.isQueuePaused, isTrue);
 
       final first = service.speak('paused-1', 'first queued');
       final second = service.speak('paused-2', 'second queued');
@@ -291,8 +294,8 @@ void main() {
       await Future<void>.delayed(const Duration(milliseconds: 30));
       expect(started, isEmpty);
 
-      await service.resume();
-      expect(service.isPaused, isFalse);
+      await service.resumeQueue();
+      expect(service.isQueuePaused, isFalse);
 
       await first.toList();
       await second.toList();
@@ -320,7 +323,7 @@ void main() {
       final longStream = service.speak('cancel-reason', 'long request');
 
       await Future<void>.delayed(const Duration(milliseconds: 12));
-      await service.stopCurrent();
+      await service.stopActiveSynthesis();
       await longStream.toList();
 
       expect(output.lastCancelReason, CancelReason.stopCurrent);
@@ -349,7 +352,7 @@ void main() {
         );
 
         await Future<void>.delayed(const Duration(milliseconds: 12));
-        await service.pause();
+        await service.pauseQueue();
         await Future<void>.delayed(const Duration(milliseconds: 12));
         await service.dispose();
 
@@ -415,7 +418,7 @@ void main() {
     });
 
     test(
-      'requestCompleted is ingestion-based and playback completion is separate',
+      'requestSynthesisCompleted is ingestion-based and playback completion is separate',
       () async {
         final output = _PlaybackAwareTestOutput(
           outputId: 'playback-aware',
@@ -442,7 +445,7 @@ void main() {
         final completedIndex = events.indexWhere(
           (event) =>
               event.requestId == 'playback-split' &&
-              event.type == TtsRequestEventType.requestCompleted,
+              event.type == TtsRequestEventType.requestSynthesisCompleted,
         );
         final playbackCompletedIndex = events.indexWhere(
           (event) =>
@@ -493,7 +496,7 @@ void main() {
         final completedIndex = events.indexWhere(
           (event) =>
               event.requestId == 'playback-failed' &&
-              event.type == TtsRequestEventType.requestCompleted,
+              event.type == TtsRequestEventType.requestSynthesisCompleted,
         );
         final playbackFailedIndex = events.indexWhere(
           (event) =>
@@ -509,6 +512,48 @@ void main() {
         expect(playbackEvent.outputId, 'playback-aware');
         expect(playbackEvent.playbackId, 'playback-playback-failed');
         expect(playbackEvent.error?.code, TtsErrorCode.outputPlaybackFailed);
+
+        await sub.cancel();
+        await service.dispose();
+      },
+    );
+
+    test(
+      'physical playback controls are separate from synthesis controls',
+      () async {
+        final output = _PlaybackControllableTestOutput(outputId: 'speaker');
+        final service = TtsFlow(
+          engine: SineTtsEngine(
+            engineId: 'fake-engine',
+            supportsStreaming: true,
+            chunkCount: 1,
+          ),
+          defaultOutput: output,
+        );
+        final events = <TtsRequestEvent>[];
+        final sub = service.requestEvents.listen(events.add);
+
+        await service.init();
+        await service.speak('playback-control', 'hello').drain();
+
+        expect(service.hasActivePlayback('playback-control'), isTrue);
+        await service.pausePlayback('playback-control');
+        await service.resumePlayback('playback-control');
+        await service.stopPlayback('playback-control');
+        await Future<void>.delayed(Duration.zero);
+
+        expect(output.pauseCount, 1);
+        expect(output.resumeCount, 1);
+        expect(output.stopCount, 1);
+        expect(service.hasActivePlayback('playback-control'), isFalse);
+        expect(
+          events.map((event) => event.type),
+          containsAll(<TtsRequestEventType>[
+            TtsRequestEventType.requestPlaybackPaused,
+            TtsRequestEventType.requestPlaybackResumed,
+            TtsRequestEventType.requestPlaybackStopped,
+          ]),
+        );
 
         await sub.cancel();
         await service.dispose();
@@ -1214,5 +1259,104 @@ final class _PlaybackAwareTestOutput
     _playbackId = null;
     await _playbackCompletedController.close();
     await _playbackFailedController.close();
+  }
+}
+
+final class _PlaybackControllableTestOutput
+    implements TtsOutput, PlaybackControllableOutput {
+  _PlaybackControllableTestOutput({required this.outputId});
+
+  @override
+  final String outputId;
+
+  final _completed =
+      StreamController<TtsOutputPlaybackCompletedEvent>.broadcast();
+  final _failed = StreamController<TtsOutputPlaybackFailedEvent>.broadcast();
+  final Set<String> _activeRequestIds = <String>{};
+  TtsOutputSession? _session;
+  var pauseCount = 0;
+  var resumeCount = 0;
+  var stopCount = 0;
+
+  @override
+  Set<AudioCapability> get inAudioCapabilities => {PcmCapability.wav()};
+
+  @override
+  Stream<TtsOutputPlaybackCompletedEvent> get playbackCompletedEvents =>
+      _completed.stream;
+
+  @override
+  Stream<TtsOutputPlaybackFailedEvent> get playbackFailedEvents =>
+      _failed.stream;
+
+  @override
+  Future<void> init() async {}
+
+  @override
+  Future<void> initSession(TtsOutputSession session) async {
+    _session = session;
+    _activeRequestIds.add(session.requestId);
+  }
+
+  @override
+  Future<void> consumeChunk(TtsChunk chunk) async {}
+
+  @override
+  Future<AudioArtifact> finalizeSession() async {
+    final session = _session;
+    if (session == null) {
+      throw StateError('No active output session.');
+    }
+    _session = null;
+    return PlaybackAudioArtifact(
+      requestId: session.requestId,
+      audioSpec: session.audioSpec,
+      playbackId: 'playback-${session.requestId}',
+    );
+  }
+
+  @override
+  Future<void> onCancelSession(SynthesisControl control) async {
+    final requestId = _session?.requestId;
+    if (requestId != null) {
+      _activeRequestIds.remove(requestId);
+    }
+    _session = null;
+  }
+
+  @override
+  bool hasActivePlayback(String requestId) =>
+      _activeRequestIds.contains(requestId);
+
+  @override
+  Future<void> pausePlayback(String requestId) async {
+    if (!hasActivePlayback(requestId)) {
+      throw StateError('No active playback.');
+    }
+    pauseCount++;
+  }
+
+  @override
+  Future<void> resumePlayback(String requestId) async {
+    if (!hasActivePlayback(requestId)) {
+      throw StateError('No active playback.');
+    }
+    resumeCount++;
+  }
+
+  @override
+  Future<void> stopPlayback(String requestId) async {
+    if (!hasActivePlayback(requestId)) {
+      throw StateError('No active playback.');
+    }
+    stopCount++;
+    _activeRequestIds.remove(requestId);
+  }
+
+  @override
+  Future<void> dispose() async {
+    _activeRequestIds.clear();
+    await _completed.close();
+    await _failed.close();
   }
 }

@@ -87,6 +87,22 @@ abstract interface class PlaybackFailureAwareOutput {
   Stream<TtsOutputPlaybackFailedEvent> get playbackFailedEvents;
 }
 
+/// Optional output capability for physical playback control.
+///
+/// Implementations keep a request-to-playback association until physical
+/// playback completes, fails, or is stopped. They must also implement the
+/// completion and failure event capabilities so callers can observe terminal
+/// playback state.
+abstract interface class PlaybackControllableOutput
+    implements PlaybackAwareOutput, PlaybackFailureAwareOutput {
+  /// Whether [requestId] still has physical playback that can be controlled.
+  bool hasActivePlayback(String requestId);
+
+  Future<void> pausePlayback(String requestId);
+  Future<void> resumePlayback(String requestId);
+  Future<void> stopPlayback(String requestId);
+}
+
 final class TtsOutputPlaybackCompletedEvent {
   const TtsOutputPlaybackCompletedEvent({
     required this.requestId,

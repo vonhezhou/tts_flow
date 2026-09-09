@@ -34,6 +34,7 @@ final class TtsFlow
   final TtsFlowConfig _config;
   final _managedOutputs = HashSet<TtsOutput>.identity();
   final _outputInitializations = HashMap<TtsOutput, Future<void>>.identity();
+  final _playbackOutputs = <String, TtsOutput>{};
 
   @override
   TtsEngine get engine => _engine;
@@ -65,8 +66,18 @@ final class TtsFlow
       .where((event) => event is TtsRequestEvent)
       .cast<TtsRequestEvent>();
 
-  bool get isPaused => state.isPaused;
+  bool get isQueuePaused => state.isPaused;
   bool get isInitialized => state.isInitialized;
+
+  /// Whether [requestId] has physical playback that can still be controlled.
+  bool hasActivePlayback(String requestId) {
+    final output = _playbackOutputs[requestId];
+    final PlaybackControllableOutput? controllableOutput =
+        output is PlaybackControllableOutput
+        ? output as PlaybackControllableOutput
+        : null;
+    return controllableOutput?.hasActivePlayback(requestId) ?? false;
+  }
 
   Future<void> init() async {
     _ensureNotDisposed();
@@ -151,20 +162,61 @@ final class TtsFlow
     return controller.stream;
   }
 
-  Future<void> pause() async {
+  /// Prevents the queue from starting another synthesis request.
+  Future<void> pauseQueue() async {
     _ensureReady();
     state.pauseQueue();
   }
 
-  Future<void> resume() async {
+  /// Allows queued synthesis requests to start again.
+  Future<void> resumeQueue() async {
     _ensureReady();
     state.resumeQueue();
     unawaited(processQueue());
   }
 
-  Future<void> stopCurrent() async {
+  /// Cancels the synthesis request currently being produced by the engine.
+  ///
+  /// This does not control audio that has already been finalized for physical
+  /// playback. Use [stopPlayback] for that separate lifecycle.
+  Future<void> stopActiveSynthesis() async {
     _ensureReady();
     state.activeControl?.cancel(CancelReason.stopCurrent);
+  }
+
+  /// Pauses physical playback for [requestId].
+  Future<void> pausePlayback(String requestId) async {
+    final output = _requirePlaybackOutput(requestId);
+    await (output as PlaybackControllableOutput).pausePlayback(requestId);
+    emitRequestEvent(
+      TtsRequestEventType.requestPlaybackPaused,
+      requestId: requestId,
+      outputId: output.outputId,
+    );
+  }
+
+  /// Resumes physical playback for [requestId].
+  Future<void> resumePlayback(String requestId) async {
+    final output = _requirePlaybackOutput(requestId);
+    await (output as PlaybackControllableOutput).resumePlayback(requestId);
+    emitRequestEvent(
+      TtsRequestEventType.requestPlaybackResumed,
+      requestId: requestId,
+      outputId: output.outputId,
+    );
+  }
+
+  /// Stops physical playback for [requestId].
+  Future<void> stopPlayback(String requestId) async {
+    final output = _requirePlaybackOutput(requestId);
+    await (output as PlaybackControllableOutput).stopPlayback(requestId);
+    await cancelPlaybackEventListenersForRequest(requestId);
+    unregisterPlaybackControl(requestId);
+    emitRequestEvent(
+      TtsRequestEventType.requestPlaybackStopped,
+      requestId: requestId,
+      outputId: output.outputId,
+    );
   }
 
   Future<int> clearQueue() async {
@@ -199,6 +251,7 @@ final class TtsFlow
     await disposePlaybackCompletionListeners();
     await _engine.dispose();
     await _disposeManagedOutputs();
+    _playbackOutputs.clear();
     state.markDisposed();
     await eventBus.close();
   }
@@ -228,6 +281,37 @@ final class TtsFlow
       }
       rethrow;
     }
+  }
+
+  @override
+  @protected
+  void registerPlaybackControl(String requestId, TtsOutput output) {
+    if (output is PlaybackControllableOutput) {
+      _playbackOutputs[requestId] = output;
+    }
+  }
+
+  @override
+  @protected
+  void unregisterPlaybackControl(String requestId) {
+    _playbackOutputs.remove(requestId);
+  }
+
+  TtsOutput _requirePlaybackOutput(String requestId) {
+    _ensureReady();
+    final output = _playbackOutputs[requestId];
+    final PlaybackControllableOutput? controllableOutput =
+        output is PlaybackControllableOutput
+        ? output as PlaybackControllableOutput
+        : null;
+    if (output == null || controllableOutput == null) {
+      throw StateError('No active controllable playback for "$requestId".');
+    }
+    if (!controllableOutput.hasActivePlayback(requestId)) {
+      _playbackOutputs.remove(requestId);
+      throw StateError('Playback is no longer active for "$requestId".');
+    }
+    return output;
   }
 
   Future<void> _disposeManagedOutputs() async {
