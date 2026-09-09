@@ -49,6 +49,10 @@
 
 请求级 Output 的惰性初始化使调用方可以按请求选择单路或多路输出，而不用手动拼接 Output 的初始化时机。
 
+同一个 Flow 对同一个 `TtsOutput` 的摄入 session 严格串行：前一个请求必须完成 `finalizeSession()` 或 `onCancelSession()`，下一个请求才会调用 `initSession()`。因此 `TtsOutput` 只需维护一个活跃摄入 session，不承担并行合成、并行写入或音频图调度。
+
+这不等同于“设备上没有任何旧音频仍在播放”。`SpeakerOutput` 等播放 Output 可以在摄入结束后保留某个 request 的物理播放控制与事件关联；该能力只用于观测和控制已交给设备的音频，不承诺多个请求混播。
+
 ## 低延迟原则
 
 低延迟的默认路径应当是：

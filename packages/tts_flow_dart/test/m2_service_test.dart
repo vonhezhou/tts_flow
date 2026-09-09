@@ -38,6 +38,39 @@ void main() {
       await service.dispose();
     });
 
+    test(
+      'serializes output ingestion sessions across queued requests',
+      () async {
+        final output = _LifecycleTrackingOutput(outputId: 'serial-output');
+        final service = TtsFlow(
+          engine: SineTtsEngine(
+            engineId: 'fake-engine',
+            supportsStreaming: true,
+            chunkCount: 2,
+            chunkDelay: const Duration(milliseconds: 2),
+          ),
+          defaultOutput: output,
+        );
+
+        await service.init();
+        final first = service.speak('first output session');
+        final second = service.speak('second output session');
+
+        await first.toList();
+        await second.toList();
+
+        expect(output.overlappingSessionAttempted, isFalse);
+        expect(output.lifecycle, [
+          'init:${first.requestKey}',
+          'finalize:${first.requestKey}',
+          'init:${second.requestKey}',
+          'finalize:${second.requestKey}',
+        ]);
+
+        await service.dispose();
+      },
+    );
+
     test('reused utterance IDs retain distinct request handles', () async {
       final service = TtsFlow(
         engine: SineTtsEngine(
@@ -1229,6 +1262,8 @@ final class _LifecycleTrackingOutput implements TtsOutput {
   var initCount = 0;
   var initSessionCount = 0;
   var disposeCount = 0;
+  var overlappingSessionAttempted = false;
+  final lifecycle = <String>[];
   var _initialized = false;
   TtsOutputSession? _session;
 
@@ -1249,8 +1284,13 @@ final class _LifecycleTrackingOutput implements TtsOutput {
     if (!_initialized) {
       throw StateError('Output was not initialized.');
     }
+    if (_session != null) {
+      overlappingSessionAttempted = true;
+      throw StateError('Previous output session is still active.');
+    }
     initSessionCount++;
     _session = session;
+    lifecycle.add('init:${session.requestKey}');
   }
 
   @override
@@ -1263,6 +1303,7 @@ final class _LifecycleTrackingOutput implements TtsOutput {
       throw StateError('No active output session.');
     }
     _session = null;
+    lifecycle.add('finalize:${session.requestKey}');
     return InMemoryAudioArtifact(
       requestKey: session.requestKey,
       audioSpec: session.audioSpec,
@@ -1273,7 +1314,11 @@ final class _LifecycleTrackingOutput implements TtsOutput {
 
   @override
   Future<void> onCancelSession(SynthesisControl control) async {
+    final requestKey = _session?.requestKey;
     _session = null;
+    if (requestKey != null) {
+      lifecycle.add('cancel:$requestKey');
+    }
   }
 
   @override

@@ -21,10 +21,16 @@ import 'package:tts_flow_dart/src/core/tts_output_session.dart';
 /// the output before its first session and disposes it when the flow is
 /// disposed. Do not share the same output instance between flows.
 ///
+/// For one flow, ingestion sessions are strictly serial: the flow will not
+/// call [initSession] for the next request until the current request has
+/// finished with [finalizeSession] or [onCancelSession]. An implementation only
+/// needs one active ingestion session; it does not need a concurrent session
+/// map or an audio-processing scheduler.
+///
 /// Implementer expectations:
 /// - Validate that each consumed chunk belongs to the active session.
 /// - Preserve chunk order when writing bytes to a sink.
-/// - Keep session state isolated across different request ids.
+/// - Reject a second [initSession] while the current session is active.
 /// - Ensure [onCancelSession] and [dispose] are safe after partial writes.
 abstract interface class TtsOutput {
   /// Stable identifier for this output implementation.
@@ -44,8 +50,9 @@ abstract interface class TtsOutput {
 
   /// Starts a new request-scoped output session.
   ///
-  /// Implementations should reset per-request state and prepare the sink for
-  /// chunks that belong to [session.requestKey].
+  /// The preceding session is always terminal before this call. Implementations
+  /// should prepare one active sink for chunks that belong to
+  /// [session.requestKey].
   Future<void> initSession(TtsOutputSession session);
 
   /// Consumes one synthesized [chunk] for the active session.
@@ -92,7 +99,9 @@ abstract interface class PlaybackFailureAwareOutput {
 /// Implementations keep a request-to-playback association until physical
 /// playback completes, fails, or is stopped. They must also implement the
 /// completion and failure event capabilities so callers can observe terminal
-/// playback state.
+/// playback state. This capability does not require, or promise, concurrent
+/// speaker mixing: it only keeps control and observation available after the
+/// serial ingestion session has ended.
 abstract interface class PlaybackControllableOutput
     implements PlaybackAwareOutput, PlaybackFailureAwareOutput {
   /// Whether [requestKey] still has physical playback that can be controlled.

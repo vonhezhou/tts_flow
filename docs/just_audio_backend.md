@@ -108,6 +108,8 @@ finalized
 
 ## 错误、控制与并发
 
+`tts_flow` 对 `TtsOutput` 的音频摄入严格串行。这里的 backend 串行操作队列是同一原则在播放器侧的延续：它保护单个播放器的 source-list 状态，不表示 core 支持或需要多请求混播。
+
 - 后端必须监听 `AudioPlayer.errorStream`，将异步平台解码错误关联到活跃 `playbackId` 并终止该 session。
 - `JustAudioBackend.playbackErrorStream` 保留 just_audio 的原始 `PlayerException`，供平台诊断；同时它通过可选的 `SpeakerPlaybackFailureAwareBackend` 能力发出标准 `SpeakerPlaybackFailedEvent`。`SpeakerOutput`、`MulticastOutput`、`PrioritizedOutput` 和 `TtsFlow.requestEvents` 会将其继续传递为 `TtsOutputPlaybackFailedEvent` 与 `requestPlaybackFailed`。
 - `requestPlaybackFailed` 是独立的物理播放终态：它不向已经完成的 `TtsRequestHandle` chunk stream 补抛错误，也不追溯修改此前的 `requestSynthesisCompleted`，更不触发合成队列的 fail-fast 策略。调用方应使用它提示播放失败、记录诊断或自行发起新的播放请求。

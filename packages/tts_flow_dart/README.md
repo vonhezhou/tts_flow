@@ -11,6 +11,12 @@ Core design choices in this repository:
   `synthesisResult`.
 - FIFO queue semantics with halt-on-failure behavior.
 
+For one `TtsFlow`, a `TtsOutput` has exactly one active ingestion session.
+The next request starts its output session only after the previous one is
+finalized or canceled. Physical speaker playback may still be observable after
+ingestion finalizes, but this does not imply concurrent mixing or concurrent
+output ingestion.
+
 ## Audio Negotiation
 
 Audio negotiation is capability-based and request-scoped.
