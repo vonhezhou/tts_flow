@@ -17,6 +17,10 @@
   asynchronous delivery, buffering, and failure policy themselves.
 - Documented and tested `TtsRequestHandle.chunks` as a single-subscription
   application-processing handoff, rather than a core-managed fanout stream.
+- Added `TtsRequestHandle.synthesisResult`, which always resolves to a typed
+  synthesis terminal result and exposes the `AudioArtifact` returned by a
+  successfully finalized primary output without conflating it with physical
+  playback completion.
 - Breaking: `speak(text, utteranceId: ...)` now returns a `TtsRequestHandle`.
   The flow generates an opaque `requestKey` for all engine/output/playback
   routing; application-supplied `utteranceId` is retained for event correlation

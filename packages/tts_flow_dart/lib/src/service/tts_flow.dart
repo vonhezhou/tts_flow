@@ -11,6 +11,7 @@ import 'package:tts_flow_dart/src/core/tts_output.dart';
 import 'package:tts_flow_dart/src/core/tts_policy.dart';
 import 'package:tts_flow_dart/src/core/tts_request.dart';
 import 'package:tts_flow_dart/src/core/tts_request_handle.dart';
+import 'package:tts_flow_dart/src/core/tts_synthesis_result.dart';
 import 'package:tts_flow_dart/src/core/tts_voice.dart';
 import 'package:tts_flow_dart/src/service/internal/tts_utterance_queue_mixin.dart';
 import 'package:tts_flow_dart/src/service/tts_events.dart';
@@ -171,7 +172,12 @@ final class TtsFlow
     _requestEventControllers[requestKey] = requestEvents;
 
     final controller = StreamController<TtsChunk>();
-    final queued = QueuedRequest(request: request, controller: controller);
+    final synthesisResultCompleter = Completer<TtsSynthesisResult>();
+    final queued = QueuedRequest(
+      request: request,
+      controller: controller,
+      synthesisResultCompleter: synthesisResultCompleter,
+    );
     scheduler.enqueue(queued);
 
     emitRequestEvent(
@@ -191,6 +197,7 @@ final class TtsFlow
       utteranceId: resolvedUtteranceId,
       chunks: controller.stream,
       events: requestEvents.stream,
+      synthesisResult: synthesisResultCompleter.future,
       stopSynthesis: () => _stopSynthesis(requestKey),
       pausePlayback: () => _pausePlayback(requestKey),
       resumePlayback: () => _resumePlayback(requestKey),
@@ -241,6 +248,13 @@ final class TtsFlow
       requestKey: requestKey,
       state: TtsRequestState.stopped,
     );
+    queued.completeSynthesisResult(
+      TtsSynthesisStoppedResult(
+        requestKey: requestKey,
+        utteranceId: queued.request.utteranceId,
+        reason: TtsSynthesisStopReason.requested,
+      ),
+    );
     unawaited(queued.controller.close());
     releaseRequestIdentity(requestKey);
   }
@@ -278,7 +292,9 @@ final class TtsFlow
     releaseRequestIdentity(requestKey);
   }
 
-  Future<int> clearQueue() async {
+  Future<int> clearQueue() => _clearQueue(TtsSynthesisStopReason.queueCleared);
+
+  Future<int> _clearQueue(TtsSynthesisStopReason reason) async {
     _ensureNotDisposed();
     final pending = scheduler.drain();
     for (final item in pending) {
@@ -286,6 +302,13 @@ final class TtsFlow
         TtsRequestEventType.requestCanceled,
         requestKey: item.request.requestKey,
         state: TtsRequestState.canceled,
+      );
+      item.completeSynthesisResult(
+        TtsSynthesisStoppedResult(
+          requestKey: item.request.requestKey,
+          utteranceId: item.request.utteranceId,
+          reason: reason,
+        ),
       );
       unawaited(item.controller.close());
       releaseRequestIdentity(item.request.requestKey);
@@ -306,7 +329,7 @@ final class TtsFlow
     }
 
     state.activeControl?.cancel(CancelReason.serviceDispose);
-    await clearQueue();
+    await _clearQueue(TtsSynthesisStopReason.serviceDisposed);
     await _awaitActiveRequestShutdown();
     await disposePlaybackCompletionListeners();
     await _engine.dispose();

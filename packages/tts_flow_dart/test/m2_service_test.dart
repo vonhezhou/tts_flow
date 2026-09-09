@@ -116,6 +116,41 @@ void main() {
       await service.dispose();
     });
 
+    test(
+      'request synthesis result exposes the finalized output artifact',
+      () async {
+        final output = MemoryOutput();
+        final service = TtsFlow(
+          engine: SineTtsEngine(
+            engineId: 'fake-engine',
+            supportsStreaming: true,
+            chunkCount: 2,
+          ),
+          defaultOutput: output,
+        );
+
+        await service.init();
+        final handle = service.speak(
+          'artifact result',
+          utteranceId: 'artifact',
+        );
+        await handle.toList();
+        final result = await handle.synthesisResult;
+
+        expect(result, isA<TtsSynthesisCompletedResult>());
+        final completed = result as TtsSynthesisCompletedResult;
+        expect(completed.requestKey, handle.requestKey);
+        expect(completed.utteranceId, 'artifact');
+        expect(completed.artifact, isA<InMemoryAudioArtifact>());
+        expect(
+          (completed.artifact as InMemoryAudioArtifact).totalBytes,
+          greaterThan(0),
+        );
+
+        await service.dispose();
+      },
+    );
+
     test('clearQueue cancels pending requests only', () async {
       final service = TtsFlow(
         engine: SineTtsEngine(
@@ -138,6 +173,14 @@ void main() {
       expect(clearedCount, 1);
       expect(await active.toList(), isNotEmpty);
       expect(await pending.toList(), isEmpty);
+      expect(
+        await pending.synthesisResult,
+        isA<TtsSynthesisStoppedResult>().having(
+          (result) => result.reason,
+          'reason',
+          TtsSynthesisStopReason.queueCleared,
+        ),
+      );
 
       await service.dispose();
     });
@@ -171,6 +214,15 @@ void main() {
 
         await longStream.toList();
         await nextStream.toList();
+
+        expect(
+          await longStream.synthesisResult,
+          isA<TtsSynthesisStoppedResult>().having(
+            (result) => result.reason,
+            'reason',
+            TtsSynthesisStopReason.requested,
+          ),
+        );
 
         expect(
           events.any(
@@ -227,6 +279,14 @@ void main() {
         );
 
         await expectLater(stream.toList(), throwsA(isA<TtsError>()));
+        expect(
+          await stream.synthesisResult,
+          isA<TtsSynthesisFailedResult>().having(
+            (result) => result.error.code,
+            'error code',
+            TtsErrorCode.outputWriteFailed,
+          ),
+        );
         await Future<void>.delayed(const Duration(milliseconds: 20));
 
         expect(failedEvent, isNotNull);

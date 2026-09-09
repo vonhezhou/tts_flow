@@ -1,6 +1,7 @@
 import 'dart:async';
 
 import 'package:tts_flow_dart/src/core/tts_chunk.dart';
+import 'package:tts_flow_dart/src/core/tts_synthesis_result.dart';
 import 'package:tts_flow_dart/src/service/tts_events.dart';
 
 /// A handle for one concrete synthesis request.
@@ -14,6 +15,7 @@ final class TtsRequestHandle extends StreamView<TtsChunk> {
     required this.utteranceId,
     required this.chunks,
     required this.events,
+    required this.synthesisResult,
     required Future<void> Function() stopSynthesis,
     required Future<void> Function() pausePlayback,
     required Future<void> Function() resumePlayback,
@@ -48,6 +50,12 @@ final class TtsRequestHandle extends StreamView<TtsChunk> {
   /// Lifecycle events for this request only, including events emitted before
   /// the caller subscribes. This is a single-subscription stream.
   final Stream<TtsRequestEvent> events;
+
+  /// Terminal synthesis and output-ingestion result for this request.
+  ///
+  /// This future always completes with a [TtsSynthesisResult], including when
+  /// synthesis stops or fails. It does not wait for physical speaker playback.
+  final Future<TtsSynthesisResult> synthesisResult;
 
   final Future<void> Function() _stopSynthesis;
   final Future<void> Function() _pausePlayback;

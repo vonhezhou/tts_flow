@@ -11,6 +11,7 @@ import 'package:tts_flow_dart/src/core/tts_output.dart';
 import 'package:tts_flow_dart/src/core/tts_output_session.dart';
 import 'package:tts_flow_dart/src/core/tts_policy.dart';
 import 'package:tts_flow_dart/src/core/tts_request.dart';
+import 'package:tts_flow_dart/src/core/tts_synthesis_result.dart';
 import 'package:tts_flow_dart/src/service/format_negotiator.dart';
 import 'package:tts_flow_dart/src/service/queue_scheduler.dart';
 import 'package:tts_flow_dart/src/service/tts_events.dart';
@@ -19,10 +20,21 @@ import 'tts_flow_event_mixin.dart';
 import 'tts_flow_state.dart';
 
 final class QueuedRequest {
-  const QueuedRequest({required this.request, required this.controller});
+  QueuedRequest({
+    required this.request,
+    required this.controller,
+    required this.synthesisResultCompleter,
+  });
 
   final TtsRequest request;
   final StreamController<TtsChunk> controller;
+  final Completer<TtsSynthesisResult> synthesisResultCompleter;
+
+  void completeSynthesisResult(TtsSynthesisResult result) {
+    if (!synthesisResultCompleter.isCompleted) {
+      synthesisResultCompleter.complete(result);
+    }
+  }
 }
 
 mixin TtsUtteranceQueueMixin on TtsFlowEventBus {
@@ -197,16 +209,32 @@ mixin TtsUtteranceQueueMixin on TtsFlowEventBus {
           requestKey: request.requestKey,
           state: TtsRequestState.stopped,
         );
+        item.completeSynthesisResult(
+          TtsSynthesisStoppedResult(
+            requestKey: request.requestKey,
+            utteranceId: request.utteranceId,
+            reason: control.cancelReason == CancelReason.serviceDispose
+                ? TtsSynthesisStopReason.serviceDisposed
+                : TtsSynthesisStopReason.requested,
+          ),
+        );
         releaseRequestIdentity(request.requestKey);
       } else {
         if (!outputSessionInitialized) {
           await ensureOutputSessionInitialized(audioSpec);
         }
-        await effectiveOutput.finalizeSession();
+        final artifact = await effectiveOutput.finalizeSession();
         emitRequestEvent(
           TtsRequestEventType.requestSynthesisCompleted,
           requestKey: request.requestKey,
           state: TtsRequestState.completed,
+        );
+        item.completeSynthesisResult(
+          TtsSynthesisCompletedResult(
+            requestKey: request.requestKey,
+            utteranceId: request.utteranceId,
+            artifact: artifact,
+          ),
         );
         if (!hasPlaybackControl(request.requestKey) &&
             !_hasPlaybackEventListenersForRequest(request.requestKey)) {
@@ -227,6 +255,13 @@ mixin TtsUtteranceQueueMixin on TtsFlowEventBus {
         error: failure.ttsError,
         outputId: failure.outputId,
         outputError: failure.outputError,
+      );
+      item.completeSynthesisResult(
+        TtsSynthesisFailedResult(
+          requestKey: request.requestKey,
+          utteranceId: request.utteranceId,
+          error: failure.ttsError,
+        ),
       );
       releaseRequestIdentity(request.requestKey);
       item.controller.addError(failure.ttsError);
@@ -290,6 +325,13 @@ mixin TtsUtteranceQueueMixin on TtsFlowEventBus {
         TtsRequestEventType.requestCanceled,
         requestKey: item.request.requestKey,
         state: TtsRequestState.canceled,
+      );
+      item.completeSynthesisResult(
+        TtsSynthesisStoppedResult(
+          requestKey: item.request.requestKey,
+          utteranceId: item.request.utteranceId,
+          reason: TtsSynthesisStopReason.queueHalted,
+        ),
       );
       unawaited(item.controller.close());
       releaseRequestIdentity(item.request.requestKey);

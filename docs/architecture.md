@@ -116,10 +116,13 @@
 - 音频块字节及其 `TtsAudioSpec`；
 - 块顺序与请求标识；
 - 结束、失败和取消；
+- Output finalize 后的 `AudioArtifact`，以及它与物理播放完成的区别；
 - 格式能力；
 - 合成完成与物理播放完成的不同事件。
 
 队列/合成控制与物理播放控制也必须分离。队列暂停只影响后续合成请求的启动；已交给设备的音频由 `TtsRequestHandle.pausePlayback()`、`resumePlayback()` 与 `stopPlayback()` 控制。可控制播放的 Output 必须在音频提交完成后继续保留 request 到 playback 的关联，直到物理播放终止。
+
+`TtsRequestHandle.synthesisResult` 是请求合成与 Output 摄入的终态结果：成功时携带 `TtsOutput.finalizeSession()` 返回的 `AudioArtifact`，停止或失败时携带对应原因。它始终正常完成，避免仅播放的调用方因未监听 result 而得到未处理的 Future 错误。它不等待设备实际播完；物理播放仍通过 playback 事件和控制接口表达。
 
 每次 `speak()` 都由 Flow 生成唯一、不透明的 `requestKey`，它是 engine、chunk、output session 和物理播放路由的唯一键。调用方可传入 Android 风格的 `utteranceId`，它只用于业务关联并随 Flow 事件与请求句柄公开；该值允许重复，绝不能参与底层会话寻址。
 - 可选的、按请求连续的物理播放时间轴；支持该能力的 backend 可用于

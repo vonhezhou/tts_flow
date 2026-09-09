@@ -7,7 +7,8 @@ Core design choices in this repository:
 - Fixed service wiring: each TtsFlow instance uses one engine and one output.
 - Service-scoped defaults: voice/options/format are configured once per service.
 - Unified API: `speak(text, utteranceId: ...)` returns a `TtsRequestHandle`,
-  which is also a stream of `TtsChunk`.
+  which is also a stream of `TtsChunk` and exposes a terminal
+  `synthesisResult`.
 - FIFO queue semantics with halt-on-failure behavior.
 
 ## Audio Negotiation
@@ -336,6 +337,22 @@ needs multiple downstream consumers, it owns their buffering, ordering, drop,
 retry, and failure policy. Prefer `MulticastOutput` for core-managed,
 backpressure-coupled outputs and `PrioritizedOutput` for a primary output with
 non-blocking observers.
+
+## TtsRequestHandle.synthesisResult (Output Artifact)
+
+`synthesisResult` completes once synthesis and the primary output's ingestion
+lifecycle reach a terminal state. It always resolves to one of:
+
+- `TtsSynthesisCompletedResult`, containing the `AudioArtifact` returned by
+  `TtsOutput.finalizeSession()`;
+- `TtsSynthesisStoppedResult`, containing why the request ended without an
+  artifact;
+- `TtsSynthesisFailedResult`, containing the request error.
+
+It does not wait for physical speaker playback. A `PlaybackAudioArtifact`
+therefore means that audio was handed to the playback backend, not that the
+device has finished playing it. Use request playback events for device-level
+completion or failure.
 
 ## SpeakerBackend Implementation Checklist
 
