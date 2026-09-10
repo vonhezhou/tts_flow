@@ -24,7 +24,6 @@ export 'src/core/tts_synthesis_admission_policy.dart';
 export 'src/core/tts_voice.dart';
 export 'src/engine/file_tts_engine.dart';
 export 'src/engine/non_streaming_bridge.dart';
-export 'src/engine/openai_tts_engine.dart';
 export 'src/engine/sine_tts_engine.dart';
 export 'src/output/aac_file_output.dart';
 export 'src/output/memory_output.dart';

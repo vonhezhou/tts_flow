@@ -75,10 +75,9 @@ inputs) to speed up integration debugging.
   - MulticastOutput (fanout to multiple outputs)
   - PrioritizedOutput (low-latency primary output with non-blocking observers)
   - SpeakerOutput (backend abstraction baseline)
-- Built-in adapters/utilities:
+- Built-in utilities:
   - TtsFormatNegotiator
   - NonStreamingBridge
-  - OpenAiTtsEngine transport adapter API
 - Queue orchestration and controls:
   - init
   - speak
@@ -94,10 +93,6 @@ inputs) to speed up integration debugging.
 ## Voice Discovery
 
 Use service-level helper methods to inspect engine voices and locale defaults.
-For `OpenAiTtsEngine`, the available voices are determined by a built-in
-model-scoped catalog (different models support different voice sets). You can
-supply per-model overrides via `voiceCatalogOverrides`.
-
 ```dart
 import 'package:tts_flow_dart/tts_flow_dart.dart';
 
@@ -261,8 +256,9 @@ Future<void> playWavOrPcm() async {
 
 See example flow in example/main.dart.
 
-By default the example uses SineTtsEngine.
-If OPENAI_API_KEY is set, it automatically switches to OpenAiTtsEngine.
+By default the example uses SineTtsEngine. It also depends on the optional
+`tts_flow_openai` adapter and switches to OpenAiTtsEngine when
+OPENAI_API_KEY is set.
 
 Run it with:
 

@@ -8,12 +8,18 @@ import 'package:path/path.dart' as p;
 import 'package:path_provider/path_provider.dart';
 import 'package:tts_flow_dart/tts_flow_dart.dart';
 import 'package:tts_flow_flutter/tts_flow_flutter.dart';
+import 'package:tts_flow_mimo/tts_flow_mimo.dart';
 import 'package:url_launcher/url_launcher.dart';
 
 const _sampleAudioAsset = 'assets/audio/test_audio_yanfei.wav';
 
 class TtsFlowExamplePage extends StatefulWidget {
-  const TtsFlowExamplePage({super.key});
+  const TtsFlowExamplePage({this.mimoApiKey = '', super.key});
+
+  /// Development-only key supplied with `--dart-define=MIMO_API_KEY=...`.
+  ///
+  /// Do not ship production credentials in a client application.
+  final String mimoApiKey;
 
   @override
   State<TtsFlowExamplePage> createState() => _TtsFlowExamplePageState();
@@ -58,7 +64,10 @@ class _TtsFlowExamplePageState extends State<TtsFlowExamplePage> {
   double _minPitch = 0.0;
   double _maxPitch = 0.0;
 
-  String get _engineLabel => 'Bundled WAV sample';
+  bool get _usesMimo => widget.mimoApiKey.trim().isNotEmpty;
+
+  String get _engineLabel =>
+      _usesMimo ? 'Xiaomi MiMo V2.5 TTS (live)' : 'Bundled WAV sample';
 
   @override
   void initState() {
@@ -83,7 +92,9 @@ class _TtsFlowExamplePageState extends State<TtsFlowExamplePage> {
   Future<void> _initService() async {
     final outputDir = await getTemporaryDirectory();
     final outputWavPath = p.join(outputDir.path, 'tts_flow_example.wav');
-    final sampleAudioPath = await _copySampleAudioToTemp(outputDir);
+    final sampleAudioPath = _usesMimo
+        ? null
+        : await _copySampleAudioToTemp(outputDir);
     _outputDirPath = outputDir.path;
     _outputWavPath = outputWavPath;
 
@@ -193,10 +204,13 @@ class _TtsFlowExamplePageState extends State<TtsFlowExamplePage> {
     return sampleFile.path;
   }
 
-  TtsEngineDefaults _createEngine(String sampleAudioPath) {
+  TtsEngine _createEngine(String? sampleAudioPath) {
+    if (_usesMimo) {
+      return MimoTtsEngine(apiKey: widget.mimoApiKey.trim());
+    }
     return FileTtsEngine(
       engineId: 'bundled-wav-file',
-      provider: WavFileContentProvider.fromWav(sampleAudioPath),
+      provider: WavFileContentProvider.fromWav(sampleAudioPath!),
       chunkSizeBytes: 4096,
       maxBytesPerSecond: 64000,
     );
@@ -494,6 +508,8 @@ class _TtsFlowExamplePageState extends State<TtsFlowExamplePage> {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
+            _SourceNotice(usesMimo: _usesMimo),
+            const SizedBox(height: 12),
             TextField(
               controller: _textController,
               minLines: 2,
@@ -682,6 +698,35 @@ class _TtsFlowExamplePageState extends State<TtsFlowExamplePage> {
                 ),
               ),
             ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class _SourceNotice extends StatelessWidget {
+  const _SourceNotice({required this.usesMimo});
+
+  final bool usesMimo;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final message = usesMimo
+        ? 'Live source: Xiaomi MiMo V2.5 TTS. Audio is synthesized remotely and streamed to the speaker.'
+        : 'Demo source: bundled WAV sample. Launch with --dart-define=MIMO_API_KEY=... to use Xiaomi MiMo V2.5 TTS.';
+    return Card(
+      color: usesMimo
+          ? theme.colorScheme.primaryContainer
+          : theme.colorScheme.surfaceContainerHighest,
+      child: Padding(
+        padding: const EdgeInsets.all(12),
+        child: Row(
+          children: [
+            Icon(usesMimo ? Icons.cloud_done : Icons.info_outline),
+            const SizedBox(width: 8),
+            Expanded(child: Text(message)),
           ],
         ),
       ),

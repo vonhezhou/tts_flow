@@ -7,6 +7,7 @@ import 'package:http/http.dart' as http;
 import 'package:http/testing.dart';
 import 'package:test/test.dart';
 import 'package:tts_flow_dart/tts_flow_dart.dart';
+import 'package:tts_flow_openai/tts_flow_openai.dart';
 
 const _pcmDescriptor = PcmDescriptor(
   sampleRateHz: 24000,

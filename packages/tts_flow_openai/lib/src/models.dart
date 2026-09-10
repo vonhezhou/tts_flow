@@ -1,6 +1,8 @@
 import 'dart:convert';
 import 'dart:typed_data';
 
+// Transport model types used by the OpenAI adapter.
+
 final class OpenAiApiRequest {
   const OpenAiApiRequest({
     this.method = 'POST',

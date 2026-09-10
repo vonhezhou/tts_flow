@@ -1,12 +1,18 @@
 import 'dart:io';
 
 import 'package:tts_flow_dart/tts_flow_dart.dart';
+import 'package:tts_flow_mimo/tts_flow_mimo.dart';
+import 'package:tts_flow_openai/tts_flow_openai.dart';
 
 Future<void> main() async {
   final apiKey = Platform.environment['OPENAI_API_KEY'];
   final useOpenAi = apiKey != null && apiKey.isNotEmpty;
+  final mimoApiKey = Platform.environment['MIMO_API_KEY'];
+  final useMimo = mimoApiKey != null && mimoApiKey.isNotEmpty;
 
-  final engine = useOpenAi
+  final engine = useMimo
+      ? MimoTtsEngine(apiKey: mimoApiKey)
+      : useOpenAi
       ? OpenAiTtsEngine.fromClientConfig(
           config: OpenAiClientConfig(
             apiKey: apiKey,
@@ -25,9 +31,11 @@ Future<void> main() async {
   await service.init();
 
   print(
-    useOpenAi
+    useMimo
+        ? 'Running example in MiMo mode (MIMO_API_KEY detected).'
+        : useOpenAi
         ? 'Running example in OpenAI mode (OPENAI_API_KEY detected).'
-        : 'Running example in fake-engine mode (set OPENAI_API_KEY for real API calls).',
+        : 'Running example in fake-engine mode (set MIMO_API_KEY or OPENAI_API_KEY for real API calls).',
   );
 
   final queueSub = service.queueEvents.listen((event) {

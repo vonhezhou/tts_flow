@@ -9,6 +9,9 @@ workspace:
   - apps/tts_flow_dart_example
   - apps/tts_flow_flutter_example
   - packages/tts_flow_dart
+  - packages/tts_flow_openai
+  - packages/tts_flow_mimo
+  - packages/tts_flow_azure
   - packages/tts_flow_flutter
 
 dev_dependencies:

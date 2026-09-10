@@ -30,8 +30,22 @@ Manager 管理 Flutter 插件；因此 macOS 回归基线为 12.0 及以上。
 ## Purpose
 
 This app is a deterministic playback and output-lifecycle demonstration for
-`tts_flow_flutter`. It uses a bundled WAV fixture through `FileTtsEngine`, so
-it can run without an online TTS account or API key.
+`tts_flow_flutter`. By default it uses a bundled WAV fixture through
+`FileTtsEngine`, so it can run without an online TTS account or API key.
+
+## Xiaomi MiMo live source
+
+Supply a MiMo API key at launch to use the real `MimoTtsEngine` source for the
+Speaker tab. It streams 24 kHz PCM from MiMo and plays it through
+`JustAudioBackend` while writing the auxiliary WAV file.
+
+```sh
+flutter run --dart-define=MIMO_API_KEY=your_key_here
+```
+
+Without that define, the example remains in deterministic bundled-WAV mode.
+The key is deliberately not persisted or entered in the UI; do not bundle a
+production key in a client app.
 
 It demonstrates speaker playback, physical playback events, output writing,
 and decoded WAV export. It intentionally does not embed an online-provider

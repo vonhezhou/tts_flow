@@ -1,5 +1,7 @@
 import 'package:http/http.dart' as http;
 
+// Retry decorator for transient provider failures.
+
 import 'models.dart';
 import 'transport.dart';
 
@@ -9,8 +11,8 @@ final class OpenAiRetryingApiClient implements OpenAiApiClient {
     this.maxRetries = 2,
     this.initialBackoff = const Duration(milliseconds: 250),
     Future<void> Function(Duration)? delay,
-  })  : _inner = inner,
-        _delay = delay ?? Future<void>.delayed;
+  }) : _inner = inner,
+       _delay = delay ?? Future<void>.delayed;
 
   final OpenAiApiClient _inner;
   final int maxRetries;

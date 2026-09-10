@@ -4,29 +4,35 @@ import 'package:logging_appenders/logging_appenders.dart';
 import 'package:tts_flow_flutter_example/reader_demo_page.dart';
 import 'package:tts_flow_flutter_example/tts_flow_example_page.dart';
 
+const _mimoApiKey = String.fromEnvironment('MIMO_API_KEY');
+
 void main(List<String> args) {
   Logger.root.clearListeners();
   Logger.root.level = Level.ALL;
   PrintAppender(formatter: ColorFormatter()).attachToLogger(Logger.root);
 
-  runApp(const MyApp());
+  runApp(const MyApp(mimoApiKey: _mimoApiKey));
 }
 
 class MyApp extends StatelessWidget {
-  const MyApp({super.key});
+  const MyApp({required this.mimoApiKey, super.key});
+
+  final String mimoApiKey;
 
   @override
   Widget build(BuildContext context) {
     return MaterialApp(
       title: 'TtsFlow Speaker Example',
       theme: ThemeData.dark(),
-      home: const _ExampleHome(),
+      home: _ExampleHome(mimoApiKey: mimoApiKey),
     );
   }
 }
 
 class _ExampleHome extends StatelessWidget {
-  const _ExampleHome();
+  const _ExampleHome({required this.mimoApiKey});
+
+  final String mimoApiKey;
 
   @override
   Widget build(BuildContext context) {
@@ -42,8 +48,11 @@ class _ExampleHome extends StatelessWidget {
             ],
           ),
         ),
-        body: const TabBarView(
-          children: [TtsFlowExamplePage(), ReaderDemoPage()],
+        body: TabBarView(
+          children: [
+            TtsFlowExamplePage(mimoApiKey: mimoApiKey),
+            const ReaderDemoPage(),
+          ],
         ),
       ),
     );
