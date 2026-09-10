@@ -47,8 +47,27 @@ Without that define, the example remains in deterministic bundled-WAV mode.
 The key is deliberately not persisted or entered in the UI; do not bundle a
 production key in a client app.
 
+## Azure AI Speech live source
+
+To use Azure Speech, provide the Speech resource key and its Azure region, and
+explicitly select Azure so a key alone never unexpectedly triggers paid or
+quota-backed requests. Azure returns MP3, so the example records an auxiliary
+MP3 file instead of WAV in this mode.
+
+```sh
+flutter run \
+  --dart-define=TTS_SOURCE=azure \
+  --dart-define=AZURE_SPEECH_KEY=your_key_here \
+  --dart-define=AZURE_SPEECH_REGION=eastasia
+```
+
+Use the same region that hosts the Speech resource. The example queries
+Azure's regional voice list after startup, so the voice dropdown contains the
+voices available to that resource. Keep production credentials on a backend;
+these launch-time defines are intended only for development.
+
 It demonstrates speaker playback, physical playback events, output writing,
-and decoded WAV export. It intentionally does not embed an online-provider
+and decoded WAV or MP3 export. It intentionally does not embed an online-provider
 credential flow; provider credentials remain application-owned.
 
 See the repository [architecture](../../docs/architecture.md) and the

@@ -7,6 +7,7 @@ import 'package:logging/logging.dart';
 import 'package:path/path.dart' as p;
 import 'package:path_provider/path_provider.dart';
 import 'package:tts_flow_dart/tts_flow_dart.dart';
+import 'package:tts_flow_azure/tts_flow_azure.dart';
 import 'package:tts_flow_flutter/tts_flow_flutter.dart';
 import 'package:tts_flow_mimo/tts_flow_mimo.dart';
 import 'package:url_launcher/url_launcher.dart';
@@ -14,12 +15,27 @@ import 'package:url_launcher/url_launcher.dart';
 const _sampleAudioAsset = 'assets/audio/test_audio_yanfei.wav';
 
 class TtsFlowExamplePage extends StatefulWidget {
-  const TtsFlowExamplePage({this.mimoApiKey = '', super.key});
+  const TtsFlowExamplePage({
+    this.mimoApiKey = '',
+    this.azureSpeechKey = '',
+    this.azureSpeechRegion = '',
+    this.ttsSource = '',
+    super.key,
+  });
 
   /// Development-only key supplied with `--dart-define=MIMO_API_KEY=...`.
   ///
   /// Do not ship production credentials in a client application.
   final String mimoApiKey;
+
+  /// Development-only Azure credentials supplied with
+  /// `--dart-define=AZURE_SPEECH_KEY=...` and
+  /// `--dart-define=AZURE_SPEECH_REGION=...`.
+  final String azureSpeechKey;
+  final String azureSpeechRegion;
+
+  /// Optional live source selector: `mimo` or `azure`.
+  final String ttsSource;
 
   @override
   State<TtsFlowExamplePage> createState() => _TtsFlowExamplePageState();
@@ -51,7 +67,7 @@ class _TtsFlowExamplePageState extends State<TtsFlowExamplePage> {
   Duration _playerPos = Duration.zero;
   Duration _playerDuration = Duration.zero;
   String? _outputDirPath;
-  String? _outputWavPath;
+  String? _outputAudioPath;
   List<TtsVoice> _voices = const <TtsVoice>[];
   String? _selectedVoiceId;
   double _volume = 1.0;
@@ -64,10 +80,29 @@ class _TtsFlowExamplePageState extends State<TtsFlowExamplePage> {
   double _minPitch = 0.0;
   double _maxPitch = 0.0;
 
-  bool get _usesMimo => widget.mimoApiKey.trim().isNotEmpty;
+  String get _requestedSource => widget.ttsSource.trim().toLowerCase();
 
-  String get _engineLabel =>
-      _usesMimo ? 'Xiaomi MiMo V2.5 TTS (live)' : 'Bundled WAV sample';
+  bool get _usesMimo =>
+      (_requestedSource.isEmpty || _requestedSource == 'mimo') &&
+      widget.mimoApiKey.trim().isNotEmpty;
+
+  bool get _usesAzure =>
+      _requestedSource == 'azure' &&
+      widget.azureSpeechKey.trim().isNotEmpty &&
+      widget.azureSpeechRegion.trim().isNotEmpty;
+
+  bool get _hasAzureConfiguration =>
+      widget.azureSpeechKey.trim().isNotEmpty &&
+      widget.azureSpeechRegion.trim().isNotEmpty;
+
+  String get _engineLabel {
+    if (_usesAzure) return 'Azure AI Speech (live)';
+    if (_usesMimo) return 'Xiaomi MiMo V2.5 TTS (live)';
+    if (_requestedSource == 'azure' && !_hasAzureConfiguration) {
+      return 'Azure AI Speech (configuration needed)';
+    }
+    return 'Bundled WAV sample';
+  }
 
   @override
   void initState() {
@@ -91,12 +126,15 @@ class _TtsFlowExamplePageState extends State<TtsFlowExamplePage> {
 
   Future<void> _initService() async {
     final outputDir = await getTemporaryDirectory();
-    final outputWavPath = p.join(outputDir.path, 'tts_flow_example.wav');
-    final sampleAudioPath = _usesMimo
+    final outputAudioPath = p.join(
+      outputDir.path,
+      _usesAzure ? 'tts_flow_example.mp3' : 'tts_flow_example.wav',
+    );
+    final sampleAudioPath = (_usesMimo || _usesAzure)
         ? null
         : await _copySampleAudioToTemp(outputDir);
     _outputDirPath = outputDir.path;
-    _outputWavPath = outputWavPath;
+    _outputAudioPath = outputAudioPath;
 
     final engine = _createEngine(sampleAudioPath);
 
@@ -105,8 +143,10 @@ class _TtsFlowExamplePageState extends State<TtsFlowExamplePage> {
       defaultOutput: PrioritizedOutput(
         primary: SpeakerOutput(backend: _backend),
         auxiliaries: [
-          _WavRecordingAuxiliaryOutput(
-            output: WavFileOutput(outputWavPath),
+          _RecordingAuxiliaryOutput(
+            output: _usesAzure
+                ? Mp3FileOutput(outputAudioPath)
+                : WavFileOutput(outputAudioPath),
             log: _log,
           ),
         ],
@@ -115,7 +155,9 @@ class _TtsFlowExamplePageState extends State<TtsFlowExamplePage> {
 
     try {
       await service.init();
-      service.preferredFormat = TtsAudioFormat.pcm;
+      service.preferredFormat = _usesAzure
+          ? TtsAudioFormat.mp3
+          : TtsAudioFormat.pcm;
 
       _minVolume = engine.minVolume;
       _maxVolume = engine.maxVolume;
@@ -177,7 +219,7 @@ class _TtsFlowExamplePageState extends State<TtsFlowExamplePage> {
         _voices = voices;
         _selectedVoiceId = selectedVoiceId;
         _status =
-            'Ready using $_engineLabel. Tap "Speak" to play it through the device speaker. Auxiliary WAV: $outputWavPath';
+            'Ready using $_engineLabel. Tap "Speak" to play it through the device speaker. Auxiliary audio: $outputAudioPath';
       });
     } catch (error, stackTrace) {
       _log.severe('Failed to initialize TtsFlow.', error, stackTrace);
@@ -205,6 +247,14 @@ class _TtsFlowExamplePageState extends State<TtsFlowExamplePage> {
   }
 
   TtsEngine _createEngine(String? sampleAudioPath) {
+    if (_usesAzure) {
+      return AzureSpeechTtsEngine(
+        config: AzureSpeechConfig(
+          subscriptionKey: widget.azureSpeechKey.trim(),
+          region: widget.azureSpeechRegion.trim(),
+        ),
+      );
+    }
     if (_usesMimo) {
       return MimoTtsEngine(apiKey: widget.mimoApiKey.trim());
     }
@@ -355,7 +405,7 @@ class _TtsFlowExamplePageState extends State<TtsFlowExamplePage> {
   }
 
   Future<void> _openTempOutputDir() async {
-    final dirPath = _outputWavPath;
+    final dirPath = _outputAudioPath;
     if (dirPath == null || dirPath.isEmpty) {
       setState(() {
         _status = 'Temporary output directory is not available.';
@@ -508,7 +558,12 @@ class _TtsFlowExamplePageState extends State<TtsFlowExamplePage> {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            _SourceNotice(usesMimo: _usesMimo),
+            _SourceNotice(
+              usesMimo: _usesMimo,
+              usesAzure: _usesAzure,
+              requestedSource: _requestedSource,
+              hasAzureConfiguration: _hasAzureConfiguration,
+            ),
             const SizedBox(height: 12),
             TextField(
               controller: _textController,
@@ -651,7 +706,7 @@ class _TtsFlowExamplePageState extends State<TtsFlowExamplePage> {
             Text(_status, style: Theme.of(context).textTheme.bodyMedium),
             const SizedBox(height: 6),
             SelectableText(
-              'WAV output: ${_outputWavPath ?? 'resolving...'}',
+              'Audio output: ${_outputAudioPath ?? 'resolving...'}',
               style: Theme.of(context).textTheme.bodySmall,
             ),
             const SizedBox(height: 12),
@@ -706,25 +761,41 @@ class _TtsFlowExamplePageState extends State<TtsFlowExamplePage> {
 }
 
 class _SourceNotice extends StatelessWidget {
-  const _SourceNotice({required this.usesMimo});
+  const _SourceNotice({
+    required this.usesMimo,
+    required this.usesAzure,
+    required this.requestedSource,
+    required this.hasAzureConfiguration,
+  });
 
   final bool usesMimo;
+  final bool usesAzure;
+  final String requestedSource;
+  final bool hasAzureConfiguration;
 
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
-    final message = usesMimo
+    final isMisconfiguredAzure =
+        requestedSource == 'azure' && !hasAzureConfiguration;
+    final message = usesAzure
+        ? 'Live source: Azure AI Speech. Azure returns streamed MP3 audio for the selected neural voice.'
+        : usesMimo
         ? 'Live source: Xiaomi MiMo V2.5 TTS. Audio is synthesized remotely and streamed to the speaker.'
-        : 'Demo source: bundled WAV sample. Launch with --dart-define=MIMO_API_KEY=... to use Xiaomi MiMo V2.5 TTS.';
+        : isMisconfiguredAzure
+        ? 'Azure source was requested, but AZURE_SPEECH_KEY or AZURE_SPEECH_REGION is missing. Using the bundled WAV sample.'
+        : 'Demo source: bundled WAV sample. Launch with --dart-define=MIMO_API_KEY=... for MiMo, or --dart-define=TTS_SOURCE=azure --dart-define=AZURE_SPEECH_KEY=... --dart-define=AZURE_SPEECH_REGION=... for Azure.';
     return Card(
-      color: usesMimo
+      color: (usesMimo || usesAzure)
           ? theme.colorScheme.primaryContainer
           : theme.colorScheme.surfaceContainerHighest,
       child: Padding(
         padding: const EdgeInsets.all(12),
         child: Row(
           children: [
-            Icon(usesMimo ? Icons.cloud_done : Icons.info_outline),
+            Icon(
+              (usesMimo || usesAzure) ? Icons.cloud_done : Icons.info_outline,
+            ),
             const SizedBox(width: 8),
             Expanded(child: Text(message)),
           ],
@@ -738,10 +809,10 @@ class _SourceNotice extends StatelessWidget {
 ///
 /// It owns serial file delivery itself, which is deliberately not a
 /// responsibility of tts_flow's primary/auxiliary output wrapper.
-final class _WavRecordingAuxiliaryOutput implements TtsAuxiliaryOutput {
-  _WavRecordingAuxiliaryOutput({required this.output, required this.log});
+final class _RecordingAuxiliaryOutput implements TtsAuxiliaryOutput {
+  _RecordingAuxiliaryOutput({required this.output, required this.log});
 
-  final WavFileOutput output;
+  final TtsOutput output;
   final Logger log;
   Future<void> _pending = Future<void>.value();
   var _hasSession = false;
@@ -796,12 +867,12 @@ final class _WavRecordingAuxiliaryOutput implements TtsAuxiliaryOutput {
   void _enqueue(String operation, Future<void> Function() action) {
     _pending = _pending
         .catchError((Object error, StackTrace stackTrace) {
-          log.warning('Auxiliary WAV recorder failed.', error, stackTrace);
+          log.warning('Auxiliary audio recorder failed.', error, stackTrace);
         })
         .then<void>((_) => action())
         .catchError((Object error, StackTrace stackTrace) {
           log.warning(
-            'Auxiliary WAV recorder failed during $operation.',
+            'Auxiliary audio recorder failed during $operation.',
             error,
             stackTrace,
           );
