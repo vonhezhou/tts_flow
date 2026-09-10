@@ -223,6 +223,44 @@ void main() {
           expect(written.isLastChunk, isTrue);
         },
       );
+
+      test(
+        'rejects encoded input beyond its bounded conversion buffer',
+        () async {
+          decoder = Decoder(
+            outputId: 'decoder',
+            output: mockOutput,
+            maxBufferedBytes: 3,
+          );
+          when(() => mockOutput.inAudioCapabilities).thenReturn({
+            PcmCapability.wav(),
+          });
+          when(() => mockOutput.startWrite(any())).thenAnswer((_) async {});
+
+          await decoder.startWrite(
+            const TtsOutputWriteContext(
+              requestKey: 'request-1',
+              audioSpec: TtsAudioSpec.mp3(),
+              voice: null,
+              options: null,
+            ),
+          );
+
+          await expectLater(
+            decoder.writeChunk(
+              TtsAudioChunk(
+                requestKey: 'request-1',
+                sequenceNumber: 0,
+                bytes: Uint8List.fromList([1, 2, 3, 4]),
+                audioSpec: const TtsAudioSpec.mp3(),
+                isLastChunk: true,
+                timestamp: DateTime(2026),
+              ),
+            ),
+            throwsA(isA<StateError>()),
+          );
+        },
+      );
     });
 
     group('cancelWrite', () {

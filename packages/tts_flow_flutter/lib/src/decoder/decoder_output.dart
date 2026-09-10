@@ -76,8 +76,13 @@ final class Decoder implements TtsOutput {
     required this.output,
     this.pcmFormat,
     this.defaultPcmFormat = const PcmDescriptor.s16Mono24KHz(),
+    this.maxBufferedBytes = 64 * 1024 * 1024,
     AudioPcmConverter converter = _convertWithPlatformAudioDecoder,
-  }) : _converter = converter;
+  }) : assert(
+         maxBufferedBytes == null || maxBufferedBytes > 0,
+         'maxBufferedBytes must be positive or null.',
+       ),
+       _converter = converter;
 
   @override
   final String outputId;
@@ -92,6 +97,14 @@ final class Decoder implements TtsOutput {
   /// The default PCM format to use if [Decoder] and [Decoder.output]
   /// are open-ended and can not agree on a fixed format.
   final PcmDescriptor defaultPcmFormat;
+
+  /// Maximum encoded bytes retained for a whole-payload conversion.
+  ///
+  /// Compressed conversion is intentionally non-streaming, so the default
+  /// 64 MiB limit prevents an unexpectedly long response from retaining
+  /// unbounded memory.
+  /// Set this to `null` only when the caller explicitly accepts that risk.
+  final int? maxBufferedBytes;
 
   final AudioPcmConverter _converter;
 
@@ -177,6 +190,14 @@ final class Decoder implements TtsOutput {
       final buffer = _buffer;
       if (buffer == null) {
         throw StateError('Decoder conversion buffer is not initialized.');
+      }
+      final maxBytes = maxBufferedBytes;
+      final nextLength = buffer.length + chunk.bytes.length;
+      if (maxBytes != null && nextLength > maxBytes) {
+        throw StateError(
+          'Decoder input exceeds maxBufferedBytes '
+          '($nextLength > $maxBytes).',
+        );
       }
       buffer.add(chunk.bytes);
       _lastBufferedSequenceNumber = chunk.sequenceNumber;

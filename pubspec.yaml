@@ -32,16 +32,10 @@ melos:
       description: Run all tests.
 
     test:dart:
-      exec: dart test
-      packageFilters:
-        dirExists: test
-        flutter: false
-    
+      run: dart run melos exec --dir-exists=test --no-flutter -- dart test
+
     test:flutter:
-      exec: flutter test
-      packageFilters:
-        dirExists: test
-        scope: tts_flow_flutter
+      run: dart run melos exec --dir-exists=test --scope=tts_flow_flutter -- flutter test
 
     test:integration:macos:
       run: cd apps/tts_flow_flutter_example && flutter test integration_test/just_audio_jitter_test.dart -d macos
