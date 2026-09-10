@@ -6,11 +6,15 @@ Optional Xiaomi MiMo V2.5 TTS adapter for `tts_flow_dart`.
 import 'package:tts_flow_dart/tts_flow_dart.dart';
 import 'package:tts_flow_mimo/tts_flow_mimo.dart';
 
-final flow = TtsFlow(
-  engine: MimoTtsEngine(apiKey: 'MIMO_API_KEY'),
-  defaultOutput: WavFileOutput('speech.wav'),
-);
-flow.preferredFormat = TtsAudioFormat.pcm;
+Future<void> main() async {
+  final flow = TtsFlow(
+    engine: MimoTtsEngine(apiKey: 'MIMO_API_KEY'),
+    defaultOutput: WavFileOutput('speech.wav'),
+  );
+  await flow.init();
+  flow.preferredFormat = TtsAudioFormat.pcm;
+  await flow.dispose();
+}
 ```
 
 The adapter uses `https://api.xiaomimimo.com/v1/chat/completions` with
@@ -24,3 +28,6 @@ Use `TtsRequest.params` for MiMo-specific controls:
 
 For voice cloning, use a `TtsVoice` whose `voiceId` is the documented
 `data:audio/...;base64,...` value.
+
+`MimoTtsEngine.requestTimeout` controls the HTTP request deadline (30 seconds
+by default). Cancel an active request through its `TtsRequestHandle`.

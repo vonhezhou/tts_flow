@@ -10,3 +10,7 @@ final engine = OpenAiTtsEngine.fromClientConfig(
   config: const OpenAiClientConfig(apiKey: '...'),
 );
 ```
+
+`OpenAiClientConfig.requestTimeout` controls the HTTP request deadline
+(30 seconds by default). Stop an active synthesis through its
+`TtsRequestHandle`, rather than a service-wide timeout option.

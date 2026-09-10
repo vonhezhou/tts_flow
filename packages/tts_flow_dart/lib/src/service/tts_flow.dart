@@ -344,9 +344,17 @@ final class TtsFlow
 
     state.activeControl?.cancel(CancelReason.serviceDispose);
     await _clearQueue(TtsSynthesisStopReason.serviceDisposed);
-    await _awaitActiveRequestShutdown();
+    // Give a cooperative engine a bounded opportunity to observe cancellation
+    // before asking it to release its transport. Output disposal deliberately
+    // happens only after the active stream has actually exited: Dart cannot
+    // forcibly cancel an arbitrary async generator, and disposing an output
+    // earlier could race a late write or cancel callback from that generator.
+    await _awaitActiveRequestShutdown(
+      timeout: config.activeSynthesisShutdownTimeout,
+    );
     await disposePlaybackCompletionListeners();
     await _engine.dispose();
+    await _awaitActiveRequestShutdown();
     await _disposeManagedOutputs();
     _playbackOutputs.clear();
     _utteranceIdsByRequestKey.clear();
@@ -458,9 +466,8 @@ final class TtsFlow
     }
   }
 
-  Future<void> _awaitActiveRequestShutdown() async {
+  Future<void> _awaitActiveRequestShutdown({Duration? timeout}) async {
     const pollInterval = Duration(milliseconds: 10);
-    final timeout = config.activeSynthesisShutdownTimeout;
     final deadline = timeout == null ? null : DateTime.now().add(timeout);
 
     while (state.activeControl != null &&

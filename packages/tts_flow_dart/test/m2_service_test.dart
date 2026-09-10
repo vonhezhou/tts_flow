@@ -718,6 +718,39 @@ void main() {
       },
     );
 
+    test(
+      'dispose retains outputs until a cancellation-delayed engine exits',
+      () async {
+        final output = _LifecycleTrackingOutput(outputId: 'shutdown-order');
+        final service = TtsFlow(
+          engine: SineTtsEngine(
+            engineId: 'delayed-engine',
+            supportsStreaming: true,
+            chunkCount: 1,
+            chunkDelay: const Duration(milliseconds: 60),
+          ),
+          defaultOutput: output,
+          config: const TtsFlowConfig(
+            activeSynthesisShutdownTimeout: Duration(milliseconds: 1),
+          ),
+        );
+        await service.init();
+        final request = service.speak('delayed shutdown');
+
+        await Future<void>.delayed(const Duration(milliseconds: 5));
+        final stopwatch = Stopwatch()..start();
+        await service.dispose();
+        stopwatch.stop();
+
+        expect(
+          stopwatch.elapsed,
+          greaterThanOrEqualTo(const Duration(milliseconds: 35)),
+        );
+        expect(output.disposeCount, 1);
+        expect(await request.synthesisResult, isA<TtsSynthesisStoppedResult>());
+      },
+    );
+
     test('service exposes engine available voices and defaults', () async {
       final service = TtsFlow(
         engine: SineTtsEngine(engineId: 'fake-engine', supportsStreaming: true),

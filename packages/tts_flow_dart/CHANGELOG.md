@@ -1,15 +1,6 @@
 # Changelog
 
-## 0.1.0
-
-- M1: Added core contracts, models, and fake engine/output for validation.
-- M2: Added TtsFlow FIFO queue orchestration, request/queue events, and control APIs.
-- M3: Added request-scoped format negotiation and OpenAI non-streaming engine adapter.
-- M4: Added production MemoryOutput and (Wav/Mp3/Aac)FileOutput with request-scoped session isolation.
-- M5: Added SpeakerOutput baseline with backend abstraction and playback session artifact.
-- M6: Added integration-style service tests, improved docs, and example application flow.
-
-## Unreleased
+## 0.2.0
 
 - Breaking: `TtsRequestHandle` no longer extends `Stream<TtsChunk>`.
   Consume its sole audio handoff through `handle.chunks`.
@@ -19,6 +10,10 @@
 - Breaking: removed the unused request-level `TtsOptions.timeout` and
   `TtsFlow.timeout`. Online transport timeouts are configured explicitly by
   the corresponding engine client configuration.
+- `TtsFlow.dispose()` now treats `activeSynthesisShutdownTimeout` as a
+  pre-engine-dispose grace period. Managed outputs remain alive until the
+  active engine stream has actually exited, preventing late callbacks from
+  writing to released output resources.
 - Added `PrioritizedOutput` and `TtsAuxiliaryOutput` for playback-first
   fanout. Only the primary output participates in backpressure and format
   negotiation; auxiliary observers are synchronous notifications that own any
@@ -69,7 +64,7 @@
 - Added persistent service defaults for synthesis behavior:
  `voice`, `options`, and `preferredFormat`.
 - Added direct option field accessors on `TtsFlow` for
- `speed`, `pitch`, `volume`, `sampleRateHz`, and `timeout`.
+ `speed`, `pitch`, `volume`, and `sampleRateHz`.
 - `speak(...)` now constructs a fresh internal `TtsRequest` snapshot from
  current service defaults on each invocation (call params are per-request only).
 
@@ -80,3 +75,12 @@
 - `OpenAiTtsEngine` resolves available voices from a built-in model-scoped
  catalog (`tts-1`, `tts-1-hd`, `gpt-4o-mini-tts`) with deterministic locale
  fallback. Per-model overrides can be supplied via `voiceCatalogOverrides`.
+
+## 0.1.0
+
+- M1: Added core contracts, models, and fake engine/output for validation.
+- M2: Added TtsFlow FIFO queue orchestration, request/queue events, and control APIs.
+- M3: Added request-scoped format negotiation and OpenAI non-streaming engine adapter.
+- M4: Added production MemoryOutput and (Wav/Mp3/Aac)FileOutput with request-scoped session isolation.
+- M5: Added SpeakerOutput baseline with backend abstraction and playback session artifact.
+- M6: Added integration-style service tests, improved docs, and example application flow.

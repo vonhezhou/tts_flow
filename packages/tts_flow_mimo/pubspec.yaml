@@ -1,6 +1,6 @@
 name: tts_flow_mimo
 description: Xiaomi MiMo V2.5 TTS adapter for tts_flow_dart.
-version: 0.1.0
+version: 0.2.0
 homepage: https://github.com/vonhezhou/tts_flow/packages/tts_flow_mimo
 resolution: workspace
 
@@ -9,7 +9,7 @@ environment:
 
 dependencies:
   http: ^1.5.0
-  tts_flow_dart: ^0.1.0
+  tts_flow_dart: ^0.2.0
 
 dev_dependencies:
   lints: ^6.0.0

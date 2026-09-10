@@ -1,7 +1,7 @@
 name: tts_flow_flutter
-description: A Very Good Project created by Very Good CLI.
-version: 0.1.0+1
-publish_to: none
+description: Flutter playback and explicit audio-conversion adapters for tts_flow.
+version: 0.2.0
+homepage: https://github.com/vonhezhou/tts_flow/tree/main/packages/tts_flow_flutter
 resolution: workspace
 
 environment:
@@ -18,7 +18,7 @@ dependencies:
   media_kit_libs_linux: ^1.2.1
   media_kit_libs_windows_audio: ^1.0.9
   meta: ^1.17.0
-  tts_flow_dart: ^0.1.0
+  tts_flow_dart: ^0.2.0
 
 dev_dependencies:
   flutter_test:

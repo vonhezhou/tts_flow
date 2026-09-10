@@ -1,108 +1,82 @@
 # tts_flow_flutter
 
-[![style: very good analysis][very_good_analysis_badge]][very_good_analysis_link]
-[![Powered by Mason](https://img.shields.io/endpoint?url=https%3A%2F%2Ftinyurl.com%2Fmason-badge)](https://github.com/felangel/mason)
-[![License: MIT][license_badge]][license_link]
-
 Flutter playback and optional conversion adapters for `tts_flow_dart`.
-It keeps compatible online TTS audio in its encoded form for direct
-`just_audio` playback; `Decoder` is an explicit complete-payload conversion
-output for branches that need PCM.
 
-## JustAudio streaming playback
+`JustAudioBackend` is the low-latency playback path: when the provider and
+target platform support the negotiated encoded format (for example MP3), bytes
+are handed to `just_audio` unchanged. `Decoder` is an explicit whole-payload
+conversion output for a non-critical branch that needs PCM; it is not a
+streaming decoder and should not sit on the latency-critical playback path.
 
-`JustAudioBackend` plays compatible online TTS streams by appending finite
-`StreamAudioSource` segments to a just_audio source list. It preserves the
-encoded audio path; it does not decode or packetize provider audio in Dart.
-
-The provider must continuously supply audio that is compatible with source-list
-playback on the target platform. Provider-specific stream discontinuities, such
-as an encoding parameter change within one response, must be handled by that
-provider adapter or by an application-level fallback.
-
-Because just_audio implements `StreamAudioSource` using a localhost proxy on
-some native platforms, host applications must configure Android release network
-access and localhost cleartext traffic, iOS/macOS ATS, and macOS sandbox network
-entitlements. The example app includes these settings. See the repository's
-[JustAudioBackend design](../../docs/just_audio_backend.md) for the lifecycle,
-platform, and compatibility requirements.
-
-Platform errors that occur after audio has been handed to just_audio are exposed
-through `JustAudioBackend.playbackErrorStream` and terminate the affected
-playback session. The same failure is also propagated through `SpeakerOutput`
-and `TtsFlow.requestEvents` as `requestPlaybackFailed`; this is separate from
-the synthesis request result, so an already completed `speak()` stream is not
-retroactively failed.
-
-For deterministic jitter regression, `playbackWaitingStream` reports when an
-unfinished source list is exhausted. A later chunk can recover from this state;
-the event is diagnostic rather than a playback failure.
-
-`playbackSourceStartedStream` reports the exact point at which a native player
-requests a source and the source becomes immutable. It can gate deterministic
-test timing without inferring readiness from platform-specific player states.
-
-On Linux and Windows, `JustAudioBackend` initializes `just_audio_media_kit`
-before constructing its player. macOS continues to use just_audio's native
-implementation by default. Applications may still call
-`JustAudioBackend.ensureInitialized()` from `main()`; doing so is idempotent.
-
-## Installation 💻
-
-**❗ In order to start using Tts Flow Flutter you must have the [Flutter SDK][flutter_install_link] installed on your machine.**
-
-Install via `flutter pub add`:
+## Install
 
 ```sh
-dart pub add tts_flow_flutter
+flutter pub add tts_flow_dart tts_flow_flutter
 ```
 
----
+Provider engines are separate optional packages, such as `tts_flow_openai`,
+`tts_flow_azure`, and `tts_flow_mimo`.
 
-## Continuous Integration 🤖
+## Quick start
 
-Tts Flow Flutter comes with a built-in [GitHub Actions workflow][github_actions_link] powered by [Very Good Workflows][very_good_workflows_link] but you can also add your preferred CI/CD solution.
+This complete example uses the built-in deterministic engine. Replace it with
+an online engine in an application and keep the `SpeakerOutput` wiring.
 
-Out of the box, on each pull request and push, the CI `formats`, `lints`, and `tests` the code. This ensures the code remains consistent and behaves correctly as you add functionality or make changes. The project uses [Very Good Analysis][very_good_analysis_link] for a strict set of analysis options used by our team. Code coverage is enforced using the [Very Good Workflows][very_good_coverage_link].
+```dart
+import 'package:tts_flow_dart/tts_flow_dart.dart';
+import 'package:tts_flow_flutter/tts_flow_flutter.dart';
 
----
+Future<void> main() async {
+  final flow = TtsFlow(
+    engine: SineTtsEngine(
+      engineId: 'demo-engine',
+      supportsStreaming: true,
+      chunkCount: 3,
+    ),
+    defaultOutput: SpeakerOutput(backend: JustAudioBackend()),
+  );
 
-## Running Tests 🧪
+  await flow.init();
+  flow.preferredFormat = TtsAudioFormat.pcm;
+  await flow.speak('Hello from tts_flow').synthesisResult;
+  await flow.dispose();
+}
+```
 
-For first time users, install the [very_good_cli][very_good_cli_link]:
+For a real Flutter application, see
+[`apps/tts_flow_flutter_example`](../../apps/tts_flow_flutter_example). It can
+run with a bundled fixture, MiMo, or Azure Speech.
+
+## Streaming playback contract
+
+`JustAudioBackend` appends finite `StreamAudioSource` segments to a source
+list. It preserves encoded provider audio rather than decoding or packetizing
+it in Dart. A provider must therefore keep encoding parameters compatible for
+the lifetime of one response; provider-specific discontinuities belong in that
+provider adapter or in an application fallback.
+
+Platform errors after audio has reached `just_audio` are exposed through
+`JustAudioBackend.playbackErrorStream` and the core request event
+`requestPlaybackFailed`. This is distinct from a completed synthesis result.
+
+On Linux and Windows the backend initializes `just_audio_media_kit` before
+constructing its player. Calling `JustAudioBackend.ensureInitialized()` in
+`main()` is safe but optional.
+
+Read the repository [JustAudioBackend guide](../../docs/just_audio_backend.md)
+before shipping: it documents source lifecycle, Android localhost/cleartext
+requirements, iOS/macOS ATS, and macOS sandbox network entitlements.
+
+## Tests
 
 ```sh
-dart pub global activate very_good_cli
+flutter test
 ```
 
-To run all unit tests:
+The repository's native jitter regression lives in the Flutter example and is
+run explicitly on a desktop device:
 
 ```sh
-very_good test --coverage
+cd apps/tts_flow_flutter_example
+flutter test integration_test/just_audio_jitter_test.dart -d macos
 ```
-
-To view the generated coverage report you can use [lcov](https://github.com/linux-test-project/lcov).
-
-```sh
-# Generate Coverage Report
-genhtml coverage/lcov.info -o coverage/
-
-# Open Coverage Report
-open coverage/index.html
-```
-
-[flutter_install_link]: https://docs.flutter.dev/get-started/install
-[github_actions_link]: https://docs.github.com/en/actions/learn-github-actions
-[license_badge]: https://img.shields.io/badge/license-MIT-blue.svg
-[license_link]: https://opensource.org/licenses/MIT
-[logo_black]: https://raw.githubusercontent.com/VGVentures/very_good_brand/main/styles/README/vgv_logo_black.png#gh-light-mode-only
-[logo_white]: https://raw.githubusercontent.com/VGVentures/very_good_brand/main/styles/README/vgv_logo_white.png#gh-dark-mode-only
-[mason_link]: https://github.com/felangel/mason
-[very_good_analysis_badge]: https://img.shields.io/badge/style-very_good_analysis-B22C89.svg
-[very_good_analysis_link]: https://pub.dev/packages/very_good_analysis
-[very_good_cli_link]: https://pub.dev/packages/very_good_cli
-[very_good_coverage_link]: https://github.com/marketplace/actions/very-good-coverage
-[very_good_ventures_link]: https://verygood.ventures
-[very_good_ventures_link_light]: https://verygood.ventures#gh-light-mode-only
-[very_good_ventures_link_dark]: https://verygood.ventures#gh-dark-mode-only
-[very_good_workflows_link]: https://github.com/VeryGoodOpenSource/very_good_workflows

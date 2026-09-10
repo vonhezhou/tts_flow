@@ -1,4 +1,4 @@
-/// A Very Good Project created by Very Good CLI.
+/// Flutter playback and explicit audio-conversion adapters for `tts_flow`.
 library;
 
 export 'src/decoder/decoder_output.dart';

@@ -26,10 +26,13 @@ final class TtsFlowConfig {
   final TtsSynthesisAdmissionPolicy synthesisAdmissionPolicy;
 
   /// Maximum time [TtsFlow.dispose] waits for an active engine stream to
-  /// observe cancellation before disposing engine and output resources.
+  /// observe cancellation before it invokes [TtsEngine.dispose].
   ///
-  /// Set this to `null` when the caller prefers to wait indefinitely for a
-  /// cooperative engine shutdown. Engines must still observe
-  /// [SynthesisControl] promptly.
+  /// Outputs are disposed only after the active stream has actually exited, so
+  /// a late engine callback can never write to an already-disposed output.
+  /// Set this to `null` when the caller prefers to wait indefinitely before
+  /// invoking engine disposal. Engines must still observe [SynthesisControl]
+  /// promptly and make [TtsEngine.dispose] complete only after their own work
+  /// has stopped.
   final Duration? activeSynthesisShutdownTimeout;
 }

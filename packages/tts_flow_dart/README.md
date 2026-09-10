@@ -37,11 +37,32 @@ only to outputs that retain controllable playback associations; unsynthesized
 text remains in the normal FIFO queue. Custom policies receive a snapshot and
 can call `flow.refreshSynthesisAdmission()` after their own state changes.
 
-When disposing a flow, active synthesis is first cancelled and the flow waits
-up to five seconds for the engine stream to end before releasing engine and
-output resources. Configure `TtsFlowConfig.activeSynthesisShutdownTimeout`
-to use a different grace period, or `null` to wait indefinitely for a
-cooperative engine.
+When disposing a flow, active synthesis is first cancelled. The flow waits up
+to five seconds for the engine stream to end, then invokes `engine.dispose()`
+as the escalation step. It never releases an Output until the active stream has
+actually exited. Configure `TtsFlowConfig.activeSynthesisShutdownTimeout` to
+use a different pre-escalation grace period, or `null` to wait indefinitely
+before asking the engine to dispose.
+
+The shutdown order is fixed: cancel active synthesis, wait for the configured
+grace period, dispose the engine, confirm that the active stream has exited,
+then dispose managed outputs. An engine must make `SynthesisControl`
+cancellation observable promptly and must not complete `dispose()` while its
+stream can still write. The timeout is a pre-escalation grace period, not a
+request-level network timeout.
+
+## Input limits and request deadlines
+
+`TtsEngine.maxInputCharacterCount` is measured in user-perceived characters
+(extended grapheme clusters), not UTF-16 code units or UTF-8 bytes. A value of
+`0` means that the engine imposes no framework-level limit. Provider adapters
+may still enforce their own documented provider limits.
+
+`TtsOptions` deliberately has no `timeout` field. A synthesis deadline belongs
+to the transport that can actually cancel it: configure the adapter's own
+`requestTimeout` (`OpenAiClientConfig`, `AzureSpeechConfig`, or
+`MimoTtsEngine`) instead. Use `TtsRequestHandle.stopSynthesis()` for explicit
+request cancellation.
 
 ## Audio Negotiation
 
@@ -350,6 +371,14 @@ Use `MulticastOutput` instead when every output must receive a complete,
 backpressure-coupled stream. For a full external processing pipeline, consume
 `TtsRequestHandle.chunks` in the application rather than expanding this
 package into a media graph.
+
+For a complete Flutter example with `JustAudioBackend` as the primary and a
+bounded, asynchronous file auxiliary that drops remaining work after its first
+failure, see
+[`auxiliary_output_example.dart`](../../apps/tts_flow_flutter_example/lib/auxiliary_output_example.dart).
+It demonstrates the essential ownership rule: an auxiliary queues copied audio
+bytes, reports its own asynchronous errors, and never makes player latency or
+the request result depend on its file I/O.
 
 ## TtsRequestHandle.chunks (Application Processing Handoff)
 

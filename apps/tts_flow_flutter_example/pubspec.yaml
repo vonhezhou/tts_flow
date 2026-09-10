@@ -1,5 +1,5 @@
 name: tts_flow_flutter_example
-description: "A new Flutter project."
+description: Deterministic playback and online-TTS integration example for tts_flow_flutter.
 # The following line prevents the package from being accidentally published to
 # pub.dev using `flutter pub publish`. This is preferred for private packages.
 publish_to: 'none' # Remove this line if you wish to publish to pub.dev
@@ -38,10 +38,10 @@ dependencies:
   logging: ^1.3.0
   logging_appenders: ^2.0.0+1
   just_audio: ^0.10.5
-  tts_flow_dart: ^0.1.0
-  tts_flow_flutter: ^0.1.0
-  tts_flow_mimo: ^0.1.0
-  tts_flow_azure: ^0.1.0
+  tts_flow_dart: ^0.2.0
+  tts_flow_flutter: ^0.2.0
+  tts_flow_mimo: ^0.2.0
+  tts_flow_azure: ^0.2.0
   path: ^1.9.1
   path_provider: ^2.1.5
   url_launcher: ^6.3.2
