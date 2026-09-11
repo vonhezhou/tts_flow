@@ -13,6 +13,7 @@ import 'package:tts_flow_mimo/tts_flow_mimo.dart';
 import 'package:url_launcher/url_launcher.dart';
 
 part 'tts_flow_example_page_recording_output.dart';
+part 'tts_flow_example_page_service_factory.dart';
 part 'tts_flow_example_page_widgets.dart';
 
 const _sampleAudioAsset = 'assets/audio/test_audio_yanfei.wav';
@@ -128,35 +129,20 @@ class _TtsFlowExamplePageState extends State<TtsFlowExamplePage> {
   }
 
   Future<void> _initService() async {
-    final outputDir = await getTemporaryDirectory();
-    final outputAudioPath = p.join(
-      outputDir.path,
-      _usesAzure ? 'tts_flow_example.mp3' : 'tts_flow_example.wav',
-    );
-    final sampleAudioPath = (_usesMimo || _usesAzure)
-        ? null
-        : await _copySampleAudioToTemp(outputDir);
-    _outputDirPath = outputDir.path;
-    _outputAudioPath = outputAudioPath;
-
-    final engine = _createEngine(sampleAudioPath);
-
-    final service = TtsFlow(
-      engine: engine,
-      defaultOutput: PrioritizedOutput(
-        primary: SpeakerOutput(backend: _backend),
-        auxiliaries: [
-          _RecordingAuxiliaryOutput(
-            output: _usesAzure
-                ? Mp3FileOutput(outputAudioPath)
-                : WavFileOutput(outputAudioPath),
-            log: _log,
-          ),
-        ],
-      ),
-    );
-
+    TtsFlow? service;
     try {
+      final resources = await _ExampleServiceFactory(
+        usesMimo: _usesMimo,
+        usesAzure: _usesAzure,
+        mimoApiKey: widget.mimoApiKey,
+        azureSpeechKey: widget.azureSpeechKey,
+        azureSpeechRegion: widget.azureSpeechRegion,
+      ).create(backend: _backend, log: _log);
+      service = resources.service;
+      final engine = resources.engine;
+      _outputDirPath = resources.outputDirectoryPath;
+      _outputAudioPath = resources.outputAudioPath;
+
       await service.init();
       service.preferredFormat = _usesAzure
           ? TtsAudioFormat.mp3
@@ -222,11 +208,11 @@ class _TtsFlowExamplePageState extends State<TtsFlowExamplePage> {
         _voices = voices;
         _selectedVoiceId = selectedVoiceId;
         _status =
-            'Ready using $_engineLabel. Tap "Speak" to play it through the device speaker. Auxiliary audio: $outputAudioPath';
+            'Ready using $_engineLabel. Tap "Speak" to play it through the device speaker. Auxiliary audio: $_outputAudioPath';
       });
     } catch (error, stackTrace) {
       _log.severe('Failed to initialize TtsFlow.', error, stackTrace);
-      await service.dispose();
+      await service?.dispose();
       if (!mounted) {
         return;
       }
@@ -234,39 +220,6 @@ class _TtsFlowExamplePageState extends State<TtsFlowExamplePage> {
         _status = 'Failed to initialize TtsFlow: $error';
       });
     }
-  }
-
-  Future<String> _copySampleAudioToTemp(Directory outputDir) async {
-    final sampleFile = File(p.join(outputDir.path, 'tts_flow_sample.wav'));
-    final assetData = await rootBundle.load(_sampleAudioAsset);
-    await sampleFile.writeAsBytes(
-      assetData.buffer.asUint8List(
-        assetData.offsetInBytes,
-        assetData.lengthInBytes,
-      ),
-      flush: true,
-    );
-    return sampleFile.path;
-  }
-
-  TtsEngine _createEngine(String? sampleAudioPath) {
-    if (_usesAzure) {
-      return AzureSpeechTtsEngine(
-        config: AzureSpeechConfig(
-          subscriptionKey: widget.azureSpeechKey.trim(),
-          region: widget.azureSpeechRegion.trim(),
-        ),
-      );
-    }
-    if (_usesMimo) {
-      return MimoTtsEngine(apiKey: widget.mimoApiKey.trim());
-    }
-    return FileTtsEngine(
-      engineId: 'bundled-wav-file',
-      provider: WavFileContentProvider.fromWav(sampleAudioPath!),
-      chunkSizeBytes: 4096,
-      maxBytesPerSecond: 64000,
-    );
   }
 
   void _onQueueEvent(TtsQueueEvent event) {
