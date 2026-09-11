@@ -13,12 +13,18 @@ final class ProviderPlaybackFixture {
   ProviderPlaybackFixture._({
     required this.provider,
     required this.kind,
+    required this.sampleRateHz,
+    required this.channels,
     required this.audioSpec,
     required List<ProviderPlaybackFixtureChunk> chunks,
   }) : chunks = List.unmodifiable(chunks);
 
   final String provider;
   final String kind;
+
+  /// Capture metadata retained for every encoded and PCM fixture.
+  final int sampleRateHz;
+  final int channels;
   final TtsAudioSpec audioSpec;
   final List<ProviderPlaybackFixtureChunk> chunks;
 
@@ -41,6 +47,12 @@ final class ProviderPlaybackFixture {
     if (entries.isEmpty) {
       throw FormatException('$manifestAsset must include at least one chunk.');
     }
+    final sampleRateHz = _requiredPositiveInt(
+      manifest,
+      'sampleRateHz',
+      manifestAsset,
+    );
+    final channels = _requiredPositiveInt(manifest, 'channels', manifestAsset);
 
     var previousOffset = -1;
     final chunks = <ProviderPlaybackFixtureChunk>[];
@@ -86,6 +98,8 @@ final class ProviderPlaybackFixture {
     return ProviderPlaybackFixture._(
       provider: _requiredString(manifest, 'provider', manifestAsset),
       kind: _requiredString(manifest, 'kind', manifestAsset),
+      sampleRateHz: sampleRateHz,
+      channels: channels,
       audioSpec: _audioSpecFromManifest(manifest, manifestAsset, format),
       chunks: chunks,
     );
@@ -258,4 +272,12 @@ int _requiredInt(Map<String, Object?> map, String key, String source) {
     return value;
   }
   throw FormatException('$source.$key must be an integer.');
+}
+
+int _requiredPositiveInt(Map<String, Object?> map, String key, String source) {
+  final value = _requiredInt(map, key, source);
+  if (value > 0) {
+    return value;
+  }
+  throw FormatException('$source.$key must be greater than zero.');
 }

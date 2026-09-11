@@ -34,7 +34,7 @@ Each sample has a neighboring JSON manifest with this shape:
 ```
 
 `format` accepts `pcm`, `mp3`, `opus`, and `aac`. `sampleRateHz` and
-`channels` document the capture for every format. For `pcm`, add
+`channels` are required positive capture metadata for every format. For `pcm`, add
 `bitsPerSample` and `encoding` (`signedInt`, `unsignedInt`, or `float`) so the
 fixture can reconstruct its exact `TtsAudioSpec`. The first chunk must have an
 `arrivalOffsetMs` of `0`; subsequent offsets are elapsed from the beginning of

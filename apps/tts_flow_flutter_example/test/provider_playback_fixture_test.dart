@@ -33,6 +33,8 @@ void main() {
 
     expect(fixture.provider, 'test');
     expect(fixture.kind, 'continuous');
+    expect(fixture.sampleRateHz, 24000);
+    expect(fixture.channels, 1);
     expect(
       fixture.audioSpec,
       TtsAudioSpec.pcm(const PcmDescriptor.s16Mono24KHz()),
@@ -61,8 +63,27 @@ void main() {
         bundle: _MapAssetBundle({
           'assets/fixtures/test/invalid/manifest.json': utf8.encode('''
             {
-              "provider": "test", "format": "mp3", "kind": "invalid",
+              "provider": "test", "format": "mp3", "sampleRateHz": 24000,
+              "channels": 1, "kind": "invalid",
               "chunks": [{"file": "000.bin", "arrivalOffsetMs": 1}]
+            }
+          '''),
+          'assets/fixtures/test/invalid/000.bin': [0],
+        }),
+      ),
+      throwsFormatException,
+    );
+  });
+
+  test('requires capture metadata for encoded fixtures', () async {
+    await expectLater(
+      ProviderPlaybackFixture.load(
+        manifestAsset: 'assets/fixtures/test/invalid/metadata.json',
+        bundle: _MapAssetBundle({
+          'assets/fixtures/test/invalid/metadata.json': utf8.encode('''
+            {
+              "provider": "test", "format": "mp3", "kind": "invalid",
+              "chunks": [{"file": "000.bin", "arrivalOffsetMs": 0}]
             }
           '''),
           'assets/fixtures/test/invalid/000.bin': [0],
