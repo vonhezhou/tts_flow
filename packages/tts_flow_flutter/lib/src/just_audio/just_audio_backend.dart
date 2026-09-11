@@ -8,6 +8,7 @@ import 'package:tts_flow_dart/tts_flow_dart.dart';
 import 'package:tts_flow_flutter/src/just_audio/chunk_audio_source.dart';
 
 part 'just_audio_playback_session.dart';
+part 'just_audio_playback_timeline.dart';
 part 'just_audio_source_list_operations.dart';
 
 final _logger = Logger('JustAudioPlayer');
@@ -100,8 +101,12 @@ class JustAudioBackend
       );
     });
 
-    _durationSubscription = _player.durationStream.listen(_onDurationChanged);
-    _posSubscription = _player.positionStream.listen(_onPosChanged);
+    _durationSubscription = _player.durationStream.listen(
+      (duration) => _timeline.onDurationChanged(_currentSource(), duration),
+    );
+    _posSubscription = _player.positionStream.listen(
+      (position) => _timeline.onPositionChanged(_currentSource(), position),
+    );
     _errorSubscription = _player.errorStream.listen((error) {
       unawaited(_enqueuePlayerOperation(() => _onPlayerError(error)));
     });
@@ -117,8 +122,12 @@ class JustAudioBackend
         _enqueuePlayerOperation(() => _onProcessingStateChanged(state)),
       );
     });
-    _durationSubscription = _player.durationStream.listen(_onDurationChanged);
-    _posSubscription = _player.positionStream.listen(_onPosChanged);
+    _durationSubscription = _player.durationStream.listen(
+      (duration) => _timeline.onDurationChanged(_currentSource(), duration),
+    );
+    _posSubscription = _player.positionStream.listen(
+      (position) => _timeline.onPositionChanged(_currentSource(), position),
+    );
     _errorSubscription = _player.errorStream.listen((error) {
       unawaited(_enqueuePlayerOperation(() => _onPlayerError(error)));
     });
@@ -156,6 +165,10 @@ class JustAudioBackend
 
   final StreamController<TtsPlaybackPositionEvent> _playbackPositionController =
       StreamController<TtsPlaybackPositionEvent>.broadcast();
+  late final _timeline = _JustAudioPlaybackTimeline(
+    sessions: _sessions,
+    positionController: _playbackPositionController,
+  );
   late final StreamSubscription<Duration?> _posSubscription;
 
   final StreamController<JustAudioPlaybackErrorEvent> _playbackErrorController =
@@ -528,63 +541,5 @@ class JustAudioBackend
     }
 
     return _player.audioSources.elementAtOrNull(index);
-  }
-
-  void _onDurationChanged(Duration? duration) {
-    if (duration == null) {
-      return;
-    }
-
-    final curSource = _currentSource();
-    if (curSource == null) {
-      return;
-    }
-
-    if (curSource is! ChunkAudioSource) {
-      return;
-    }
-
-    final session = _sessions[curSource.playbackId];
-    if (session == null) {
-      return;
-    }
-
-    session.addOrUpdateSourceDuration(curSource.index, duration);
-    final prevDuration = session.calcDurationOffset(curSource.index);
-    curSource.playbackOffset = prevDuration;
-
-    _logger.fine(
-      'onDuration: '
-      '${curSource.requestKey},${curSource.index} '
-      '$duration, ${curSource.playbackOffset}',
-    );
-  }
-
-  void _onPosChanged(Duration pos) {
-    final curSource = _currentSource();
-    if (curSource == null || curSource is! ChunkAudioSource) {
-      return;
-    }
-
-    final session = _sessions[curSource.playbackId];
-    if (session == null) {
-      return;
-    }
-
-    // try to fix playbackOffset
-    if (curSource.index != 0 && curSource.playbackOffset == Duration.zero) {
-      curSource.playbackOffset = session.calcDurationOffset(
-        curSource.index,
-      );
-    }
-
-    final newPos = curSource.playbackOffset + pos;
-    _playbackPositionController.add(
-      TtsPlaybackPositionEvent(
-        playbackId: curSource.playbackId,
-        requestKey: curSource.requestKey,
-        position: newPos,
-      ),
-    );
   }
 }
