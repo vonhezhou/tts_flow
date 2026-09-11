@@ -5,7 +5,7 @@ import 'package:http/http.dart' as http;
 import 'models.dart';
 import 'transport.dart';
 
-final class OpenAiRetryingApiClient implements OpenAiApiClient {
+final class OpenAiRetryingApiClient implements OpenAiDisposableApiClient {
   OpenAiRetryingApiClient({
     required OpenAiApiClient inner,
     this.maxRetries = 2,
@@ -22,6 +22,14 @@ final class OpenAiRetryingApiClient implements OpenAiApiClient {
   @override
   Future<http.StreamedResponse> send(OpenAiApiRequest request) async {
     return _runWithRetry(() => _inner.send(request));
+  }
+
+  @override
+  Future<void> dispose() async {
+    final inner = _inner;
+    if (inner is OpenAiDisposableApiClient) {
+      await inner.dispose();
+    }
   }
 
   Future<T> _runWithRetry<T>(Future<T> Function() op) async {

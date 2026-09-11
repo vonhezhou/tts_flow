@@ -13,14 +13,34 @@ part 'openai_voice_catalog.dart';
 
 class OpenAiTtsEngine with TtsEngineDefaults implements TtsEngine {
   OpenAiTtsEngine({
+    required OpenAiApiClient apiClient,
+    String engineId = 'openai',
+    String defaultVoiceId = 'alloy',
+    int nonStreamingChunkSizeBytes = 4096,
+    String model = 'gpt-4o-mini-tts',
+    String apiKey = '',
+    Map<String, List<TtsVoice>>? voiceCatalogOverrides,
+  }) : this._(
+         apiClient: apiClient,
+         engineId: engineId,
+         defaultVoiceId: defaultVoiceId,
+         nonStreamingChunkSizeBytes: nonStreamingChunkSizeBytes,
+         model: model,
+         apiKey: apiKey,
+         voiceCatalogOverrides: voiceCatalogOverrides,
+         ownsApiClient: false,
+       );
+
+  OpenAiTtsEngine._({
     required this.apiClient,
-    this.engineId = 'openai',
-    this.defaultVoiceId = 'alloy',
-    this.nonStreamingChunkSizeBytes = 4096,
-    this.model = 'gpt-4o-mini-tts',
-    this.apiKey = '',
-    this.voiceCatalogOverrides,
-  });
+    required this.engineId,
+    required this.defaultVoiceId,
+    required this.nonStreamingChunkSizeBytes,
+    required this.model,
+    required this.apiKey,
+    required this.voiceCatalogOverrides,
+    required bool ownsApiClient,
+  }) : _ownsApiClient = ownsApiClient;
 
   factory OpenAiTtsEngine.fromClientConfig({
     required OpenAiClientConfig config,
@@ -45,7 +65,7 @@ class OpenAiTtsEngine with TtsEngineDefaults implements TtsEngine {
           )
         : baseClient;
 
-    return OpenAiTtsEngine(
+    return OpenAiTtsEngine._(
       apiClient: apiClient,
       engineId: engineId,
       defaultVoiceId: defaultVoiceId,
@@ -53,6 +73,7 @@ class OpenAiTtsEngine with TtsEngineDefaults implements TtsEngine {
       model: config.model,
       apiKey: config.apiKey,
       voiceCatalogOverrides: voiceCatalogOverrides,
+      ownsApiClient: true,
     );
   }
 
@@ -69,6 +90,7 @@ class OpenAiTtsEngine with TtsEngineDefaults implements TtsEngine {
   final String model;
   final String apiKey;
   final Map<String, List<TtsVoice>>? voiceCatalogOverrides;
+  final bool _ownsApiClient;
 
   @override
   bool get supportsStreaming => true;
@@ -374,5 +396,13 @@ class OpenAiTtsEngine with TtsEngineDefaults implements TtsEngine {
   Future<void> init() async {}
 
   @override
-  Future<void> dispose() async {}
+  Future<void> dispose() async {
+    if (!_ownsApiClient) {
+      return;
+    }
+    final client = apiClient;
+    if (client is OpenAiDisposableApiClient) {
+      await client.dispose();
+    }
+  }
 }

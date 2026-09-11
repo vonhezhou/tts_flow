@@ -5,15 +5,17 @@ import 'package:http/http.dart' as http;
 import 'models.dart';
 import 'transport.dart';
 
-class OpenAiHttpApiClient implements OpenAiApiClient {
+class OpenAiHttpApiClient implements OpenAiDisposableApiClient {
   OpenAiHttpApiClient({
     required OpenAiClientConfig config,
     http.Client? httpClient,
   }) : _config = config,
-       _httpClient = httpClient ?? http.Client();
+       _httpClient = httpClient ?? http.Client(),
+       _ownsHttpClient = httpClient == null;
 
   final OpenAiClientConfig _config;
   final http.Client _httpClient;
+  final bool _ownsHttpClient;
 
   @override
   Future<http.StreamedResponse> send(OpenAiApiRequest request) async {
@@ -41,6 +43,13 @@ class OpenAiHttpApiClient implements OpenAiApiClient {
         message: 'OpenAI network request failed.',
         cause: error,
       );
+    }
+  }
+
+  @override
+  Future<void> dispose() async {
+    if (_ownsHttpClient) {
+      _httpClient.close();
     }
   }
 }

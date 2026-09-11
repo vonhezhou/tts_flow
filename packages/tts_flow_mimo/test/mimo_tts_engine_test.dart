@@ -90,4 +90,27 @@ void main() {
       ),
     );
   });
+
+  test('does not close an application-provided HTTP client', () async {
+    final client = _CloseTrackingClient();
+    final engine = MimoTtsEngine(apiKey: 'test-key', httpClient: client);
+
+    await engine.dispose();
+
+    expect(client.isClosed, isFalse);
+  });
+}
+
+final class _CloseTrackingClient extends http.BaseClient {
+  var isClosed = false;
+
+  @override
+  Future<http.StreamedResponse> send(http.BaseRequest request) {
+    throw UnimplementedError();
+  }
+
+  @override
+  void close() {
+    isClosed = true;
+  }
 }

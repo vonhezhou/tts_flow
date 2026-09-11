@@ -20,7 +20,8 @@ class MimoTtsEngine with TtsEngineDefaults implements TtsEngine {
     this.endpoint = 'https://api.xiaomimimo.com/v1/chat/completions',
     this.requestTimeout = const Duration(seconds: 30),
     http.Client? httpClient,
-  }) : _httpClient = httpClient ?? http.Client();
+  }) : _httpClient = httpClient ?? http.Client(),
+       _ownsHttpClient = httpClient == null;
 
   final String apiKey;
   final String model;
@@ -30,6 +31,7 @@ class MimoTtsEngine with TtsEngineDefaults implements TtsEngine {
   final String endpoint;
   final Duration requestTimeout;
   final http.Client _httpClient;
+  final bool _ownsHttpClient;
   static const _audioDecoder = MimoSseAudioDecoder();
 
   static const _pcmDescriptor = PcmDescriptor(
@@ -245,7 +247,9 @@ class MimoTtsEngine with TtsEngineDefaults implements TtsEngine {
 
   @override
   Future<void> dispose() async {
-    _httpClient.close();
+    if (_ownsHttpClient) {
+      _httpClient.close();
+    }
   }
 }
 

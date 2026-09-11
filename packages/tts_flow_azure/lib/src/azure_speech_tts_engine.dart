@@ -46,12 +46,14 @@ class AzureSpeechTtsEngine with TtsEngineDefaults implements TtsEngine {
     required this.config,
     this.engineId = 'azure-speech',
     http.Client? httpClient,
-  }) : _httpClient = httpClient ?? http.Client();
+  }) : _httpClient = httpClient ?? http.Client(),
+       _ownsHttpClient = httpClient == null;
 
   final AzureSpeechConfig config;
   @override
   final String engineId;
   final http.Client _httpClient;
+  final bool _ownsHttpClient;
 
   List<TtsVoice>? _cachedVoices;
 
@@ -79,7 +81,11 @@ class AzureSpeechTtsEngine with TtsEngineDefaults implements TtsEngine {
   }
 
   @override
-  Future<void> dispose() async {}
+  Future<void> dispose() async {
+    if (_ownsHttpClient) {
+      _httpClient.close();
+    }
+  }
 
   @override
   Future<List<TtsVoice>> getAvailableVoices({String? locale}) async {
