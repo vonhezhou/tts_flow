@@ -1,0 +1,6 @@
+# Copy this file to android/key.properties and replace every value locally.
+# android/key.properties and keystores are ignored by Git.
+storePassword=replace-with-keystore-password
+keyPassword=replace-with-key-password
+keyAlias=replace-with-key-alias
+storeFile=/absolute/path/to/release.keystore

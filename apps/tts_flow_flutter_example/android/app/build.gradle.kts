@@ -1,3 +1,17 @@
+import java.io.FileInputStream
+import java.util.Properties
+
+val releaseSigningProperties = Properties()
+val releaseSigningPropertiesFile = rootProject.file("key.properties")
+
+if (releaseSigningPropertiesFile.exists()) {
+    releaseSigningProperties.load(FileInputStream(releaseSigningPropertiesFile))
+}
+
+fun requiredReleaseSigningProperty(name: String): String =
+    releaseSigningProperties.getProperty(name)
+        ?: error("Missing $name in android/key.properties.")
+
 plugins {
     id("com.android.application")
     id("kotlin-android")
@@ -20,21 +34,33 @@ android {
     }
 
     defaultConfig {
-        // TODO: Specify your own unique Application ID (https://developer.android.com/studio/build/application-id.html).
         applicationId = "com.github.vonhezhou.tts_flow_flutter_example"
-        // You can update the following values to match your application needs.
-        // For more information, see: https://flutter.dev/to/review-gradle-config.
         minSdk = flutter.minSdkVersion
         targetSdk = flutter.targetSdkVersion
         versionCode = flutter.versionCode
         versionName = flutter.versionName
     }
 
+    signingConfigs {
+        if (releaseSigningPropertiesFile.exists()) {
+            create("release") {
+                keyAlias = requiredReleaseSigningProperty("keyAlias")
+                keyPassword = requiredReleaseSigningProperty("keyPassword")
+                storeFile = file(requiredReleaseSigningProperty("storeFile"))
+                storePassword = requiredReleaseSigningProperty("storePassword")
+            }
+        }
+    }
+
     buildTypes {
         release {
-            // TODO: Add your own signing config for the release build.
-            // Signing with the debug keys for now, so `flutter run --release` works.
-            signingConfig = signingConfigs.getByName("debug")
+            // This is a runnable demonstration app. Do not distribute an APK
+            // signed with the fallback debug key; see android/key.properties.example.
+            signingConfig = if (releaseSigningPropertiesFile.exists()) {
+                signingConfigs.getByName("release")
+            } else {
+                signingConfigs.getByName("debug")
+            }
         }
     }
 }

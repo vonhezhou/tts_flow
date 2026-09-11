@@ -34,6 +34,18 @@ This app is a deterministic playback and output-lifecycle demonstration for
 `tts_flow_flutter`. By default it uses a bundled WAV fixture through
 `FileTtsEngine`, so it can run without an online TTS account or API key.
 
+## Android release signing
+
+The checked-in application ID belongs to this demonstration app. A release
+build uses the debug key only when `android/key.properties` is absent, so that
+local `flutter run --release` remains usable. Do not distribute such an APK.
+
+For a distributable build, copy `android/key.properties.example` to the ignored
+`android/key.properties`, replace every value with a dedicated keystore, and
+then build normally. The Gradle configuration fails early if that local file is
+present but incomplete. A production app should use its own application ID and
+secure CI secret store rather than committing a keystore or credential file.
+
 ## Xiaomi MiMo live source
 
 Supply a MiMo API key at launch to use the real `MimoTtsEngine` source for the
