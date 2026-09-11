@@ -1,0 +1,25 @@
+name: Windows playback regression
+
+on:
+  workflow_dispatch:
+  schedule:
+    # Thursday 03:30 UTC; native Windows playback is outside the Linux CI job.
+    - cron: '30 3 * * 4'
+
+permissions:
+  contents: read
+
+jobs:
+  just-audio-jitter:
+    name: JustAudio jitter integration test
+    runs-on: windows-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+      - uses: subosito/flutter-action@1508160852fb97248640997f7cfb38da241df0ba # v2.9.1
+        with:
+          flutter-version: 3.41.0
+          cache: true
+      - run: dart pub get
+      - run: flutter test integration_test/just_audio_jitter_test.dart -d windows
+        working-directory: apps/tts_flow_flutter_example

@@ -20,8 +20,14 @@ import 'package:tts_flow_dart/src/service/tts_events.dart';
 import 'internal/tts_flow_event_mixin.dart';
 import 'internal/tts_options_mixin.dart';
 
+part 'internal/tts_flow_output_lifecycle.dart';
+
 final class TtsFlow
-    with TtsOptionsMixin, TtsFlowEventBus, TtsUtteranceQueueMixin {
+    with
+        TtsOptionsMixin,
+        TtsFlowEventBus,
+        TtsUtteranceQueueMixin,
+        TtsFlowOutputLifecycle {
   TtsFlow({
     required TtsEngine engine,
     TtsOutput? defaultOutput,
@@ -35,12 +41,6 @@ final class TtsFlow
   final TtsEngine _engine;
   final TtsOutput? _defaultOutput;
   final TtsFlowConfig _config;
-  final _managedOutputs = HashSet<TtsOutput>.identity();
-  final _outputInitializations = HashMap<TtsOutput, Future<void>>.identity();
-  final _playbackOutputs = <String, TtsOutput>{};
-  final _utteranceIdsByRequestKey = <String, String>{};
-  final _requestEventControllers =
-      <String, StreamController<TtsRequestEvent>>{};
   var _nextRequestKey = 0;
 
   @override
@@ -73,28 +73,8 @@ final class TtsFlow
       .where((event) => event is TtsRequestEvent)
       .cast<TtsRequestEvent>();
 
-  @override
-  @protected
-  String? utteranceIdForRequestKey(String requestKey) =>
-      _utteranceIdsByRequestKey[requestKey];
-
-  @override
-  @protected
-  void onRequestEventEmitted(TtsRequestEvent event) {
-    _requestEventControllers[event.requestKey]?.add(event);
-  }
-
   bool get isQueuePaused => state.isPaused;
   bool get isInitialized => state.isInitialized;
-
-  bool _hasActivePlayback(String requestKey) {
-    final output = _playbackOutputs[requestKey];
-    final PlaybackControllableOutput? controllableOutput =
-        output is PlaybackControllableOutput
-        ? output as PlaybackControllableOutput
-        : null;
-    return controllableOutput?.hasActivePlayback(requestKey) ?? false;
-  }
 
   Future<void> init() async {
     _ensureNotDisposed();
@@ -369,66 +349,6 @@ final class TtsFlow
     await eventBus.close();
   }
 
-  /// Initializes [output] at most once for this flow.
-  ///
-  /// `TtsFlow` owns every output passed to it, including request-level output
-  /// overrides, and disposes those outputs when the flow is disposed.
-  @override
-  @protected
-  Future<void> ensureOutputInitialized(TtsOutput output) async {
-    _managedOutputs.add(output);
-
-    final existingInitialization = _outputInitializations[output];
-    if (existingInitialization != null) {
-      await existingInitialization;
-      return;
-    }
-
-    final initialization = Future<void>.sync(output.init);
-    _outputInitializations[output] = initialization;
-    try {
-      await initialization;
-    } catch (_) {
-      if (identical(_outputInitializations[output], initialization)) {
-        _outputInitializations.remove(output);
-      }
-      rethrow;
-    }
-  }
-
-  @override
-  @protected
-  void registerPlaybackControl(String requestKey, TtsOutput output) {
-    if (output is PlaybackControllableOutput) {
-      _playbackOutputs[requestKey] = output;
-    }
-  }
-
-  @override
-  @protected
-  void unregisterPlaybackControl(String requestKey) {
-    _playbackOutputs.remove(requestKey);
-  }
-
-  @override
-  @protected
-  bool hasPlaybackControl(String requestKey) =>
-      _playbackOutputs.containsKey(requestKey);
-
-  @override
-  @protected
-  int get outstandingPlaybackRequestCount => _playbackOutputs.length;
-
-  @override
-  @protected
-  void releaseRequestIdentity(String requestKey) {
-    _utteranceIdsByRequestKey.remove(requestKey);
-    final controller = _requestEventControllers.remove(requestKey);
-    if (controller != null) {
-      unawaited(controller.close());
-    }
-  }
-
   TtsOutput _requirePlaybackOutput(String requestKey) {
     _ensureReady();
     final output = _playbackOutputs[requestKey];
@@ -444,36 +364,6 @@ final class TtsFlow
       throw StateError('Playback is no longer active for "$requestKey".');
     }
     return output;
-  }
-
-  Future<void> _disposeManagedOutputs() async {
-    Object? firstError;
-    StackTrace? firstStackTrace;
-
-    for (final output in _managedOutputs) {
-      try {
-        await output.dispose();
-      } catch (error, stackTrace) {
-        firstError ??= error;
-        firstStackTrace ??= stackTrace;
-      }
-    }
-    _managedOutputs.clear();
-    _outputInitializations.clear();
-
-    if (firstError != null) {
-      Error.throwWithStackTrace(firstError, firstStackTrace!);
-    }
-  }
-
-  Future<void> _awaitActiveRequestShutdown({Duration? timeout}) async {
-    const pollInterval = Duration(milliseconds: 10);
-    final deadline = timeout == null ? null : DateTime.now().add(timeout);
-
-    while (state.activeControl != null &&
-        (deadline == null || DateTime.now().isBefore(deadline))) {
-      await Future<void>.delayed(pollInterval);
-    }
   }
 
   void _ensureNotDisposed() {

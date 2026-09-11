@@ -14,8 +14,8 @@ jobs:
     name: Analyze and test
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
-      - uses: subosito/flutter-action@v2
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+      - uses: subosito/flutter-action@1508160852fb97248640997f7cfb38da241df0ba # v2.9.1
         with:
           flutter-version: 3.41.0
           cache: true
@@ -26,8 +26,8 @@ jobs:
     name: Build coverage reports
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
-      - uses: subosito/flutter-action@v2
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+      - uses: subosito/flutter-action@1508160852fb97248640997f7cfb38da241df0ba # v2.9.1
         with:
           flutter-version: 3.41.0
           cache: true
@@ -42,9 +42,21 @@ jobs:
           --packages=../../.dart_tool/package_config.json
           --report-on=lib
         working-directory: packages/tts_flow_dart
+      - name: Enforce Dart-core coverage baseline
+        run: |
+          line_coverage="$(awk -F: '/^LF:/{lf += $2} /^LH:/{lh += $2} END { if (lf == 0) exit 1; printf "%.2f", 100 * lh / lf }' coverage/lcov.info)"
+          echo "Dart-core line coverage: ${line_coverage}%"
+          awk -v coverage="$line_coverage" 'BEGIN { exit coverage < 76.0 }'
+        working-directory: packages/tts_flow_dart
       - run: flutter test --coverage
         working-directory: packages/tts_flow_flutter
-      - uses: actions/upload-artifact@v4
+      - name: Enforce Flutter coverage baseline
+        run: |
+          line_coverage="$(awk -F: '/^LF:/{lf += $2} /^LH:/{lh += $2} END { if (lf == 0) exit 1; printf "%.2f", 100 * lh / lf }' coverage/lcov.info)"
+          echo "Flutter line coverage: ${line_coverage}%"
+          awk -v coverage="$line_coverage" 'BEGIN { exit coverage < 76.0 }'
+        working-directory: packages/tts_flow_flutter
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
         if: always()
         with:
           name: coverage-reports

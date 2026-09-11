@@ -1,7 +1,7 @@
 name: tts_flow_azure
 description: Azure AI Speech text-to-speech adapter for tts_flow_dart.
 version: 0.2.0
-homepage: https://github.com/vonhezhou/tts_flow/packages/tts_flow_azure
+homepage: https://github.com/vonhezhou/tts_flow/tree/main/packages/tts_flow_azure
 resolution: workspace
 
 environment:

@@ -33,6 +33,19 @@ Each sample has a neighboring JSON manifest with this shape:
 }
 ```
 
+`format` accepts `pcm`, `mp3`, `opus`, and `aac`. `sampleRateHz` and
+`channels` document the capture for every format. For `pcm`, add
+`bitsPerSample` and `encoding` (`signedInt`, `unsignedInt`, or `float`) so the
+fixture can reconstruct its exact `TtsAudioSpec`. The first chunk must have an
+`arrivalOffsetMs` of `0`; subsequent offsets are elapsed from the beginning of
+the capture and must be non-decreasing.
+
+Put fixtures under
+`apps/tts_flow_flutter_example/assets/fixtures/<provider>/<kind>/`. The
+`ProviderPlaybackFixture` loader replays their raw chunks directly through a
+deterministic engine, without credentials or network access. A fixture's
+manifest is the only timing source: do not add artificial delays in its test.
+
 The test fixture loader must replay chunks in manifest order and apply only the
 recorded arrival offsets. It must assert playback completion, waiting events,
 and playback failures; it must not require live credentials or network access.
