@@ -1,0 +1,25 @@
+name: macOS playback regression
+
+on:
+  workflow_dispatch:
+  schedule:
+    # Monday 03:30 UTC; keeps native-player coverage independent of PR latency.
+    - cron: '30 3 * * 1'
+
+permissions:
+  contents: read
+
+jobs:
+  just-audio-jitter:
+    name: JustAudio jitter integration test
+    runs-on: macos-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+      - uses: subosito/flutter-action@v2
+        with:
+          flutter-version: 3.41.0
+          cache: true
+      - run: dart pub get
+      - run: flutter test integration_test/just_audio_jitter_test.dart -d macos
+        working-directory: apps/tts_flow_flutter_example

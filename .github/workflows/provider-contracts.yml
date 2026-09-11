@@ -1,0 +1,72 @@
+name: Provider live contracts
+
+on:
+  workflow_dispatch:
+  schedule:
+    # Wednesday 04:00 UTC. Each job is skipped unless its required secret exists.
+    - cron: '0 4 * * 3'
+
+permissions:
+  contents: read
+
+jobs:
+  configuration:
+    runs-on: ubuntu-latest
+    outputs:
+      openai: ${{ steps.availability.outputs.openai }}
+      azure: ${{ steps.availability.outputs.azure }}
+      mimo: ${{ steps.availability.outputs.mimo }}
+    steps:
+      - id: availability
+        env:
+          OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
+          AZURE_SPEECH_KEY: ${{ secrets.AZURE_SPEECH_KEY }}
+          AZURE_SPEECH_REGION: ${{ secrets.AZURE_SPEECH_REGION }}
+          MIMO_API_KEY: ${{ secrets.MIMO_API_KEY }}
+        run: |
+          if [ -n "$OPENAI_API_KEY" ]; then echo 'openai=true' >> "$GITHUB_OUTPUT"; else echo 'openai=false' >> "$GITHUB_OUTPUT"; fi
+          if [ -n "$AZURE_SPEECH_KEY" ] && [ -n "$AZURE_SPEECH_REGION" ]; then echo 'azure=true' >> "$GITHUB_OUTPUT"; else echo 'azure=false' >> "$GITHUB_OUTPUT"; fi
+          if [ -n "$MIMO_API_KEY" ]; then echo 'mimo=true' >> "$GITHUB_OUTPUT"; else echo 'mimo=false' >> "$GITHUB_OUTPUT"; fi
+
+  openai:
+    needs: configuration
+    if: ${{ needs.configuration.outputs.openai == 'true' }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dart-lang/setup-dart@v1
+      - run: dart pub get
+      - run: dart run tool/live_contract_check.dart
+        working-directory: packages/tts_flow_openai
+        env:
+          OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
+
+  azure:
+    needs: configuration
+    if: ${{ needs.configuration.outputs.azure == 'true' }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dart-lang/setup-dart@v1
+      - run: dart pub get
+      - run: dart run tool/live_contract_check.dart
+        working-directory: packages/tts_flow_azure
+        env:
+          AZURE_SPEECH_KEY: ${{ secrets.AZURE_SPEECH_KEY }}
+          AZURE_SPEECH_REGION: ${{ secrets.AZURE_SPEECH_REGION }}
+
+  mimo:
+    needs: configuration
+    if: ${{ needs.configuration.outputs.mimo == 'true' }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dart-lang/setup-dart@v1
+      - run: dart pub get
+      - run: dart run tool/live_contract_check.dart
+        working-directory: packages/tts_flow_mimo
+        env:
+          MIMO_API_KEY: ${{ secrets.MIMO_API_KEY }}

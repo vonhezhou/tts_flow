@@ -13,3 +13,14 @@ Migration and release baseline: [migrating to 0.2](./docs/migrating_to_0_2.md).
 
 For the Flutter `just_audio` playback adapter's stream segmentation, lifecycle,
 and platform requirements, see the [JustAudioBackend guide](./docs/just_audio_backend.md).
+
+## Automated checks
+
+- `CI` runs static analysis and unit tests on pull requests and pushes to `main`.
+- `macOS playback regression` runs the native JustAudio jitter regression weekly
+  and can be run manually.
+- `Provider live contracts` runs weekly only for providers whose GitHub Actions
+  secrets are configured. It sends a short fixed text and checks that the audio
+  stream is non-empty, complete, and in the expected format. Configure only the
+  secrets for providers you intend to validate: `OPENAI_API_KEY`,
+  `AZURE_SPEECH_KEY` plus `AZURE_SPEECH_REGION`, and `MIMO_API_KEY`.
