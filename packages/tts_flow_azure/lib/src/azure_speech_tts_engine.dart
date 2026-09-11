@@ -5,6 +5,8 @@ import 'dart:typed_data';
 import 'package:http/http.dart' as http;
 import 'package:tts_flow_dart/tts_flow_dart.dart';
 
+import 'azure_speech_components.dart';
+
 /// Configuration for the Azure AI Speech REST text-to-speech endpoint.
 ///
 /// Create a Speech resource in [region] and pass one of its resource keys as
@@ -54,6 +56,13 @@ class AzureSpeechTtsEngine with TtsEngineDefaults implements TtsEngine {
   final String engineId;
   final http.Client _httpClient;
   final bool _ownsHttpClient;
+  late final _ssmlBuilder = AzureSsmlBuilder(
+    defaultVoiceId: config.defaultVoiceId,
+    defaultVoiceLocale: config.defaultVoiceLocale,
+  );
+  late final _voiceParser = AzureSpeechVoiceParser(
+    defaultVoiceId: config.defaultVoiceId,
+  );
 
   List<TtsVoice>? _cachedVoices;
 
@@ -201,12 +210,7 @@ class AzureSpeechTtsEngine with TtsEngineDefaults implements TtsEngine {
         );
       }
 
-      final payload = jsonDecode(response.body) as List<Object?>;
-      final voices = payload
-          .whereType<Map<String, Object?>>()
-          .map(_voiceFromJson)
-          .whereType<TtsVoice>()
-          .toList(growable: false);
+      final voices = _voiceParser.parse(response.body);
       if (voices.isEmpty) {
         throw const _AzureSpeechHttpException(
           0,
@@ -231,21 +235,6 @@ class AzureSpeechTtsEngine with TtsEngineDefaults implements TtsEngine {
     }
   }
 
-  TtsVoice? _voiceFromJson(Map<String, Object?> value) {
-    final voiceId = value['ShortName'];
-    if (voiceId is! String || voiceId.isEmpty) {
-      return null;
-    }
-    final displayName = value['DisplayName'];
-    final locale = value['Locale'];
-    return TtsVoice(
-      voiceId: voiceId,
-      locale: locale is String ? locale : null,
-      displayName: displayName is String ? displayName : voiceId,
-      isDefault: voiceId == config.defaultVoiceId,
-    );
-  }
-
   Future<http.StreamedResponse> _sendSynthesisRequest(
     TtsRequest request,
   ) async {
@@ -257,7 +246,7 @@ class AzureSpeechTtsEngine with TtsEngineDefaults implements TtsEngine {
             'X-Microsoft-OutputFormat': 'audio-24khz-48kbitrate-mono-mp3',
             'User-Agent': config.userAgent,
           })
-          ..body = _buildSsml(request);
+          ..body = _ssmlBuilder.build(request);
     try {
       return await _httpClient.send(httpRequest).timeout(config.requestTimeout);
     } on TimeoutException {
@@ -277,29 +266,6 @@ class AzureSpeechTtsEngine with TtsEngineDefaults implements TtsEngine {
   Map<String, String> _authHeaders() => {
     'Ocp-Apim-Subscription-Key': config.subscriptionKey,
   };
-
-  String _buildSsml(TtsRequest request) {
-    final voice = request.voice;
-    final voiceId = voice?.voiceId ?? config.defaultVoiceId;
-    final locale = voice?.locale ?? config.defaultVoiceLocale;
-    final speed = request.options?.speed;
-    final rate = speed == null ? null : '${(speed * 100).round()}%';
-    final content = _escapeXml(request.text);
-    final speech = rate == null
-        ? content
-        : '<prosody rate="$rate">$content</prosody>';
-    return '<speak version="1.0" xml:lang="${_escapeXml(locale)}" '
-        'xmlns="http://www.w3.org/2001/10/synthesis">'
-        '<voice name="${_escapeXml(voiceId)}">$speech</voice>'
-        '</speak>';
-  }
-
-  String _escapeXml(String input) => input
-      .replaceAll('&', '&amp;')
-      .replaceAll('<', '&lt;')
-      .replaceAll('>', '&gt;')
-      .replaceAll('"', '&quot;')
-      .replaceAll("'", '&apos;');
 
   Future<Uint8List> _collect(Stream<List<int>> stream) async {
     final builder = BytesBuilder(copy: false);
