@@ -21,5 +21,4 @@ jobs:
           flutter-version: 3.41.0
           cache: true
       - run: dart pub get
-      - run: flutter test integration_test/just_audio_jitter_test.dart -d windows
-        working-directory: apps/tts_flow_flutter_example
+      - run: dart run melos run test:integration:windows

@@ -9,6 +9,8 @@ import 'models.dart';
 import 'retrying_transport.dart';
 import 'transport.dart';
 
+part 'openai_voice_catalog.dart';
+
 class OpenAiTtsEngine with TtsEngineDefaults implements TtsEngine {
   OpenAiTtsEngine({
     required this.apiClient,
@@ -67,47 +69,6 @@ class OpenAiTtsEngine with TtsEngineDefaults implements TtsEngine {
   final String model;
   final String apiKey;
   final Map<String, List<TtsVoice>>? voiceCatalogOverrides;
-
-  static const Map<String, List<TtsVoice>> _builtInCatalog = {
-    'tts-1': [
-      TtsVoice(voiceId: 'alloy'),
-      TtsVoice(voiceId: 'echo'),
-      TtsVoice(voiceId: 'fable'),
-      TtsVoice(voiceId: 'nova'),
-      TtsVoice(voiceId: 'onyx'),
-      TtsVoice(voiceId: 'shimmer'),
-    ],
-    'tts-1-hd': [
-      TtsVoice(voiceId: 'alloy'),
-      TtsVoice(voiceId: 'echo'),
-      TtsVoice(voiceId: 'fable'),
-      TtsVoice(voiceId: 'nova'),
-      TtsVoice(voiceId: 'onyx'),
-      TtsVoice(voiceId: 'shimmer'),
-    ],
-    'gpt-4o-mini-tts': [
-      TtsVoice(voiceId: 'alloy'),
-      TtsVoice(voiceId: 'ash'),
-      TtsVoice(voiceId: 'ballad'),
-      TtsVoice(voiceId: 'coral'),
-      TtsVoice(voiceId: 'echo'),
-      TtsVoice(voiceId: 'fable'),
-      TtsVoice(voiceId: 'nova'),
-      TtsVoice(voiceId: 'onyx'),
-      TtsVoice(voiceId: 'sage'),
-      TtsVoice(voiceId: 'shimmer'),
-      TtsVoice(voiceId: 'verse'),
-    ],
-  };
-
-  static const List<String> _fallbackVoiceIds = [
-    'alloy',
-    'echo',
-    'fable',
-    'nova',
-    'onyx',
-    'shimmer',
-  ];
 
   @override
   bool get supportsStreaming => true;
@@ -386,52 +347,11 @@ class OpenAiTtsEngine with TtsEngineDefaults implements TtsEngine {
     return builder.takeBytes();
   }
 
-  List<TtsVoice> _resolveVoices() {
-    final override = voiceCatalogOverrides?[model];
-    if (override != null) {
-      return _withDefaultFallback(override);
-    }
-    final catalog = _builtInCatalog[model];
-    if (catalog != null) {
-      return _withDefaultFallback(catalog);
-    }
-    return _fallbackVoices();
-  }
-
-  List<TtsVoice> _withDefaultFallback(List<TtsVoice> discovered) {
-    if (discovered.isEmpty) {
-      return _fallbackVoices();
-    }
-    final hasDefault = discovered.any((voice) => voice.isDefault);
-    if (hasDefault) {
-      return discovered;
-    }
-
-    return discovered
-        .map((voice) {
-          if (voice.voiceId != defaultVoiceId) {
-            return voice;
-          }
-          return TtsVoice(
-            voiceId: voice.voiceId,
-            locale: voice.locale,
-            displayName: voice.displayName,
-            isDefault: true,
-          );
-        })
-        .toList(growable: false);
-  }
-
-  List<TtsVoice> _fallbackVoices() {
-    return _fallbackVoiceIds
-        .map((voiceId) {
-          return TtsVoice(
-            voiceId: voiceId,
-            isDefault: voiceId == defaultVoiceId,
-          );
-        })
-        .toList(growable: false);
-  }
+  List<TtsVoice> _resolveVoices() => _OpenAiVoiceCatalog(
+    model: model,
+    defaultVoiceId: defaultVoiceId,
+    overrides: voiceCatalogOverrides,
+  ).resolve();
 
   String _normalizeLocale(String locale) {
     return locale.trim().replaceAll('_', '-').toLowerCase();

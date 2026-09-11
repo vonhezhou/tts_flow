@@ -18,3 +18,7 @@ When a Provider fixture is introduced, run its `continuous`, `jitter`, and
 `invalid` cases on each target in scope. Link the recorded result from the
 release issue or changelog; do not infer a target's status from another native
 runner.
+
+For the deterministic jitter regression, use `dart run melos run
+test:integration:macos` or `dart run melos run test:integration:windows` on
+the corresponding desktop target.

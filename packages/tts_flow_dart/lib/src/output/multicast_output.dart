@@ -10,6 +10,8 @@ import 'package:tts_flow_dart/src/core/tts_output_write_context.dart';
 import 'package:tts_flow_dart/src/core/tts_policy.dart';
 import 'package:tts_flow_dart/src/output/capability_intersection.dart';
 
+part 'multicast_output_playback_controls.dart';
+
 enum MulticastOutputErrorPolicy {
   /// If any individual output fails,
   /// the entire Multicast output fails immediately.
@@ -86,8 +88,7 @@ final class MulticastOutput implements TtsOutput, PlaybackControllableOutput {
   TtsOutputWriteContext? _writeContext;
   final Map<String, TtsOutput> _activeOutputs = <String, TtsOutput>{};
   final Map<String, TtsError> _outputErrors = <String, TtsError>{};
-  final Map<String, Set<PlaybackControllableOutput>>
-  _playbackControlsByRequest = <String, Set<PlaybackControllableOutput>>{};
+  final _playbackControls = _MulticastPlaybackControls();
 
   @override
   Stream<TtsOutputPlaybackCompletedEvent> get playbackCompletedEvents =>
@@ -146,12 +147,7 @@ final class MulticastOutput implements TtsOutput, PlaybackControllableOutput {
         await output.startWrite(writeContext);
         _activeOutputs[output.outputId] = output;
         if (output case final PlaybackControllableOutput playbackOutput) {
-          _playbackControlsByRequest
-              .putIfAbsent(
-                writeContext.requestKey,
-                () => <PlaybackControllableOutput>{},
-              )
-              .add(playbackOutput);
+          _playbackControls.register(writeContext.requestKey, playbackOutput);
         }
       } catch (error) {
         final converted = _toOutputError(
@@ -288,41 +284,26 @@ final class MulticastOutput implements TtsOutput, PlaybackControllableOutput {
       }
     }
     if (requestKey != null) {
-      _playbackControlsByRequest.remove(requestKey);
+      _playbackControls.removeRequest(requestKey);
     }
     _clearSession();
   }
 
   @override
-  bool hasActivePlayback(String requestKey) {
-    final controls = _playbackControlsByRequest[requestKey];
-    return controls != null && controls.isNotEmpty;
-  }
+  bool hasActivePlayback(String requestKey) =>
+      _playbackControls.has(requestKey);
 
   @override
-  Future<void> pausePlayback(String requestKey) {
-    return _controlPlayback(
-      requestKey,
-      (output) => output.pausePlayback(requestKey),
-    );
-  }
+  Future<void> pausePlayback(String requestKey) =>
+      _playbackControls.pause(requestKey);
 
   @override
-  Future<void> resumePlayback(String requestKey) {
-    return _controlPlayback(
-      requestKey,
-      (output) => output.resumePlayback(requestKey),
-    );
-  }
+  Future<void> resumePlayback(String requestKey) =>
+      _playbackControls.resume(requestKey);
 
   @override
-  Future<void> stopPlayback(String requestKey) async {
-    await _controlPlayback(
-      requestKey,
-      (output) => output.stopPlayback(requestKey),
-    );
-    _playbackControlsByRequest.remove(requestKey);
-  }
+  Future<void> stopPlayback(String requestKey) =>
+      _playbackControls.stop(requestKey);
 
   @override
   Future<void> dispose() async {
@@ -345,7 +326,7 @@ final class MulticastOutput implements TtsOutput, PlaybackControllableOutput {
       }
     }
     _clearSession();
-    _playbackControlsByRequest.clear();
+    _playbackControls.clear();
     for (final subscription in _playbackCompletedSubscriptions) {
       await subscription.cancel();
     }
@@ -399,19 +380,6 @@ final class MulticastOutput implements TtsOutput, PlaybackControllableOutput {
     _activeOutputs.clear();
   }
 
-  Future<void> _controlPlayback(
-    String requestKey,
-    Future<void> Function(PlaybackControllableOutput output) operation,
-  ) async {
-    final controls = _playbackControlsByRequest[requestKey];
-    if (controls == null || controls.isEmpty) {
-      throw StateError('No active playback for "$requestKey".');
-    }
-    for (final output in controls.toList()) {
-      await operation(output);
-    }
-  }
-
   void _forwardPlaybackCompleted(
     TtsOutput source,
     TtsOutputPlaybackCompletedEvent event,
@@ -436,14 +404,7 @@ final class MulticastOutput implements TtsOutput, PlaybackControllableOutput {
     if (playbackControl == null) {
       return;
     }
-    final controls = _playbackControlsByRequest[requestKey];
-    if (controls == null) {
-      return;
-    }
-    controls.remove(playbackControl);
-    if (controls.isEmpty) {
-      _playbackControlsByRequest.remove(requestKey);
-    }
+    _playbackControls.remove(requestKey, playbackControl);
   }
 
   Future<void> _rollbackOutputs({

@@ -5,6 +5,8 @@ import 'dart:typed_data';
 import 'package:http/http.dart' as http;
 import 'package:tts_flow_dart/tts_flow_dart.dart';
 
+import 'mimo_sse_audio_decoder.dart';
+
 /// A MiMo V2.5 TTS adapter using the OpenAI-compatible Chat Completions API.
 ///
 /// MiMo streams Base64 encoded PCM16LE audio. This adapter exposes it as 24 kHz,
@@ -28,6 +30,7 @@ class MimoTtsEngine with TtsEngineDefaults implements TtsEngine {
   final String endpoint;
   final Duration requestTimeout;
   final http.Client _httpClient;
+  static const _audioDecoder = MimoSseAudioDecoder();
 
   static const _pcmDescriptor = PcmDescriptor(
     sampleRateHz: 24000,
@@ -122,7 +125,7 @@ class MimoTtsEngine with TtsEngineDefaults implements TtsEngine {
 
       var sequence = 0;
       Uint8List? pending;
-      await for (final audio in _audioEvents(response.stream)) {
+      await for (final audio in _audioDecoder.decode(response.stream)) {
         if (control.isCanceled) return;
         if (pending != null) {
           yield _chunk(request, resolvedFormat, sequence++, pending, false);
@@ -193,35 +196,6 @@ class MimoTtsEngine with TtsEngineDefaults implements TtsEngine {
       },
       'stream': true,
     };
-  }
-
-  Stream<Uint8List> _audioEvents(Stream<List<int>> stream) async* {
-    var buffered = '';
-    await for (final text in stream.transform(utf8.decoder)) {
-      buffered += text;
-      buffered = buffered.replaceAll('\r\n', '\n');
-      while (true) {
-        final boundary = buffered.indexOf('\n\n');
-        if (boundary < 0) break;
-        final event = buffered.substring(0, boundary);
-        buffered = buffered.substring(boundary + 2);
-        final data = event
-            .split('\n')
-            .where((line) => line.startsWith('data:'))
-            .map((line) => line.substring(5).trim())
-            .join('\n');
-        if (data.isEmpty || data == '[DONE]') continue;
-        final json = jsonDecode(data) as Map<String, Object?>;
-        final choices = json['choices'] as List<Object?>?;
-        final delta = choices?.isEmpty == false
-            ? (choices!.first as Map<String, Object?>)['delta']
-                  as Map<String, Object?>?
-            : null;
-        final audio = delta?['audio'] as Map<String, Object?>?;
-        final encoded = audio?['data'] as String?;
-        if (encoded != null && encoded.isNotEmpty) yield base64Decode(encoded);
-      }
-    }
   }
 
   TtsAudioChunk _chunk(
