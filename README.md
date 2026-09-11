@@ -10,6 +10,7 @@ for flutter: [tts_flow_flutter](./packages/tts_flow_flutter/README.md)
 
 Architecture, scope, and extension boundaries: [architecture](./docs/architecture.md).
 Migration and release baseline: [migrating to 0.2](./docs/migrating_to_0_2.md).
+Provider stream-fixture policy: [provider playback fixtures](./docs/provider_playback_fixtures.md).
 
 For the Flutter `just_audio` playback adapter's stream segmentation, lifecycle,
 and platform requirements, see the [JustAudioBackend guide](./docs/just_audio_backend.md).
@@ -17,6 +18,8 @@ and platform requirements, see the [JustAudioBackend guide](./docs/just_audio_ba
 ## Automated checks
 
 - `CI` runs static analysis and unit tests on pull requests and pushes to `main`.
+  It also uploads Dart-core and Flutter-adapter LCOV reports as a workflow
+  artifact; establish a stable baseline before enforcing a coverage threshold.
 - `macOS playback regression` runs the native JustAudio jitter regression weekly
   and can be run manually.
 - `Provider live contracts` runs weekly only for providers whose GitHub Actions

@@ -1,0 +1,38 @@
+version: 2
+updates:
+  - package-ecosystem: github-actions
+    directory: /
+    schedule:
+      interval: weekly
+  - package-ecosystem: pub
+    directory: /
+    schedule:
+      interval: weekly
+  - package-ecosystem: pub
+    directory: /apps/tts_flow_dart_example
+    schedule:
+      interval: weekly
+  - package-ecosystem: pub
+    directory: /apps/tts_flow_flutter_example
+    schedule:
+      interval: weekly
+  - package-ecosystem: pub
+    directory: /packages/tts_flow_dart
+    schedule:
+      interval: weekly
+  - package-ecosystem: pub
+    directory: /packages/tts_flow_flutter
+    schedule:
+      interval: weekly
+  - package-ecosystem: pub
+    directory: /packages/tts_flow_openai
+    schedule:
+      interval: weekly
+  - package-ecosystem: pub
+    directory: /packages/tts_flow_azure
+    schedule:
+      interval: weekly
+  - package-ecosystem: pub
+    directory: /packages/tts_flow_mimo
+    schedule:
+      interval: weekly

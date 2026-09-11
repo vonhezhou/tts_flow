@@ -1,6 +1,7 @@
 # tts_flow_flutter_example
 
-A new Flutter project.
+Deterministic playback and online-TTS integration example for
+`tts_flow_flutter`.
 
 ## JustAudio 受控抖动回归
 
