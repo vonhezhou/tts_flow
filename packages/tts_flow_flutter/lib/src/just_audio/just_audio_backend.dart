@@ -7,6 +7,9 @@ import 'package:logging/logging.dart';
 import 'package:tts_flow_dart/tts_flow_dart.dart';
 import 'package:tts_flow_flutter/src/just_audio/chunk_audio_source.dart';
 
+part 'just_audio_playback_session.dart';
+part 'just_audio_source_list_operations.dart';
+
 final _logger = Logger('JustAudioPlayer');
 
 /// A platform playback failure associated with one TTS playback session.
@@ -79,61 +82,6 @@ final class JustAudioPlaybackSourceStartedEvent {
 
   /// Time at which the source became immutable.
   final DateTime timestamp;
-}
-
-final class _PlaybackSession {
-  _PlaybackSession({
-    required this.playbackId,
-    required this.requestKey,
-    required this.audioSpec,
-  });
-
-  final String playbackId;
-  final String requestKey;
-  final TtsAudioSpec audioSpec;
-
-  ChunkAudioSource? tailSource;
-  int totalBytes = 0;
-  bool isFinalized = false;
-  bool isStopped = false;
-  bool isWaitingForNextSource = false;
-
-  int nextIndex = 0;
-
-  final completedSourceIndexes = <int>{};
-
-  final sourceDurationMap = <int, Duration>{};
-
-  void addOrUpdateSourceDuration(int index, Duration duration) {
-    sourceDurationMap[index] = duration;
-  }
-
-  Duration calcDurationOffset(int index) {
-    final prevSourceDurations = sourceDurationMap.entries
-        .where((entry) => entry.key < index)
-        .map((entry) => entry.value);
-
-    if (prevSourceDurations.isEmpty) {
-      return Duration.zero;
-    }
-
-    return prevSourceDurations.reduce((value, element) => value + element);
-  }
-
-  Duration? calcTotalDuration() {
-    if (sourceDurationMap.values.isEmpty) {
-      return null;
-    }
-
-    return sourceDurationMap.values.reduce((value, element) => value + element);
-  }
-}
-
-final class _SourceRange {
-  const _SourceRange({required this.start, required this.endExclusive});
-
-  final int start;
-  final int endExclusive;
 }
 
 /// A [SpeakerBackend] implementation using the just_audio package.
@@ -446,128 +394,6 @@ class JustAudioBackend
       throw StateError('Unknown playbackId: $playbackId');
     }
     return session;
-  }
-
-  Future<ChunkAudioSource> _createSegment(_PlaybackSession session) async {
-    final sourceIndex = session.nextIndex;
-    final source = ChunkAudioSource(
-      audioSpec: session.audioSpec,
-      playbackId: session.playbackId,
-      index: sourceIndex,
-      requestKey: session.requestKey,
-      isTerminalSegment: false,
-      onStarted: () {
-        if (_disposeRequested) {
-          return;
-        }
-        _playbackSourceStartedController.add(
-          JustAudioPlaybackSourceStartedEvent(
-            playbackId: session.playbackId,
-            requestKey: session.requestKey,
-            sourceIndex: sourceIndex,
-            timestamp: DateTime.now().toUtc(),
-          ),
-        );
-      },
-    );
-    session.nextIndex++;
-
-    session.tailSource = source;
-    await _player.addAudioSource(source);
-    _logger.fine('Added new segment for ${session.playbackId}');
-    return source;
-  }
-
-  Future<void> _ensurePlaybackRunning() async {
-    if (_player.audioSources.isEmpty) {
-      return;
-    }
-
-    if (!_player.playing) {
-      if (_player.processingState == ProcessingState.completed &&
-          _player.currentIndex != null &&
-          _player.currentIndex! < _player.audioSources.length - 1) {
-        await _player.seekToNext();
-      } else if (_player.currentIndex == null) {
-        await _player.seek(Duration.zero, index: 0);
-      }
-      _startPlayerInBackground();
-      return;
-    }
-
-    if (_player.processingState == ProcessingState.completed &&
-        _player.currentIndex != null &&
-        _player.currentIndex! < _player.audioSources.length - 1) {
-      await _player.seekToNext();
-      _startPlayerInBackground();
-    }
-  }
-
-  _SourceRange? _findRangeForPlayback(String playbackId) {
-    var seen = false;
-    var gapStarted = false;
-    int? start;
-    var endExclusive = 0;
-
-    for (var i = 0; i < _player.audioSources.length; i++) {
-      final source = _player.audioSources[i];
-      if (source is! ChunkAudioSource) {
-        throw StateError(
-          'Unexpected audio source type in playlist: ${source.runtimeType}',
-        );
-      }
-
-      if (source.playbackId == playbackId) {
-        if (gapStarted) {
-          throw StateError('Playback segments must be contiguous: $playbackId');
-        }
-        seen = true;
-        start ??= i;
-        endExclusive = i + 1;
-      } else if (seen) {
-        gapStarted = true;
-      }
-    }
-
-    if (start == null) {
-      return null;
-    }
-
-    return _SourceRange(start: start, endExclusive: endExclusive);
-  }
-
-  Future<void> _resumeAfterRemoval(int removedStart) async {
-    if (_player.audioSources.isEmpty) {
-      await _player.stop();
-      return;
-    }
-
-    final nextIndex = removedStart >= _player.audioSources.length
-        ? _player.audioSources.length - 1
-        : removedStart;
-    await _player.stop();
-    await _player.seek(Duration.zero, index: nextIndex);
-    _startPlayerInBackground();
-  }
-
-  /// Starts just_audio without blocking source-list mutations.
-  ///
-  /// [AudioPlayer.play] completes only when playback ends, pauses, or stops.
-  /// Awaiting it in the serialized operation queue would prevent subsequent
-  /// chunks from being appended while the first source is playing.
-  void _startPlayerInBackground() {
-    unawaited(_awaitPlayerStart());
-  }
-
-  Future<void> _awaitPlayerStart() async {
-    try {
-      await _player.play();
-    } on Object catch (error, stackTrace) {
-      // Native decode errors are correlated to a session by errorStream. This
-      // branch prevents an unhandled play Future from escaping the queue while
-      // retaining a diagnostic for errors that do not reach that stream.
-      _logger.warning('just_audio play invocation failed.', error, stackTrace);
-    }
   }
 
   Future<void> _onProcessingStateChanged(ProcessingState state) async {

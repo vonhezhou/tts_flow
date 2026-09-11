@@ -12,6 +12,9 @@ import 'package:tts_flow_flutter/tts_flow_flutter.dart';
 import 'package:tts_flow_mimo/tts_flow_mimo.dart';
 import 'package:url_launcher/url_launcher.dart';
 
+part 'tts_flow_example_page_recording_output.dart';
+part 'tts_flow_example_page_widgets.dart';
+
 const _sampleAudioAsset = 'assets/audio/test_audio_yanfei.wav';
 
 class TtsFlowExamplePage extends StatefulWidget {
@@ -575,103 +578,27 @@ class _TtsFlowExamplePageState extends State<TtsFlowExamplePage> {
               ),
             ),
             const SizedBox(height: 12),
-            Card(
-              child: Padding(
-                padding: const EdgeInsets.all(12),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      'Voice & Audio Controls',
-                      style: Theme.of(context).textTheme.titleSmall,
-                    ),
-                    const SizedBox(height: 8),
-                    DropdownButtonFormField<String>(
-                      initialValue:
-                          _voices.any(
-                            (voice) => voice.voiceId == _selectedVoiceId,
-                          )
-                          ? _selectedVoiceId
-                          : null,
-                      isExpanded: true,
-                      decoration: const InputDecoration(
-                        border: OutlineInputBorder(),
-                        labelText: 'Voice',
-                      ),
-                      items: _voices
-                          .map(
-                            (voice) => DropdownMenuItem<String>(
-                              value: voice.voiceId,
-                              child: Text(_voiceLabel(voice)),
-                            ),
-                          )
-                          .toList(growable: false),
-                      onChanged: _isReady ? _onVoiceChanged : null,
-                    ),
-                    const SizedBox(height: 8),
-                    Text(
-                      _supportsControl(_minVolume, _maxVolume)
-                          ? 'Volume: ${_volume.toStringAsFixed(2)} '
-                                '(range ${_minVolume.toStringAsFixed(2)} - ${_maxVolume.toStringAsFixed(2)})'
-                          : 'Volume: unsupported',
-                    ),
-                    Slider(
-                      min: _supportsControl(_minVolume, _maxVolume)
-                          ? _minVolume
-                          : 0.0,
-                      max: _supportsControl(_minVolume, _maxVolume)
-                          ? _maxVolume
-                          : 1.0,
-                      divisions: _sliderDivisions(_minVolume, _maxVolume),
-                      value: _sliderValue(_volume, _minVolume, _maxVolume),
-                      onChanged:
-                          _isReady && _supportsControl(_minVolume, _maxVolume)
-                          ? _onVolumeChanged
-                          : null,
-                    ),
-                    Text(
-                      _supportsControl(_minSpeed, _maxSpeed)
-                          ? 'Speed: ${_speed.toStringAsFixed(2)} '
-                                '(range ${_minSpeed.toStringAsFixed(2)} - ${_maxSpeed.toStringAsFixed(2)})'
-                          : 'Speed: unsupported',
-                    ),
-                    Slider(
-                      min: _supportsControl(_minSpeed, _maxSpeed)
-                          ? _minSpeed
-                          : 0.0,
-                      max: _supportsControl(_minSpeed, _maxSpeed)
-                          ? _maxSpeed
-                          : 1.0,
-                      divisions: _sliderDivisions(_minSpeed, _maxSpeed),
-                      value: _sliderValue(_speed, _minSpeed, _maxSpeed),
-                      onChanged:
-                          _isReady && _supportsControl(_minSpeed, _maxSpeed)
-                          ? _onSpeedChanged
-                          : null,
-                    ),
-                    Text(
-                      _supportsControl(_minPitch, _maxPitch)
-                          ? 'Pitch: ${_pitch.toStringAsFixed(2)} '
-                                '(range ${_minPitch.toStringAsFixed(2)} - ${_maxPitch.toStringAsFixed(2)})'
-                          : 'Pitch: unsupported',
-                    ),
-                    Slider(
-                      min: _supportsControl(_minPitch, _maxPitch)
-                          ? _minPitch
-                          : 0.0,
-                      max: _supportsControl(_minPitch, _maxPitch)
-                          ? _maxPitch
-                          : 1.0,
-                      divisions: _sliderDivisions(_minPitch, _maxPitch),
-                      value: _sliderValue(_pitch, _minPitch, _maxPitch),
-                      onChanged:
-                          _isReady && _supportsControl(_minPitch, _maxPitch)
-                          ? _onPitchChanged
-                          : null,
-                    ),
-                  ],
-                ),
-              ),
+            _VoiceAndAudioControls(
+              isReady: _isReady,
+              voices: _voices,
+              selectedVoiceId: _selectedVoiceId,
+              voiceLabel: _voiceLabel,
+              onVoiceChanged: _onVoiceChanged,
+              volume: _volume,
+              minVolume: _minVolume,
+              maxVolume: _maxVolume,
+              onVolumeChanged: _onVolumeChanged,
+              speed: _speed,
+              minSpeed: _minSpeed,
+              maxSpeed: _maxSpeed,
+              onSpeedChanged: _onSpeedChanged,
+              pitch: _pitch,
+              minPitch: _minPitch,
+              maxPitch: _maxPitch,
+              onPitchChanged: _onPitchChanged,
+              supportsControl: _supportsControl,
+              sliderValue: _sliderValue,
+              sliderDivisions: _sliderDivisions,
             ),
             const SizedBox(height: 12),
             Wrap(
@@ -757,125 +684,5 @@ class _TtsFlowExamplePageState extends State<TtsFlowExamplePage> {
         ),
       ),
     );
-  }
-}
-
-class _SourceNotice extends StatelessWidget {
-  const _SourceNotice({
-    required this.usesMimo,
-    required this.usesAzure,
-    required this.requestedSource,
-    required this.hasAzureConfiguration,
-  });
-
-  final bool usesMimo;
-  final bool usesAzure;
-  final String requestedSource;
-  final bool hasAzureConfiguration;
-
-  @override
-  Widget build(BuildContext context) {
-    final theme = Theme.of(context);
-    final isMisconfiguredAzure =
-        requestedSource == 'azure' && !hasAzureConfiguration;
-    final message = usesAzure
-        ? 'Live source: Azure AI Speech. Azure returns streamed MP3 audio for the selected neural voice.'
-        : usesMimo
-        ? 'Live source: Xiaomi MiMo V2.5 TTS. Audio is synthesized remotely and streamed to the speaker.'
-        : isMisconfiguredAzure
-        ? 'Azure source was requested, but AZURE_SPEECH_KEY or AZURE_SPEECH_REGION is missing. Using the bundled WAV sample.'
-        : 'Demo source: bundled WAV sample. Launch with --dart-define=MIMO_API_KEY=... for MiMo, or --dart-define=TTS_SOURCE=azure --dart-define=AZURE_SPEECH_KEY=... --dart-define=AZURE_SPEECH_REGION=... for Azure.';
-    return Card(
-      color: (usesMimo || usesAzure)
-          ? theme.colorScheme.primaryContainer
-          : theme.colorScheme.surfaceContainerHighest,
-      child: Padding(
-        padding: const EdgeInsets.all(12),
-        child: Row(
-          children: [
-            Icon(
-              (usesMimo || usesAzure) ? Icons.cloud_done : Icons.info_outline,
-            ),
-            const SizedBox(width: 8),
-            Expanded(child: Text(message)),
-          ],
-        ),
-      ),
-    );
-  }
-}
-
-/// Example-side recording observer for [PrioritizedOutput].
-///
-/// It owns serial file delivery itself, which is deliberately not a
-/// responsibility of tts_flow's primary/auxiliary output wrapper.
-final class _RecordingAuxiliaryOutput implements TtsAuxiliaryOutput {
-  _RecordingAuxiliaryOutput({required this.output, required this.log});
-
-  final TtsOutput output;
-  final Logger log;
-  Future<void> _pending = Future<void>.value();
-  var _hasSession = false;
-
-  @override
-  String get outputId => 'example-wav-recorder';
-
-  @override
-  void init() {
-    _enqueue('init', output.init);
-  }
-
-  @override
-  void startWrite(TtsOutputWriteContext writeContext) {
-    _hasSession = true;
-    _enqueue('startWrite', () => output.startWrite(writeContext));
-  }
-
-  @override
-  void writeChunk(TtsChunk chunk) {
-    if (_hasSession) {
-      _enqueue('writeChunk', () => output.writeChunk(chunk));
-    }
-  }
-
-  @override
-  void finishWrite() {
-    if (!_hasSession) {
-      return;
-    }
-    _hasSession = false;
-    _enqueue('finishWrite', () async {
-      await output.finishWrite();
-    });
-  }
-
-  @override
-  void cancelWrite(SynthesisControl control) {
-    if (!_hasSession) {
-      return;
-    }
-    _hasSession = false;
-    _enqueue('cancelWrite', () => output.cancelWrite(control));
-  }
-
-  @override
-  void dispose() {
-    _hasSession = false;
-    _enqueue('dispose', output.dispose);
-  }
-
-  void _enqueue(String operation, Future<void> Function() action) {
-    _pending = _pending
-        .catchError((Object error, StackTrace stackTrace) {
-          log.warning('Auxiliary audio recorder failed.', error, stackTrace);
-        })
-        .then<void>((_) => action())
-        .catchError((Object error, StackTrace stackTrace) {
-          log.warning(
-            'Auxiliary audio recorder failed during $operation.',
-            error,
-            stackTrace,
-          );
-        });
   }
 }
