@@ -59,3 +59,43 @@ and playback failures; it must not require live credentials or network access.
    it to the fixture set.
 4. Record platforms that have been verified in the manifest or test name; do
    not infer support on untested platforms.
+
+### Capture helper
+
+`tool/capture_provider_fixture.py` captures audio chunks at the HTTP stream
+boundary and writes only the raw bytes and their monotonic arrival offsets. It
+reads credentials from the environment and deliberately never serializes them,
+request/response headers, or source text. It supports the Provider request
+shapes used by this repository:
+
+```sh
+# Use a dedicated low-privilege test credential. Do not put it in a command,
+# fixture, shell profile committed to Git, or chat message.
+export OPENAI_API_KEY='...'
+python3 tool/capture_provider_fixture.py capture openai
+
+export AZURE_SPEECH_KEY='...'
+export AZURE_SPEECH_REGION='eastasia'
+python3 tool/capture_provider_fixture.py capture azure
+
+export MIMO_API_KEY='...'
+python3 tool/capture_provider_fixture.py capture mimo
+```
+
+The first command writes
+`assets/fixtures/<provider>/continuous/manifest.json` and numbered binary
+chunks. Check that its phrase is redistributable before adding the generated
+audio to Git. Then derive a stable network-gap case without relying on an
+unreliable local connection:
+
+```sh
+python3 tool/capture_provider_fixture.py jitter \
+  apps/tts_flow_flutter_example/assets/fixtures/openai/continuous/manifest.json \
+  --gap-after 1 --gap-ms 850
+```
+
+This creates the neighboring `jitter` fixture with the same audio and a
+deterministic 850 ms delay before the selected following chunk. Adjust the
+gap and chunk index to target the buffering transition under test. `invalid`
+fixtures remain intentionally hand-authored, because their purpose is to test
+rejection paths rather than a Provider response.
