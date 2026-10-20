@@ -10,7 +10,7 @@ For each Provider × format combination, add three independently replayable
 samples:
 
 1. `continuous`: normal chunk arrival;
-2. `jitter`: a real delayed-chunk sequence that exposes a supply gap;
+2. `jitter`: a recorded or explicitly derived delayed-chunk sequence that exposes a supply gap;
 3. `invalid`: an intentionally malformed or unsupported response.
 
 Store binary audio only when it is generated from a short, non-user test
@@ -99,3 +99,22 @@ deterministic 850 ms delay before the selected following chunk. Adjust the
 gap and chunk index to target the buffering transition under test. `invalid`
 fixtures remain intentionally hand-authored, because their purpose is to test
 rejection paths rather than a Provider response.
+
+### Included MiMo samples
+
+The MiMo PCM fixtures were captured on 2026-10-20 from `mimo-v2.5-tts` with
+`mimo_default`, using the fixed phrase `This is a provider fixture.`.
+`continuous` contains eight real provider audio events (130560 bytes, 24 kHz,
+16-bit mono PCM, 2.72 seconds). Its arrival offsets are relative to the first
+audio event. `jitter` preserves those bytes and adds 850 ms after chunk zero;
+its gap is deliberately derived, rather than a claim about provider latency.
+`invalid` is hand-authored arrival metadata that starts at 1 ms and is rejected
+before playback; it does not exercise native decoder failure.
+
+The asset unit test checks loading, matching audio, the derived timing, and
+invalid metadata rejection. The captured samples are also included in
+`integration_test/just_audio_jitter_test.dart` for explicit native replay.
+Verified on macOS on 2026-10-20: continuous playback completes without waiting;
+jitter emits waiting, recovers, and completes once; neither emits playback
+failure. Other native platforms have not been verified with these samples.
+See [Azure setup](azure_speech_setup.md) for the next provider's credentials.

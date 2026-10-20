@@ -70,6 +70,9 @@ flutter:
     # Captured Provider regression samples are added here as self-contained
     # manifests plus raw chunks; this directory is intentionally asset-backed.
     - assets/fixtures/
+    - assets/fixtures/mimo/continuous/
+    - assets/fixtures/mimo/jitter/
+    - assets/fixtures/mimo/invalid/
 
   # The following line ensures that the Material Icons font is
   # included with your application, so that you can use the icons in

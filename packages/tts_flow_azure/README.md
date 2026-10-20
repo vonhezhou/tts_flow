@@ -3,6 +3,9 @@
 Optional Azure AI Speech adapter for `tts_flow_dart`. It uses the Azure Speech
 REST API, sends SSML, and streams 24 kHz / 48 kbps mono MP3 response bytes.
 
+本地资源创建、fish 环境变量、验证与 fixture 采集见
+[Azure Speech 配置指南](../../docs/azure_speech_setup.md)。
+
 ```dart
 import 'package:tts_flow_dart/tts_flow_dart.dart';
 import 'package:tts_flow_azure/tts_flow_azure.dart';

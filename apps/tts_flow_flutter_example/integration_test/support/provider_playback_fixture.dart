@@ -8,7 +8,7 @@ import 'package:tts_flow_dart/tts_flow_dart.dart';
 ///
 /// The manifest and chunks live under `assets/fixtures/`; their schema is
 /// documented in `docs/provider_playback_fixtures.md`. Arrival offsets are
-/// measured from the start of synthesis, rather than being test-controlled.
+/// measured from the first audio chunk, with derived gaps stored in the manifest.
 final class ProviderPlaybackFixture {
   ProviderPlaybackFixture._({
     required this.provider,

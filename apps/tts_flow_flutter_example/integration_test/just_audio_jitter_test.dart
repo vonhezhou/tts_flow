@@ -7,11 +7,37 @@ import 'package:just_audio/just_audio.dart';
 import 'package:tts_flow_dart/tts_flow_dart.dart';
 import 'package:tts_flow_flutter/tts_flow_flutter.dart';
 
+import 'support/provider_playback_fixture.dart';
+
 const _sampleAudioAsset = 'assets/audio/test_audio_yanfei.wav';
 const _utteranceId = 'just-audio-jitter-regression';
 
 void main() {
   IntegrationTestWidgetsFlutterBinding.ensureInitialized();
+
+  group('Captured MiMo PCM', () {
+    for (final kind in ['continuous', 'jitter']) {
+      test('$kind fixture completes with expected waiting', () async {
+        final fixture = await ProviderPlaybackFixture.load(
+          manifestAsset: 'assets/fixtures/mimo/$kind/manifest.json',
+        );
+        final result = await _runReplay(
+          engine: ProviderPlaybackFixtureEngine(fixture),
+        );
+        expect(result.playbackFailedEvents, isEmpty);
+        expect(result.playbackCompletedEvents, hasLength(1));
+        expect(result.waitingEvents, kind == 'jitter' ? isNotEmpty : isEmpty);
+      }, timeout: const Timeout(Duration(seconds: 30)));
+    }
+    test('invalid arrival metadata is rejected before playback', () async {
+      await expectLater(
+        ProviderPlaybackFixture.load(
+          manifestAsset: 'assets/fixtures/mimo/invalid/manifest.json',
+        ),
+        throwsFormatException,
+      );
+    });
+  });
 
   group('JustAudioBackend controlled jitter', () {
     test('the PCM/WAV fixture plays through AssetAudioSource', () async {
@@ -75,9 +101,10 @@ void main() {
 }
 
 Future<_ReplayResult> _runReplay({
-  required _PcmSample sample,
-  required int firstChunkBytes,
-  required Duration delayAfterReady,
+  _PcmSample? sample,
+  int firstChunkBytes = 0,
+  Duration delayAfterReady = Duration.zero,
+  TtsEngine? engine,
 }) async {
   final backend = JustAudioBackend();
   final firstSourceStarted = Completer<void>();
@@ -102,13 +129,15 @@ Future<_ReplayResult> _runReplay({
   final backendErrorSub = backend.playbackErrorStream.listen(backendErrors.add);
 
   final service = TtsFlow(
-    engine: _GatedReplayEngine(
-      audioBytes: sample.audioBytes,
-      audioSpec: sample.audioSpec,
-      firstChunkBytes: firstChunkBytes,
-      delayAfterReady: delayAfterReady,
-      firstSourceStarted: firstSourceStarted.future,
-    ),
+    engine:
+        engine ??
+        _GatedReplayEngine(
+          audioBytes: sample!.audioBytes,
+          audioSpec: sample.audioSpec,
+          firstChunkBytes: firstChunkBytes,
+          delayAfterReady: delayAfterReady,
+          firstSourceStarted: firstSourceStarted.future,
+        ),
     defaultOutput: SpeakerOutput(backend: backend),
   );
   final requestSub = service.requestEvents.listen((event) {

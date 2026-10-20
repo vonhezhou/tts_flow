@@ -1,0 +1,44 @@
+{
+  "provider": "mimo",
+  "format": "pcm",
+  "sampleRateHz": 24000,
+  "channels": 1,
+  "kind": "jitter",
+  "verifiedPlatforms": ["macos"],
+  "chunks": [
+    {
+      "file": "000.bin",
+      "arrivalOffsetMs": 0
+    },
+    {
+      "file": "001.bin",
+      "arrivalOffsetMs": 893
+    },
+    {
+      "file": "002.bin",
+      "arrivalOffsetMs": 949
+    },
+    {
+      "file": "003.bin",
+      "arrivalOffsetMs": 1012
+    },
+    {
+      "file": "004.bin",
+      "arrivalOffsetMs": 1072
+    },
+    {
+      "file": "005.bin",
+      "arrivalOffsetMs": 1133
+    },
+    {
+      "file": "006.bin",
+      "arrivalOffsetMs": 1195
+    },
+    {
+      "file": "007.bin",
+      "arrivalOffsetMs": 1334
+    }
+  ],
+  "bitsPerSample": 16,
+  "encoding": "signedInt"
+}

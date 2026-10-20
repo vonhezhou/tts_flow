@@ -1,5 +1,6 @@
 #!/usr/bin/env python3
 import importlib.util
+import io
 import sys
 import tempfile
 import unittest
@@ -20,7 +21,7 @@ class CaptureProviderFixtureTest(unittest.TestCase):
         chunks = capture._normalize_offsets(
             [capture.CapturedChunk(b"a", 12), capture.CapturedChunk(b"b", 4)],
         )
-        self.assertEqual([chunk.arrival_offset_ms for chunk in chunks], [0, 4])
+        self.assertEqual([chunk.arrival_offset_ms for chunk in chunks], [0, 0])
         metadata = capture.AudioMetadata("mimo", "pcm", 24000, 1, 16, "signedInt")
         with tempfile.TemporaryDirectory() as temp:
             destination = Path(temp) / "mimo" / "continuous"
@@ -41,6 +42,44 @@ class CaptureProviderFixtureTest(unittest.TestCase):
     def test_mimo_sse_audio_event_decodes_without_retaining_envelope(self):
         event = b'data: {"choices":[{"delta":{"audio":{"data":"AQI="}}}]}'
         self.assertEqual(capture._mimo_event_audio(event), b"\x01\x02")
+
+    def test_mimo_skips_role_finish_and_usage_events(self):
+        for event in (
+            b'data: {"choices":[{"delta":{"role":"assistant","audio":null}}]}',
+            b'data: {"choices":[{"delta":{},"finish_reason":"stop"}]}',
+            b'data: {"choices":[],"usage":{"total_tokens":10}}',
+            b'data: [DONE]',
+        ):
+            with self.subTest(event=event):
+                self.assertIsNone(capture._mimo_event_audio(event))
+
+    def test_mimo_capture_accepts_a_complete_provider_stream(self):
+        stream = io.BytesIO(
+            b'data: {"choices":[{"delta":{"audio":null}}]}\r\n\r\n'
+            b'data: {"choices":[{"delta":{"audio":{"data":"AQI="}}}]}\n\n'
+            b'data: {"choices":[{"delta":{"audio":null},"finish_reason":"stop"}]}\n\n'
+            b'data: {"choices":[],"usage":{"total_tokens":10}}\n\n'
+            b'data: [DONE]\n\n'
+        )
+        chunks = capture._capture_mimo_sse(stream)
+        self.assertEqual(chunks, [capture.CapturedChunk(b"\x01\x02", 0)])
+
+    def test_mimo_rejects_provider_errors_and_corrupt_audio(self):
+        for event in (
+            b'data: {"error":{"message":"failed"}}',
+            b'data: {"choices":[{"delta":{"audio":{"data":"!invalid"}}}]}',
+        ):
+            with self.subTest(event=event):
+                with self.assertRaisesRegex(RuntimeError, "invalid SSE"):
+                    capture._mimo_event_audio(event)
+
+    def test_offsets_are_relative_to_first_audio_not_request_start(self):
+        chunks = capture._normalize_offsets([
+            capture.CapturedChunk(b"a", 1200),
+            capture.CapturedChunk(b"b", 1235),
+            capture.CapturedChunk(b"c", 1270),
+        ])
+        self.assertEqual([chunk.arrival_offset_ms for chunk in chunks], [0, 35, 70])
 
 
 if __name__ == "__main__":

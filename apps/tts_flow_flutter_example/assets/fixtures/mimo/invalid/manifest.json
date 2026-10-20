@@ -1,0 +1,10 @@
+{
+  "provider": "mimo",
+  "format": "pcm",
+  "sampleRateHz": 24000,
+  "channels": 1,
+  "bitsPerSample": 16,
+  "encoding": "signedInt",
+  "kind": "invalid",
+  "chunks": [{"file": "000.bin", "arrivalOffsetMs": 1}]
+}

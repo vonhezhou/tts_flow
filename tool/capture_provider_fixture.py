@@ -134,17 +134,30 @@ def _mimo_event_audio(event: bytes) -> bytes | None:
         return None
     try:
         payload = json.loads(data)
-        encoded = payload["choices"][0]["delta"]["audio"]["data"]
+        if not isinstance(payload, dict) or "error" in payload:
+            raise ValueError("Invalid event or provider error")
+        choices = payload.get("choices")
+        if not choices:
+            return None  # Usage-only event.
+        audio = choices[0].get("delta", {}).get("audio")
+        if audio is None:
+            return None  # Role/content/finish event.
+        encoded = audio.get("data")
+        if encoded is None or encoded == "":
+            return None
         return base64.b64decode(encoded, validate=True)
-    except (KeyError, IndexError, TypeError, ValueError, json.JSONDecodeError) as error:
+    except (AttributeError, KeyError, IndexError, TypeError, ValueError) as error:
         raise RuntimeError("MiMo returned an invalid SSE audio event.") from error
 
 
 def _normalize_offsets(chunks: Iterable[CapturedChunk]) -> list[CapturedChunk]:
     normalized: list[CapturedChunk] = []
     previous = 0
-    for index, chunk in enumerate(chunks):
-        offset = 0 if index == 0 else max(previous, chunk.arrival_offset_ms)
+    origin: int | None = None
+    for chunk in chunks:
+        if origin is None:
+            origin = chunk.arrival_offset_ms
+        offset = max(previous, chunk.arrival_offset_ms - origin)
         normalized.append(CapturedChunk(data=chunk.data, arrival_offset_ms=offset))
         previous = offset
     return normalized
