@@ -131,6 +131,20 @@ jitter emits waiting, recovers, and completes once; neither emits playback
 failure. Other native platforms have not been verified with these samples.
 See [Azure setup](azure_speech_setup.md) for the next provider's credentials.
 
+### Gemini integration status
+
+`tts_flow_gemini` uses `googleai_dart` to decode Gemini 3.1 Flash TTS streams.
+The native regression includes a simulated Gemini SSE response containing the
+existing MiMo PCM fixture, verifying SDK → adapter → TtsFlow → JustAudio
+playback offline. This is not captured Gemini audio and does not satisfy the
+live capture requirement. No real Gemini provider output has been collected.
+The SDK mock transport playback was verified on macOS on 2026-10-21:
+one completion, no waiting, and no playback failure. Other native platforms
+have not been verified for this adapter path.
+The opt-in [live contract tool](../packages/tts_flow_gemini/tool/live_contract_check.dart)
+can later capture sanitized PCM and adapter-output timing with
+`--capture-fixture`; see the [adapter guide](../packages/tts_flow_gemini/README.md).
+
 ### Offline Azure-format samples
 
 `assets/fixtures/azure_simulated/` contains a locally generated 440 Hz tone,

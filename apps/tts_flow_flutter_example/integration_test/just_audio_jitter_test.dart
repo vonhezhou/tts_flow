@@ -1,9 +1,12 @@
 import 'dart:async';
+import 'dart:convert';
 
 import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:integration_test/integration_test.dart';
 import 'package:just_audio/just_audio.dart';
+import 'package:http/http.dart' as http;
+import 'package:tts_flow_gemini/tts_flow_gemini.dart';
 import 'package:tts_flow_dart/tts_flow_dart.dart';
 import 'package:tts_flow_flutter/tts_flow_flutter.dart';
 
@@ -14,6 +17,26 @@ const _utteranceId = 'just-audio-jitter-regression';
 
 void main() {
   IntegrationTestWidgetsFlutterBinding.ensureInitialized();
+
+  test(
+    'Gemini SDK mock transport plays existing PCM through TtsFlow',
+    () async {
+      // This is a transport simulation using the captured MiMo PCM bytes.
+      // It is deliberately not represented as a live Gemini fixture.
+      final fixture = await ProviderPlaybackFixture.load(
+        manifestAsset: 'assets/fixtures/mimo/continuous/manifest.json',
+      );
+      final client = _GeminiFixtureClient(fixture);
+      addTearDown(client.close);
+      final result = await _runReplay(
+        engine: GeminiTtsEngine(apiKey: 'offline-test-key', httpClient: client),
+      );
+      expect(result.playbackFailedEvents, isEmpty);
+      expect(result.waitingEvents, isEmpty);
+      expect(result.playbackCompletedEvents, hasLength(1));
+    },
+    timeout: const Timeout(Duration(seconds: 30)),
+  );
 
   group('Synthetic Azure-format MP3 (no live Azure service)', () {
     for (final kind in ['continuous', 'jitter', 'invalid']) {
@@ -280,6 +303,44 @@ Future<_PcmSample> _loadSample() async {
     audioBytes: Uint8List.fromList(wavBytes.sublist(44)),
     audioSpec: TtsAudioSpec.pcm(header.toPcmDescriptor()),
   );
+}
+
+final class _GeminiFixtureClient extends http.BaseClient {
+  _GeminiFixtureClient(this.fixture);
+  final ProviderPlaybackFixture fixture;
+
+  @override
+  Future<http.StreamedResponse> send(http.BaseRequest request) async =>
+      http.StreamedResponse(
+        _body(),
+        200,
+        headers: {'content-type': 'text/event-stream'},
+      );
+
+  Stream<List<int>> _body() async* {
+    final clock = Stopwatch()..start();
+    for (final chunk in fixture.chunks) {
+      final remaining = chunk.arrivalOffset - clock.elapsed;
+      if (remaining > Duration.zero) await Future<void>.delayed(remaining);
+      yield utf8.encode(
+        'data: ${jsonEncode({
+          'candidates': [
+            {
+              'content': {
+                'role': 'model',
+                'parts': [
+                  {
+                    'inlineData': {'mimeType': 'audio/L16;codec=pcm;rate=24000', 'data': base64Encode(chunk.bytes)},
+                  },
+                ],
+              },
+            },
+          ],
+        })}\n\n',
+      );
+    }
+    yield utf8.encode('data: {"candidates":[{"finishReason":"STOP"}]}\n\n');
+  }
 }
 
 final class _PcmSample {

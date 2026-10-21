@@ -12,6 +12,7 @@ workspace:
   - packages/tts_flow_openai
   - packages/tts_flow_mimo
   - packages/tts_flow_azure
+  - packages/tts_flow_gemini
   - packages/tts_flow_flutter
 
 dev_dependencies:

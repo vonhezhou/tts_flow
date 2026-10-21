@@ -12,6 +12,9 @@ Architecture, scope, and extension boundaries: [architecture](./docs/architectur
 Migration and release baseline: [migrating to 0.2](./docs/migrating_to_0_2.md).
 Provider stream-fixture policy: [provider playback fixtures](./docs/provider_playback_fixtures.md).
 
+Google Gemini streaming TTS setup and offline validation:
+[tts_flow_gemini](./packages/tts_flow_gemini/README.md).
+
 For the Flutter `just_audio` playback adapter's stream segmentation, lifecycle,
 and platform requirements, see the [JustAudioBackend guide](./docs/just_audio_backend.md).
 

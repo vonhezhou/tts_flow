@@ -42,11 +42,13 @@ dependencies:
   tts_flow_flutter: ^0.2.0
   tts_flow_mimo: ^0.2.0
   tts_flow_azure: ^0.2.0
+  tts_flow_gemini: ^0.2.0
   path: ^1.9.1
   path_provider: ^2.1.5
   url_launcher: ^6.3.2
 
 dev_dependencies:
+  http: ^1.6.0
   flutter_test:
     sdk: flutter
   integration_test:

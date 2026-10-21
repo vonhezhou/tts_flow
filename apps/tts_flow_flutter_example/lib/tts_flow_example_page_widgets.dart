@@ -2,6 +2,7 @@ part of 'tts_flow_example_page.dart';
 
 class _SourceNotice extends StatelessWidget {
   const _SourceNotice({
+    required this.usesGemini,
     required this.usesMimo,
     required this.usesAzure,
     required this.requestedSource,
@@ -9,6 +10,7 @@ class _SourceNotice extends StatelessWidget {
   });
 
   final bool usesMimo;
+  final bool usesGemini;
   final bool usesAzure;
   final String requestedSource;
   final bool hasAzureConfiguration;
@@ -18,7 +20,11 @@ class _SourceNotice extends StatelessWidget {
     final theme = Theme.of(context);
     final isMisconfiguredAzure =
         requestedSource == 'azure' && !hasAzureConfiguration;
-    final message = usesAzure
+    final message = usesGemini
+        ? 'Live source: Google Gemini Flash TTS. Audio streams to the speaker.'
+        : requestedSource == 'gemini'
+        ? 'Gemini source was requested, but GEMINI_API_KEY is missing. Using the bundled WAV sample.'
+        : usesAzure
         ? 'Live source: Azure AI Speech. Azure returns streamed MP3 audio for the selected neural voice.'
         : usesMimo
         ? 'Live source: Xiaomi MiMo V2.5 TTS. Audio is synthesized remotely and streamed to the speaker.'
@@ -26,7 +32,7 @@ class _SourceNotice extends StatelessWidget {
         ? 'Azure source was requested, but AZURE_SPEECH_KEY or AZURE_SPEECH_REGION is missing. Using the bundled WAV sample.'
         : 'Demo source: bundled WAV sample. Launch with --dart-define=MIMO_API_KEY=... for MiMo, or --dart-define=TTS_SOURCE=azure --dart-define=AZURE_SPEECH_KEY=... --dart-define=AZURE_SPEECH_REGION=... for Azure.';
     return Card(
-      color: (usesMimo || usesAzure)
+      color: (usesMimo || usesAzure || usesGemini)
           ? theme.colorScheme.primaryContainer
           : theme.colorScheme.surfaceContainerHighest,
       child: Padding(
@@ -34,7 +40,9 @@ class _SourceNotice extends StatelessWidget {
         child: Row(
           children: [
             Icon(
-              (usesMimo || usesAzure) ? Icons.cloud_done : Icons.info_outline,
+              (usesMimo || usesAzure || usesGemini)
+                  ? Icons.cloud_done
+                  : Icons.info_outline,
             ),
             const SizedBox(width: 8),
             Expanded(child: Text(message)),

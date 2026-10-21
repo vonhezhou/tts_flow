@@ -22,6 +22,7 @@ jobs:
           - packages/tts_flow_openai
           - packages/tts_flow_azure
           - packages/tts_flow_mimo
+          - packages/tts_flow_gemini
     steps:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
       - uses: subosito/flutter-action@1508160852fb97248640997f7cfb38da241df0ba # v2.9.1
@@ -52,6 +53,7 @@ jobs:
             tts_flow_openai-v*) package=packages/tts_flow_openai ;;
             tts_flow_azure-v*) package=packages/tts_flow_azure ;;
             tts_flow_mimo-v*) package=packages/tts_flow_mimo ;;
+            tts_flow_gemini-v*) package=packages/tts_flow_gemini ;;
             *) echo "Unsupported release tag: $RELEASE_TAG" >&2; exit 1 ;;
           esac
           version="${RELEASE_TAG#$(basename "$package")-v}"

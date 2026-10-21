@@ -10,6 +10,7 @@ import 'package:tts_flow_dart/tts_flow_dart.dart';
 import 'package:tts_flow_azure/tts_flow_azure.dart';
 import 'package:tts_flow_flutter/tts_flow_flutter.dart';
 import 'package:tts_flow_mimo/tts_flow_mimo.dart';
+import 'package:tts_flow_gemini/tts_flow_gemini.dart';
 import 'package:url_launcher/url_launcher.dart';
 
 part 'tts_flow_example_page_recording_output.dart';
@@ -21,6 +22,7 @@ const _sampleAudioAsset = 'assets/audio/test_audio_yanfei.wav';
 
 class TtsFlowExamplePage extends StatefulWidget {
   const TtsFlowExamplePage({
+    this.geminiApiKey = '',
     this.mimoApiKey = '',
     this.azureSpeechKey = '',
     this.azureSpeechRegion = '',
@@ -33,13 +35,16 @@ class TtsFlowExamplePage extends StatefulWidget {
   /// Do not ship production credentials in a client application.
   final String mimoApiKey;
 
+  /// Development-only key supplied with `--dart-define=GEMINI_API_KEY=...`.
+  final String geminiApiKey;
+
   /// Development-only Azure credentials supplied with
   /// `--dart-define=AZURE_SPEECH_KEY=...` and
   /// `--dart-define=AZURE_SPEECH_REGION=...`.
   final String azureSpeechKey;
   final String azureSpeechRegion;
 
-  /// Optional live source selector: `mimo` or `azure`.
+  /// Optional live source selector: `mimo`, `azure`, or `gemini`.
   final String ttsSource;
 
   @override
@@ -96,11 +101,18 @@ class _TtsFlowExamplePageState extends State<TtsFlowExamplePage> {
       widget.azureSpeechKey.trim().isNotEmpty &&
       widget.azureSpeechRegion.trim().isNotEmpty;
 
+  bool get _usesGemini =>
+      _requestedSource == 'gemini' && widget.geminiApiKey.trim().isNotEmpty;
+
   bool get _hasAzureConfiguration =>
       widget.azureSpeechKey.trim().isNotEmpty &&
       widget.azureSpeechRegion.trim().isNotEmpty;
 
   String get _engineLabel {
+    if (_usesGemini) return 'Google Gemini Flash TTS (live)';
+    if (_requestedSource == 'gemini') {
+      return 'Gemini TTS (configuration needed)';
+    }
     if (_usesAzure) return 'Azure AI Speech (live)';
     if (_usesMimo) return 'Xiaomi MiMo V2.5 TTS (live)';
     if (_requestedSource == 'azure' && !_hasAzureConfiguration) {
@@ -133,6 +145,8 @@ class _TtsFlowExamplePageState extends State<TtsFlowExamplePage> {
     TtsFlow? service;
     try {
       final resources = await _ExampleServiceFactory(
+        usesGemini: _usesGemini,
+        geminiApiKey: widget.geminiApiKey,
         usesMimo: _usesMimo,
         usesAzure: _usesAzure,
         mimoApiKey: widget.mimoApiKey,
@@ -456,6 +470,7 @@ class _TtsFlowExamplePageState extends State<TtsFlowExamplePage> {
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             _SourceNotice(
+              usesGemini: _usesGemini,
               usesMimo: _usesMimo,
               usesAzure: _usesAzure,
               requestedSource: _requestedSource,

@@ -60,6 +60,23 @@ Without that define, the example remains in deterministic bundled-WAV mode.
 The key is deliberately not persisted or entered in the UI; do not bundle a
 production key in a client app.
 
+## Google Gemini live source
+
+The optional `tts_flow_gemini` adapter uses the pure Dart `googleai_dart` SDK.
+No Firebase setup is required. It streams Gemini 3.1 Flash TTS PCM to the
+speaker while writing an auxiliary WAV file.
+
+```fish
+flutter run -d macos \
+  --dart-define=TTS_SOURCE=gemini \
+  --dart-define=GEMINI_API_KEY="$GEMINI_API_KEY"
+```
+
+Gemini is explicitly selected; a key alone does not enable it. A missing key
+falls back to the bundled sample with a configuration notice. Use development
+credentials only; do not distribute API keys in a production client. See
+[adapter setup, offline tests and live capture](../../packages/tts_flow_gemini/README.md).
+
 ## Azure AI Speech live source
 
 To use Azure Speech, provide the Speech resource key and its Azure region, and

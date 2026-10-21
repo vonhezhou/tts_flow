@@ -8,6 +8,7 @@ const _mimoApiKey = String.fromEnvironment('MIMO_API_KEY');
 const _azureSpeechKey = String.fromEnvironment('AZURE_SPEECH_KEY');
 const _azureSpeechRegion = String.fromEnvironment('AZURE_SPEECH_REGION');
 const _ttsSource = String.fromEnvironment('TTS_SOURCE');
+const _geminiApiKey = String.fromEnvironment('GEMINI_API_KEY');
 
 void main(List<String> args) {
   Logger.root.clearListeners();
@@ -17,6 +18,7 @@ void main(List<String> args) {
   runApp(
     const MyApp(
       mimoApiKey: _mimoApiKey,
+      geminiApiKey: _geminiApiKey,
       azureSpeechKey: _azureSpeechKey,
       azureSpeechRegion: _azureSpeechRegion,
       ttsSource: _ttsSource,
@@ -26,6 +28,7 @@ void main(List<String> args) {
 
 class MyApp extends StatelessWidget {
   const MyApp({
+    this.geminiApiKey = '',
     required this.mimoApiKey,
     required this.azureSpeechKey,
     required this.azureSpeechRegion,
@@ -34,6 +37,7 @@ class MyApp extends StatelessWidget {
   });
 
   final String mimoApiKey;
+  final String geminiApiKey;
   final String azureSpeechKey;
   final String azureSpeechRegion;
   final String ttsSource;
@@ -44,6 +48,7 @@ class MyApp extends StatelessWidget {
       title: 'TtsFlow Speaker Example',
       theme: ThemeData.dark(),
       home: _ExampleHome(
+        geminiApiKey: geminiApiKey,
         mimoApiKey: mimoApiKey,
         azureSpeechKey: azureSpeechKey,
         azureSpeechRegion: azureSpeechRegion,
@@ -55,6 +60,7 @@ class MyApp extends StatelessWidget {
 
 class _ExampleHome extends StatelessWidget {
   const _ExampleHome({
+    required this.geminiApiKey,
     required this.mimoApiKey,
     required this.azureSpeechKey,
     required this.azureSpeechRegion,
@@ -62,6 +68,7 @@ class _ExampleHome extends StatelessWidget {
   });
 
   final String mimoApiKey;
+  final String geminiApiKey;
   final String azureSpeechKey;
   final String azureSpeechRegion;
   final String ttsSource;
@@ -83,6 +90,7 @@ class _ExampleHome extends StatelessWidget {
         body: TabBarView(
           children: [
             TtsFlowExamplePage(
+              geminiApiKey: geminiApiKey,
               mimoApiKey: mimoApiKey,
               azureSpeechKey: azureSpeechKey,
               azureSpeechRegion: azureSpeechRegion,
