@@ -73,6 +73,9 @@ flutter:
     - assets/fixtures/mimo/continuous/
     - assets/fixtures/mimo/jitter/
     - assets/fixtures/mimo/invalid/
+    - assets/fixtures/azure_simulated/continuous/
+    - assets/fixtures/azure_simulated/jitter/
+    - assets/fixtures/azure_simulated/invalid/
 
   # The following line ensures that the Material Icons font is
   # included with your application, so that you can use the icons in

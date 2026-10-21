@@ -118,3 +118,40 @@ Verified on macOS on 2026-10-20: continuous playback completes without waiting;
 jitter emits waiting, recovers, and completes once; neither emits playback
 failure. Other native platforms have not been verified with these samples.
 See [Azure setup](azure_speech_setup.md) for the next provider's credentials.
+
+### Offline Azure-format samples
+
+`assets/fixtures/azure_simulated/` contains a locally generated 440 Hz tone,
+encoded to match the adapter's `audio-24khz-48kbitrate-mono-mp3` output
+specification. These are synthetic audio and timing fixtures, **not captured
+Azure responses**, and do not satisfy the live provider capture requirement.
+The manifests retain `provenance.type: synthetic` and use the distinct provider
+name `azure_simulated` to avoid confusing them with future live captures.
+
+- `continuous`: two chunks, supplied at 0 and 30 ms.
+- `jitter`: the same audio, supplied at 0 and 1530 ms; the first chunk contains
+  480 ms of audio, so the deliberate delay exposes a supply gap.
+- `invalid`: intentionally invalid MP3 bytes, with valid manifest metadata, to
+  exercise playback failure rather than manifest rejection.
+
+The tone contains no recorded speech or user audio. The encoded stream is
+18288 bytes; continuous and jitter share identical binary content in Git.
+To regenerate, install `lameenc==1.8.1` in an isolated Python environment and
+run from the repository root:
+
+```sh
+python3 tool/generate_azure_simulated_fixture.py --overwrite
+```
+
+Ordinary tests only read the committed fixtures; they do not need the encoder,
+Azure credentials, an Azure subscription, or network access.
+Verified on macOS on 2026-10-21: continuous playback completes without waiting;
+jitter emits waiting and recovers to one completion; invalid MP3 emits one
+playback failure and no completion. Other platforms remain unverified.
+
+The Azure package's offline HTTP tests cover request construction, voice-list
+handling, multi-chunk delivery before response completion, sequence/final
+markers, cancellation, authorization failures, throttling/server errors,
+timeouts, and format rejection. Real credentials, service acceptance of SSML,
+actual Azure MP3 encoder behavior and network timing remain unverified until
+the opt-in live contract and real captures can run.

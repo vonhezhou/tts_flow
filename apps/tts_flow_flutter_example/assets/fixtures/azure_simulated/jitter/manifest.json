@@ -1,0 +1,24 @@
+{
+  "provider": "azure_simulated",
+  "format": "mp3",
+  "sampleRateHz": 24000,
+  "channels": 1,
+  "kind": "jitter",
+  "chunks": [
+    {
+      "file": "000.bin",
+      "arrivalOffsetMs": 0
+    },
+    {
+      "file": "001.bin",
+      "arrivalOffsetMs": 1530
+    }
+  ],
+  "provenance": {
+    "type": "synthetic",
+    "generator": "tool/generate_azure_simulated_fixture.py",
+    "encoder": "lameenc==1.8.1",
+    "timing": "simulated",
+    "bitrateKbps": 48
+  }
+}

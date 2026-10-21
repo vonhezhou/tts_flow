@@ -3,6 +3,24 @@
 本仓库使用 Azure Speech 的区域 REST 接口，不需要安装 Speech SDK。
 需要 `AZURE_SPEECH_KEY` 和 `AZURE_SPEECH_REGION` 两个环境变量。
 
+没有 Azure 订阅也可以运行离线测试：
+
+```sh
+dart test packages/tts_flow_azure/test
+cd apps/tts_flow_flutter_example
+flutter test integration_test/just_audio_jitter_test.dart -d macos
+```
+
+协议测试使用模拟 HTTP；原生 MP3 回放使用明确标注的 `azure_simulated`
+合成音频，详见 [fixture 覆盖与限制](provider_playback_fixtures.md)。
+这些测试不表示 Azure 真实服务联调已经通过。
+
+Speech F0 的 Neural TTS 每月有 50 万字符免费额度，但仍需要有效的 Azure 订阅。
+Azure 免费试用的 200 美元额度最多使用 30 天；额度用完或试用期结束后，
+不转为按量付费订阅，订阅及服务会停用。F0 资源档位与试用订阅是两回事。
+参考 [Speech 定价](https://azure.microsoft.com/en-us/pricing/details/speech/)、
+[免费试用到期规则](https://learn.microsoft.com/en-us/azure/cost-management-billing/manage/avoid-charges-free-account)。
+
 ## 1. 创建 Speech 资源
 
 1. 登录 [Azure Portal](https://portal.azure.com/)，确认有可用订阅。

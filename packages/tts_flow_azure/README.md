@@ -6,6 +6,12 @@ REST API, sends SSML, and streams 24 kHz / 48 kbps mono MP3 response bytes.
 本地资源创建、fish 环境变量、验证与 fixture 采集见
 [Azure Speech 配置指南](../../docs/azure_speech_setup.md)。
 
+Offline HTTP tests run without an Azure subscription:
+`dart test packages/tts_flow_azure/test` from the repository root. The Flutter
+example also replays synthetic MP3 fixtures matching the configured Azure
+output format. These tests do not replace live Azure service verification;
+see [fixture coverage](../../docs/provider_playback_fixtures.md).
+
 ```dart
 import 'package:tts_flow_dart/tts_flow_dart.dart';
 import 'package:tts_flow_azure/tts_flow_azure.dart';

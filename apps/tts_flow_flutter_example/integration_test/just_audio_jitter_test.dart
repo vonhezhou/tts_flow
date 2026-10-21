@@ -15,6 +15,27 @@ const _utteranceId = 'just-audio-jitter-regression';
 void main() {
   IntegrationTestWidgetsFlutterBinding.ensureInitialized();
 
+  group('Synthetic Azure-format MP3 (no live Azure service)', () {
+    for (final kind in ['continuous', 'jitter', 'invalid']) {
+      test('$kind MP3 replay', () async {
+        final fixture = await ProviderPlaybackFixture.load(
+          manifestAsset: 'assets/fixtures/azure_simulated/$kind/manifest.json',
+        );
+        final result = await _runReplay(
+          engine: ProviderPlaybackFixtureEngine(fixture),
+        );
+        if (kind == 'invalid') {
+          expect(result.playbackFailedEvents, hasLength(1));
+          expect(result.playbackCompletedEvents, isEmpty);
+        } else {
+          expect(result.playbackFailedEvents, isEmpty);
+          expect(result.playbackCompletedEvents, hasLength(1));
+          expect(result.waitingEvents, kind == 'jitter' ? isNotEmpty : isEmpty);
+        }
+      }, timeout: const Timeout(Duration(seconds: 30)));
+    }
+  });
+
   group('Captured MiMo PCM', () {
     for (final kind in ['continuous', 'jitter']) {
       test('$kind fixture completes with expected waiting', () async {
