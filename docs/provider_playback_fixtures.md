@@ -102,6 +102,18 @@ rejection paths rather than a Provider response.
 
 ### Included MiMo samples
 
+`mimo/long_continuous` is an additional live capture from 2026-10-21 using
+`mimo-v2.5-tts` and `mimo_default`: 156 provider audio events, 2396160 bytes
+of 24 kHz, 16-bit mono PCM, exactly 49.92 seconds. The input is an original,
+fixed Chinese test passage about a train journey, with no user content.
+The captured arrival offsets span 10.541 seconds; this is stream delivery time,
+not audio playback duration. The sample retains real chunks and timing without
+repeating, padding, or trimming the generated audio. Its native replay has a
+separate long-audio timeout. The raw PCM occupies about 2.29 MiB and is stored
+directly in Git, consistent with the short fixtures.
+Verified on macOS on 2026-10-21: native playback completes once, with no
+waiting or playback failure events. Other platforms remain unverified.
+
 The MiMo PCM fixtures were captured on 2026-10-20 from `mimo-v2.5-tts` with
 `mimo_default`, using the fixed phrase `This is a provider fixture.`.
 `continuous` contains eight real provider audio events (130560 bytes, 24 kHz,

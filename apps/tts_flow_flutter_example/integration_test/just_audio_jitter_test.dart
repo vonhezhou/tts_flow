@@ -37,6 +37,24 @@ void main() {
   });
 
   group('Captured MiMo PCM', () {
+    test('long fixture plays to completion', () async {
+      final fixture = await ProviderPlaybackFixture.load(
+        manifestAsset: 'assets/fixtures/mimo/long_continuous/manifest.json',
+      );
+      final bytes = fixture.chunks.fold<int>(
+        0,
+        (sum, chunk) => sum + chunk.bytes.length,
+      );
+      expect(bytes / (24000 * 2), inInclusiveRange(30, 60));
+      final result = await _runReplay(
+        engine: ProviderPlaybackFixtureEngine(fixture),
+        playbackTimeout: const Duration(seconds: 75),
+      );
+      expect(result.playbackFailedEvents, isEmpty);
+      expect(result.playbackCompletedEvents, hasLength(1));
+      expect(result.waitingEvents, isEmpty);
+    }, timeout: const Timeout(Duration(seconds: 100)));
+
     for (final kind in ['continuous', 'jitter']) {
       test('$kind fixture completes with expected waiting', () async {
         final fixture = await ProviderPlaybackFixture.load(
@@ -122,6 +140,7 @@ void main() {
 }
 
 Future<_ReplayResult> _runReplay({
+  Duration playbackTimeout = const Duration(seconds: 15),
   _PcmSample? sample,
   int firstChunkBytes = 0,
   Duration delayAfterReady = Duration.zero,
@@ -193,6 +212,7 @@ Future<_ReplayResult> _runReplay({
     }
 
     await _waitForPlaybackTerminalEvent(
+      timeout: playbackTimeout,
       playbackCompletedEvents: playbackCompletedEvents,
       playbackFailedEvents: playbackFailedEvents,
     );
@@ -234,12 +254,13 @@ List<String> _describeRequestFailures(List<TtsRequestEvent> events) {
 }
 
 Future<void> _waitForPlaybackTerminalEvent({
+  required Duration timeout,
   required List<TtsRequestEvent> playbackCompletedEvents,
   required List<TtsRequestEvent> playbackFailedEvents,
 }) async {
   final stopwatch = Stopwatch()..start();
   while (playbackCompletedEvents.isEmpty && playbackFailedEvents.isEmpty) {
-    if (stopwatch.elapsed > const Duration(seconds: 15)) {
+    if (stopwatch.elapsed > timeout) {
       throw TimeoutException('Timed out waiting for physical playback end.');
     }
     await Future<void>.delayed(const Duration(milliseconds: 20));

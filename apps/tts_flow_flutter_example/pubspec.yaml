@@ -71,6 +71,7 @@ flutter:
     # manifests plus raw chunks; this directory is intentionally asset-backed.
     - assets/fixtures/
     - assets/fixtures/mimo/continuous/
+    - assets/fixtures/mimo/long_continuous/
     - assets/fixtures/mimo/jitter/
     - assets/fixtures/mimo/invalid/
     - assets/fixtures/azure_simulated/continuous/
