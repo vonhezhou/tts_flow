@@ -103,3 +103,8 @@ credential flow; provider credentials remain application-owned.
 See the repository [architecture](../../docs/architecture.md) and the
 [JustAudio backend notes](../../docs/just_audio_backend.md) for scope and
 platform requirements.
+
+See the [native playback regression guide](../../docs/playback_regression.md)
+for PCM/MP3 pause/resume, stop-and-replace, long MP3 supply-gap tests, and
+diagnostic latency fields. Simulator runs validate control behavior; physical
+devices and output recording are needed for acoustic and real latency claims.

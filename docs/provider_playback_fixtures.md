@@ -218,6 +218,15 @@ the opt-in live contract and real captures can run.
 
 ### Compressed speech coverage (2026-10-22)
 
+`mimo_mp3/long_continuous` additionally preserves the 137-event, 448032-byte
+`narrative` capture documented in the [MiMo MP3 recheck](mimo_mp3_probe_2026-10-22.md).
+Its bytes are unchanged and its original offsets span 8883 ms. The separate
+[native control and latency regression](playback_regression.md) uses those
+same fragments with an explicitly Source-gated stress schedule and three
+supply pauses. This is a playback stress case, not measured provider latency.
+The long case passed macOS native replay; its completion and duration events
+do not certify acoustic continuity or identical trimming across decoders.
+
 The committed fixtures now cover PCM, MP3, AAC (ADTS), and Opus (Ogg).
 AAC/Opus are explicitly **locally transcoded derivatives**, not native provider
 responses. They exercise the playback format paths without a new subscription.

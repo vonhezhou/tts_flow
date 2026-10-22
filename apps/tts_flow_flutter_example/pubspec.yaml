@@ -83,6 +83,7 @@ flutter:
     - assets/fixtures/gemini/long_continuous/
     - assets/fixtures/gemini/jitter/
     - assets/fixtures/gemini/invalid/
+    - assets/fixtures/mimo_mp3/long_continuous/
     - assets/fixtures/mimo_mp3/continuous/
     - assets/fixtures/mimo_mp3/jitter/
     - assets/fixtures/mimo_mp3/invalid/

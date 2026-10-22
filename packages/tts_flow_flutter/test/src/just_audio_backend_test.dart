@@ -37,6 +37,8 @@ void main() {
     late _MockAudioPlayer player;
     late StreamController<ProcessingState> processingController;
     late StreamController<Duration?> durationController;
+    late StreamController<int?> indexController;
+    Duration? nativeDuration;
     late StreamController<Duration> positionController;
     late StreamController<PlayerException> errorController;
     late List<AudioSource> sources;
@@ -48,6 +50,8 @@ void main() {
       player = _MockAudioPlayer();
       processingController = StreamController<ProcessingState>.broadcast();
       durationController = StreamController<Duration?>.broadcast();
+      indexController = StreamController<int?>.broadcast();
+      nativeDuration = null;
       positionController = StreamController<Duration>.broadcast();
       errorController = StreamController<PlayerException>.broadcast();
       sources = <AudioSource>[];
@@ -69,6 +73,10 @@ void main() {
       when(() => player.playing).thenAnswer((_) => playing);
       when(() => player.processingState).thenAnswer((_) => processingState);
       when(() => player.currentIndex).thenAnswer((_) => currentIndex);
+      when(() => player.duration).thenAnswer((_) => nativeDuration);
+      when(
+        () => player.currentIndexStream,
+      ).thenAnswer((_) => indexController.stream);
 
       when(() => player.addAudioSource(any())).thenAnswer((invocation) async {
         final source = invocation.positionalArguments.first as AudioSource;
@@ -110,6 +118,7 @@ void main() {
     tearDown(() async {
       await processingController.close();
       await durationController.close();
+      await indexController.close();
       await positionController.close();
       await errorController.close();
     });
@@ -730,6 +739,59 @@ void main() {
           () => player.seek(Duration.zero, index: 0),
         ).called(greaterThanOrEqualTo(1));
         verify(() => player.play()).called(greaterThanOrEqualTo(1));
+      },
+    );
+
+    test(
+      'equal source durations still advance offsets and total duration',
+      () async {
+        final backend = JustAudioBackend.testing(player: player);
+        addTearDown(backend.dispose);
+        final completions = <SpeakerPlaybackCompletedEvent>[];
+        final positions = <TtsPlaybackPositionEvent>[];
+        final completeSub = backend.playbackCompletedEvents.listen(
+          completions.add,
+        );
+        final positionSub = backend.playbackPositionEvents.listen(
+          positions.add,
+        );
+        addTearDown(completeSub.cancel);
+        addTearDown(positionSub.cancel);
+        final id = await backend.startPlayback(
+          requestKey: 'equal-duration',
+          audioSpec: const TtsAudioSpec.mp3(),
+        );
+        for (var i = 0; i < 3; i++) {
+          await backend.appendChunk(
+            playbackId: id,
+            chunk: _audioChunk(
+              requestKey: 'equal-duration',
+              sequenceNumber: i,
+              bytes: [1, 2],
+            ),
+          );
+          await (sources.last as ChunkAudioSource).request();
+          currentIndex = i;
+          nativeDuration = const Duration(milliseconds: 320);
+          // just_audio.durationStream 使用 distinct，后续相同时长不会再次通知。
+          if (i == 0) durationController.add(nativeDuration);
+          indexController.add(i);
+          await Future<void>.delayed(Duration.zero);
+          positionController.add(const Duration(milliseconds: 100));
+          await Future<void>.delayed(Duration.zero);
+        }
+        await backend.finalizePlayback(playbackId: id);
+        processingController.add(ProcessingState.completed);
+        await Future<void>.delayed(Duration.zero);
+        expect(
+          completions.single.playedDuration,
+          const Duration(milliseconds: 960),
+        );
+        expect(positions.map((e) => e.position.inMilliseconds), [
+          100,
+          420,
+          740,
+        ]);
       },
     );
 

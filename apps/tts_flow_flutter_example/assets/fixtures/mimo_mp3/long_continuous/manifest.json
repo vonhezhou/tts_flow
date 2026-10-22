@@ -1,0 +1,571 @@
+{
+  "provider": "mimo",
+  "format": "mp3",
+  "sampleRateHz": 24000,
+  "channels": 1,
+  "kind": "long_continuous",
+  "chunks": [
+    {
+      "file": "000.bin",
+      "arrivalOffsetMs": 0
+    },
+    {
+      "file": "001.bin",
+      "arrivalOffsetMs": 46
+    },
+    {
+      "file": "002.bin",
+      "arrivalOffsetMs": 104
+    },
+    {
+      "file": "003.bin",
+      "arrivalOffsetMs": 166
+    },
+    {
+      "file": "004.bin",
+      "arrivalOffsetMs": 228
+    },
+    {
+      "file": "005.bin",
+      "arrivalOffsetMs": 290
+    },
+    {
+      "file": "006.bin",
+      "arrivalOffsetMs": 353
+    },
+    {
+      "file": "007.bin",
+      "arrivalOffsetMs": 415
+    },
+    {
+      "file": "008.bin",
+      "arrivalOffsetMs": 478
+    },
+    {
+      "file": "009.bin",
+      "arrivalOffsetMs": 542
+    },
+    {
+      "file": "010.bin",
+      "arrivalOffsetMs": 603
+    },
+    {
+      "file": "011.bin",
+      "arrivalOffsetMs": 879
+    },
+    {
+      "file": "012.bin",
+      "arrivalOffsetMs": 887
+    },
+    {
+      "file": "013.bin",
+      "arrivalOffsetMs": 925
+    },
+    {
+      "file": "014.bin",
+      "arrivalOffsetMs": 925
+    },
+    {
+      "file": "015.bin",
+      "arrivalOffsetMs": 939
+    },
+    {
+      "file": "016.bin",
+      "arrivalOffsetMs": 1068
+    },
+    {
+      "file": "017.bin",
+      "arrivalOffsetMs": 1137
+    },
+    {
+      "file": "018.bin",
+      "arrivalOffsetMs": 1184
+    },
+    {
+      "file": "019.bin",
+      "arrivalOffsetMs": 1231
+    },
+    {
+      "file": "020.bin",
+      "arrivalOffsetMs": 1290
+    },
+    {
+      "file": "021.bin",
+      "arrivalOffsetMs": 1351
+    },
+    {
+      "file": "022.bin",
+      "arrivalOffsetMs": 1414
+    },
+    {
+      "file": "023.bin",
+      "arrivalOffsetMs": 1476
+    },
+    {
+      "file": "024.bin",
+      "arrivalOffsetMs": 1538
+    },
+    {
+      "file": "025.bin",
+      "arrivalOffsetMs": 1600
+    },
+    {
+      "file": "026.bin",
+      "arrivalOffsetMs": 1662
+    },
+    {
+      "file": "027.bin",
+      "arrivalOffsetMs": 1725
+    },
+    {
+      "file": "028.bin",
+      "arrivalOffsetMs": 1788
+    },
+    {
+      "file": "029.bin",
+      "arrivalOffsetMs": 1850
+    },
+    {
+      "file": "030.bin",
+      "arrivalOffsetMs": 1913
+    },
+    {
+      "file": "031.bin",
+      "arrivalOffsetMs": 1975
+    },
+    {
+      "file": "032.bin",
+      "arrivalOffsetMs": 2079
+    },
+    {
+      "file": "033.bin",
+      "arrivalOffsetMs": 2120
+    },
+    {
+      "file": "034.bin",
+      "arrivalOffsetMs": 2158
+    },
+    {
+      "file": "035.bin",
+      "arrivalOffsetMs": 2210
+    },
+    {
+      "file": "036.bin",
+      "arrivalOffsetMs": 2270
+    },
+    {
+      "file": "037.bin",
+      "arrivalOffsetMs": 2329
+    },
+    {
+      "file": "038.bin",
+      "arrivalOffsetMs": 2391
+    },
+    {
+      "file": "039.bin",
+      "arrivalOffsetMs": 2451
+    },
+    {
+      "file": "040.bin",
+      "arrivalOffsetMs": 2512
+    },
+    {
+      "file": "041.bin",
+      "arrivalOffsetMs": 2573
+    },
+    {
+      "file": "042.bin",
+      "arrivalOffsetMs": 2853
+    },
+    {
+      "file": "043.bin",
+      "arrivalOffsetMs": 2861
+    },
+    {
+      "file": "044.bin",
+      "arrivalOffsetMs": 2898
+    },
+    {
+      "file": "045.bin",
+      "arrivalOffsetMs": 2898
+    },
+    {
+      "file": "046.bin",
+      "arrivalOffsetMs": 2899
+    },
+    {
+      "file": "047.bin",
+      "arrivalOffsetMs": 3034
+    },
+    {
+      "file": "048.bin",
+      "arrivalOffsetMs": 3112
+    },
+    {
+      "file": "049.bin",
+      "arrivalOffsetMs": 3159
+    },
+    {
+      "file": "050.bin",
+      "arrivalOffsetMs": 3215
+    },
+    {
+      "file": "051.bin",
+      "arrivalOffsetMs": 3551
+    },
+    {
+      "file": "052.bin",
+      "arrivalOffsetMs": 3565
+    },
+    {
+      "file": "053.bin",
+      "arrivalOffsetMs": 3572
+    },
+    {
+      "file": "054.bin",
+      "arrivalOffsetMs": 3580
+    },
+    {
+      "file": "055.bin",
+      "arrivalOffsetMs": 3597
+    },
+    {
+      "file": "056.bin",
+      "arrivalOffsetMs": 3641
+    },
+    {
+      "file": "057.bin",
+      "arrivalOffsetMs": 3734
+    },
+    {
+      "file": "058.bin",
+      "arrivalOffsetMs": 3811
+    },
+    {
+      "file": "059.bin",
+      "arrivalOffsetMs": 4065
+    },
+    {
+      "file": "060.bin",
+      "arrivalOffsetMs": 4073
+    },
+    {
+      "file": "061.bin",
+      "arrivalOffsetMs": 4082
+    },
+    {
+      "file": "062.bin",
+      "arrivalOffsetMs": 4091
+    },
+    {
+      "file": "063.bin",
+      "arrivalOffsetMs": 4115
+    },
+    {
+      "file": "064.bin",
+      "arrivalOffsetMs": 4363
+    },
+    {
+      "file": "065.bin",
+      "arrivalOffsetMs": 4408
+    },
+    {
+      "file": "066.bin",
+      "arrivalOffsetMs": 4454
+    },
+    {
+      "file": "067.bin",
+      "arrivalOffsetMs": 4500
+    },
+    {
+      "file": "068.bin",
+      "arrivalOffsetMs": 4547
+    },
+    {
+      "file": "069.bin",
+      "arrivalOffsetMs": 4610
+    },
+    {
+      "file": "070.bin",
+      "arrivalOffsetMs": 4672
+    },
+    {
+      "file": "071.bin",
+      "arrivalOffsetMs": 4734
+    },
+    {
+      "file": "072.bin",
+      "arrivalOffsetMs": 4797
+    },
+    {
+      "file": "073.bin",
+      "arrivalOffsetMs": 4860
+    },
+    {
+      "file": "074.bin",
+      "arrivalOffsetMs": 4922
+    },
+    {
+      "file": "075.bin",
+      "arrivalOffsetMs": 4985
+    },
+    {
+      "file": "076.bin",
+      "arrivalOffsetMs": 5046
+    },
+    {
+      "file": "077.bin",
+      "arrivalOffsetMs": 5109
+    },
+    {
+      "file": "078.bin",
+      "arrivalOffsetMs": 5171
+    },
+    {
+      "file": "079.bin",
+      "arrivalOffsetMs": 5235
+    },
+    {
+      "file": "080.bin",
+      "arrivalOffsetMs": 5297
+    },
+    {
+      "file": "081.bin",
+      "arrivalOffsetMs": 5360
+    },
+    {
+      "file": "082.bin",
+      "arrivalOffsetMs": 5422
+    },
+    {
+      "file": "083.bin",
+      "arrivalOffsetMs": 5485
+    },
+    {
+      "file": "084.bin",
+      "arrivalOffsetMs": 5547
+    },
+    {
+      "file": "085.bin",
+      "arrivalOffsetMs": 5609
+    },
+    {
+      "file": "086.bin",
+      "arrivalOffsetMs": 5672
+    },
+    {
+      "file": "087.bin",
+      "arrivalOffsetMs": 5734
+    },
+    {
+      "file": "088.bin",
+      "arrivalOffsetMs": 5773
+    },
+    {
+      "file": "089.bin",
+      "arrivalOffsetMs": 5879
+    },
+    {
+      "file": "090.bin",
+      "arrivalOffsetMs": 5918
+    },
+    {
+      "file": "091.bin",
+      "arrivalOffsetMs": 5969
+    },
+    {
+      "file": "092.bin",
+      "arrivalOffsetMs": 6029
+    },
+    {
+      "file": "093.bin",
+      "arrivalOffsetMs": 6089
+    },
+    {
+      "file": "094.bin",
+      "arrivalOffsetMs": 6401
+    },
+    {
+      "file": "095.bin",
+      "arrivalOffsetMs": 6410
+    },
+    {
+      "file": "096.bin",
+      "arrivalOffsetMs": 6448
+    },
+    {
+      "file": "097.bin",
+      "arrivalOffsetMs": 6448
+    },
+    {
+      "file": "098.bin",
+      "arrivalOffsetMs": 6457
+    },
+    {
+      "file": "099.bin",
+      "arrivalOffsetMs": 6478
+    },
+    {
+      "file": "100.bin",
+      "arrivalOffsetMs": 6576
+    },
+    {
+      "file": "101.bin",
+      "arrivalOffsetMs": 6652
+    },
+    {
+      "file": "102.bin",
+      "arrivalOffsetMs": 6700
+    },
+    {
+      "file": "103.bin",
+      "arrivalOffsetMs": 6755
+    },
+    {
+      "file": "104.bin",
+      "arrivalOffsetMs": 6818
+    },
+    {
+      "file": "105.bin",
+      "arrivalOffsetMs": 6882
+    },
+    {
+      "file": "106.bin",
+      "arrivalOffsetMs": 6946
+    },
+    {
+      "file": "107.bin",
+      "arrivalOffsetMs": 7008
+    },
+    {
+      "file": "108.bin",
+      "arrivalOffsetMs": 7072
+    },
+    {
+      "file": "109.bin",
+      "arrivalOffsetMs": 7133
+    },
+    {
+      "file": "110.bin",
+      "arrivalOffsetMs": 7196
+    },
+    {
+      "file": "111.bin",
+      "arrivalOffsetMs": 7258
+    },
+    {
+      "file": "112.bin",
+      "arrivalOffsetMs": 7534
+    },
+    {
+      "file": "113.bin",
+      "arrivalOffsetMs": 7542
+    },
+    {
+      "file": "114.bin",
+      "arrivalOffsetMs": 7550
+    },
+    {
+      "file": "115.bin",
+      "arrivalOffsetMs": 7580
+    },
+    {
+      "file": "116.bin",
+      "arrivalOffsetMs": 7596
+    },
+    {
+      "file": "117.bin",
+      "arrivalOffsetMs": 7729
+    },
+    {
+      "file": "118.bin",
+      "arrivalOffsetMs": 7803
+    },
+    {
+      "file": "119.bin",
+      "arrivalOffsetMs": 7854
+    },
+    {
+      "file": "120.bin",
+      "arrivalOffsetMs": 7903
+    },
+    {
+      "file": "121.bin",
+      "arrivalOffsetMs": 7965
+    },
+    {
+      "file": "122.bin",
+      "arrivalOffsetMs": 8028
+    },
+    {
+      "file": "123.bin",
+      "arrivalOffsetMs": 8090
+    },
+    {
+      "file": "124.bin",
+      "arrivalOffsetMs": 8153
+    },
+    {
+      "file": "125.bin",
+      "arrivalOffsetMs": 8286
+    },
+    {
+      "file": "126.bin",
+      "arrivalOffsetMs": 8335
+    },
+    {
+      "file": "127.bin",
+      "arrivalOffsetMs": 8383
+    },
+    {
+      "file": "128.bin",
+      "arrivalOffsetMs": 8429
+    },
+    {
+      "file": "129.bin",
+      "arrivalOffsetMs": 8476
+    },
+    {
+      "file": "130.bin",
+      "arrivalOffsetMs": 8529
+    },
+    {
+      "file": "131.bin",
+      "arrivalOffsetMs": 8591
+    },
+    {
+      "file": "132.bin",
+      "arrivalOffsetMs": 8692
+    },
+    {
+      "file": "133.bin",
+      "arrivalOffsetMs": 8736
+    },
+    {
+      "file": "134.bin",
+      "arrivalOffsetMs": 8797
+    },
+    {
+      "file": "135.bin",
+      "arrivalOffsetMs": 8857
+    },
+    {
+      "file": "136.bin",
+      "arrivalOffsetMs": 8883
+    }
+  ],
+  "provenance": {
+    "type": "captured",
+    "model": "mimo-v2.5-tts",
+    "voice": "mimo_default",
+    "capturedOn": "2026-10-22",
+    "sourceReport": "docs/mimo_mp3_probe_2026-10-22.json",
+    "sourceSample": "narrative",
+    "audioSha256": "f112d08dcdd3719fde108ba329baf6c9365968f545246bc1715431de8db491c5",
+    "timing": "provider SSE audio events relative to first audio",
+    "warning": "Independent encoder metadata; concatenated and per-event decoding have different durations. Original bytes retained."
+  },
+  "verifiedPlatforms": [
+    "macos"
+  ]
+}

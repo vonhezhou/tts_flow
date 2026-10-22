@@ -112,6 +112,10 @@ class JustAudioBackend
     _durationSubscription = _player.durationStream.listen(
       (duration) => _timeline.onDurationChanged(_currentSource(), duration),
     );
+    // 相邻 Source 时长相同也要登记；durationStream 的 distinct 不会再次通知。
+    _indexSubscription = _player.currentIndexStream.listen(
+      (_) => _timeline.onDurationChanged(_currentSource(), _player.duration),
+    );
     _posSubscription = _player.positionStream.listen(
       (position) => _timeline.onPositionChanged(_currentSource(), position),
     );
@@ -140,6 +144,10 @@ class JustAudioBackend
     });
     _durationSubscription = _player.durationStream.listen(
       (duration) => _timeline.onDurationChanged(_currentSource(), duration),
+    );
+    // 相邻 Source 时长相同也要登记；durationStream 的 distinct 不会再次通知。
+    _indexSubscription = _player.currentIndexStream.listen(
+      (_) => _timeline.onDurationChanged(_currentSource(), _player.duration),
     );
     _posSubscription = _player.positionStream.listen(
       (position) => _timeline.onPositionChanged(_currentSource(), position),
@@ -187,6 +195,7 @@ class JustAudioBackend
   late final StreamSubscription<ProcessingState> _processingStateSubscription;
 
   late final StreamSubscription<Duration?> _durationSubscription;
+  late final StreamSubscription<int?> _indexSubscription;
 
   final StreamController<TtsPlaybackPositionEvent> _playbackPositionController =
       StreamController<TtsPlaybackPositionEvent>.broadcast();
@@ -345,6 +354,7 @@ class JustAudioBackend
     _disposeRequested = true;
     await _processingStateSubscription.cancel();
     await _durationSubscription.cancel();
+    await _indexSubscription.cancel();
     await _posSubscription.cancel();
     await _errorSubscription.cancel();
     await _enqueuePlayerOperation(() async {

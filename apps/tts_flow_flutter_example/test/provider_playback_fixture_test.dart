@@ -9,6 +9,20 @@ import '../integration_test/support/provider_playback_fixture.dart';
 void main() {
   TestWidgetsFlutterBinding.ensureInitialized();
 
+  test('long MiMo MP3 capture retains all provider audio events', () async {
+    final fixture = await ProviderPlaybackFixture.load(
+      manifestAsset: 'assets/fixtures/mimo_mp3/long_continuous/manifest.json',
+    );
+    expect(fixture.audioSpec.format, TtsAudioFormat.mp3);
+    expect(fixture.chunks, hasLength(137));
+    expect(
+      fixture.chunks.fold<int>(0, (sum, c) => sum + c.bytes.length),
+      448032,
+    );
+    expect(fixture.chunks.last.arrivalOffset.inMilliseconds, 8883);
+    expect(fixture.chunks.every((c) => c.bytes.isNotEmpty), isTrue);
+  });
+
   for (final provider in ['derived_aac', 'derived_opus']) {
     test(
       '$provider fragmentation preserves one complete encoded stream',
