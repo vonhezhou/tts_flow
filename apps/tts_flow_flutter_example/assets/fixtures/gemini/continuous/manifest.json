@@ -1,0 +1,269 @@
+{
+  "provider": "gemini",
+  "format": "pcm",
+  "sampleRateHz": 24000,
+  "channels": 1,
+  "bitsPerSample": 16,
+  "encoding": "signedInt",
+  "kind": "continuous",
+  "verifiedPlatforms": ["macos"],
+  "chunks": [
+    {
+      "file": "000.bin",
+      "arrivalOffsetMs": 0
+    },
+    {
+      "file": "001.bin",
+      "arrivalOffsetMs": 196
+    },
+    {
+      "file": "002.bin",
+      "arrivalOffsetMs": 431
+    },
+    {
+      "file": "003.bin",
+      "arrivalOffsetMs": 432
+    },
+    {
+      "file": "004.bin",
+      "arrivalOffsetMs": 432
+    },
+    {
+      "file": "005.bin",
+      "arrivalOffsetMs": 432
+    },
+    {
+      "file": "006.bin",
+      "arrivalOffsetMs": 432
+    },
+    {
+      "file": "007.bin",
+      "arrivalOffsetMs": 433
+    },
+    {
+      "file": "008.bin",
+      "arrivalOffsetMs": 849
+    },
+    {
+      "file": "009.bin",
+      "arrivalOffsetMs": 849
+    },
+    {
+      "file": "010.bin",
+      "arrivalOffsetMs": 850
+    },
+    {
+      "file": "011.bin",
+      "arrivalOffsetMs": 850
+    },
+    {
+      "file": "012.bin",
+      "arrivalOffsetMs": 850
+    },
+    {
+      "file": "013.bin",
+      "arrivalOffsetMs": 850
+    },
+    {
+      "file": "014.bin",
+      "arrivalOffsetMs": 851
+    },
+    {
+      "file": "015.bin",
+      "arrivalOffsetMs": 851
+    },
+    {
+      "file": "016.bin",
+      "arrivalOffsetMs": 909
+    },
+    {
+      "file": "017.bin",
+      "arrivalOffsetMs": 910
+    },
+    {
+      "file": "018.bin",
+      "arrivalOffsetMs": 1029
+    },
+    {
+      "file": "019.bin",
+      "arrivalOffsetMs": 1230
+    },
+    {
+      "file": "020.bin",
+      "arrivalOffsetMs": 1230
+    },
+    {
+      "file": "021.bin",
+      "arrivalOffsetMs": 1230
+    },
+    {
+      "file": "022.bin",
+      "arrivalOffsetMs": 1231
+    },
+    {
+      "file": "023.bin",
+      "arrivalOffsetMs": 1231
+    },
+    {
+      "file": "024.bin",
+      "arrivalOffsetMs": 1443
+    },
+    {
+      "file": "025.bin",
+      "arrivalOffsetMs": 1443
+    },
+    {
+      "file": "026.bin",
+      "arrivalOffsetMs": 1444
+    },
+    {
+      "file": "027.bin",
+      "arrivalOffsetMs": 1444
+    },
+    {
+      "file": "028.bin",
+      "arrivalOffsetMs": 1663
+    },
+    {
+      "file": "029.bin",
+      "arrivalOffsetMs": 1664
+    },
+    {
+      "file": "030.bin",
+      "arrivalOffsetMs": 1664
+    },
+    {
+      "file": "031.bin",
+      "arrivalOffsetMs": 1664
+    },
+    {
+      "file": "032.bin",
+      "arrivalOffsetMs": 1665
+    },
+    {
+      "file": "033.bin",
+      "arrivalOffsetMs": 1665
+    },
+    {
+      "file": "034.bin",
+      "arrivalOffsetMs": 1666
+    },
+    {
+      "file": "035.bin",
+      "arrivalOffsetMs": 1666
+    },
+    {
+      "file": "036.bin",
+      "arrivalOffsetMs": 1666
+    },
+    {
+      "file": "037.bin",
+      "arrivalOffsetMs": 1667
+    },
+    {
+      "file": "038.bin",
+      "arrivalOffsetMs": 1667
+    },
+    {
+      "file": "039.bin",
+      "arrivalOffsetMs": 1667
+    },
+    {
+      "file": "040.bin",
+      "arrivalOffsetMs": 1668
+    },
+    {
+      "file": "041.bin",
+      "arrivalOffsetMs": 1669
+    },
+    {
+      "file": "042.bin",
+      "arrivalOffsetMs": 1669
+    },
+    {
+      "file": "043.bin",
+      "arrivalOffsetMs": 1670
+    },
+    {
+      "file": "044.bin",
+      "arrivalOffsetMs": 1670
+    },
+    {
+      "file": "045.bin",
+      "arrivalOffsetMs": 1671
+    },
+    {
+      "file": "046.bin",
+      "arrivalOffsetMs": 1671
+    },
+    {
+      "file": "047.bin",
+      "arrivalOffsetMs": 1672
+    },
+    {
+      "file": "048.bin",
+      "arrivalOffsetMs": 1672
+    },
+    {
+      "file": "049.bin",
+      "arrivalOffsetMs": 1672
+    },
+    {
+      "file": "050.bin",
+      "arrivalOffsetMs": 1673
+    },
+    {
+      "file": "051.bin",
+      "arrivalOffsetMs": 1673
+    },
+    {
+      "file": "052.bin",
+      "arrivalOffsetMs": 1673
+    },
+    {
+      "file": "053.bin",
+      "arrivalOffsetMs": 1674
+    },
+    {
+      "file": "054.bin",
+      "arrivalOffsetMs": 1674
+    },
+    {
+      "file": "055.bin",
+      "arrivalOffsetMs": 1674
+    },
+    {
+      "file": "056.bin",
+      "arrivalOffsetMs": 1674
+    },
+    {
+      "file": "057.bin",
+      "arrivalOffsetMs": 1675
+    },
+    {
+      "file": "058.bin",
+      "arrivalOffsetMs": 1675
+    },
+    {
+      "file": "059.bin",
+      "arrivalOffsetMs": 1675
+    },
+    {
+      "file": "060.bin",
+      "arrivalOffsetMs": 1675
+    },
+    {
+      "file": "061.bin",
+      "arrivalOffsetMs": 1676
+    },
+    {
+      "file": "062.bin",
+      "arrivalOffsetMs": 1677
+    }
+  ],
+  "provenance": {
+    "type": "captured",
+    "model": "gemini-3.1-flash-tts-preview",
+    "timing": "adapter output relative to first audio chunk"
+  }
+}

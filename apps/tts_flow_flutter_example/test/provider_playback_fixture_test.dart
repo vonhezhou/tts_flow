@@ -9,34 +9,55 @@ import '../integration_test/support/provider_playback_fixture.dart';
 void main() {
   TestWidgetsFlutterBinding.ensureInitialized();
 
-  test('captured MiMo assets preserve PCM bytes and derived jitter', () async {
-    final continuous = await ProviderPlaybackFixture.load(
-      manifestAsset: 'assets/fixtures/mimo/continuous/manifest.json',
-    );
-    final jitter = await ProviderPlaybackFixture.load(
-      manifestAsset: 'assets/fixtures/mimo/jitter/manifest.json',
+  test('captured Gemini long asset is 30 to 60 seconds of PCM24K', () async {
+    final fixture = await ProviderPlaybackFixture.load(
+      manifestAsset: 'assets/fixtures/gemini/long_continuous/manifest.json',
     );
     expect(
-      continuous.audioSpec,
+      fixture.audioSpec,
       TtsAudioSpec.pcm(const PcmDescriptor.s16Mono24KHz()),
     );
-    expect(continuous.chunks.length, greaterThan(1));
-    expect(jitter.chunks.length, continuous.chunks.length);
-    for (var i = 0; i < continuous.chunks.length; i++) {
-      expect(jitter.chunks[i].bytes, continuous.chunks[i].bytes);
-      expect(
-        jitter.chunks[i].arrivalOffset,
-        continuous.chunks[i].arrivalOffset +
-            Duration(milliseconds: i == 0 ? 0 : 850),
-      );
-    }
-    await expectLater(
-      ProviderPlaybackFixture.load(
-        manifestAsset: 'assets/fixtures/mimo/invalid/manifest.json',
-      ),
-      throwsFormatException,
+    final byteCount = fixture.chunks.fold<int>(
+      0,
+      (sum, chunk) => sum + chunk.bytes.length,
     );
+    expect(byteCount / (24000 * 2), inInclusiveRange(30, 60));
+    expect(fixture.chunks.every((chunk) => chunk.bytes.length.isEven), isTrue);
   });
+
+  for (final provider in ['mimo', 'gemini']) {
+    test(
+      'captured $provider assets preserve PCM bytes and derived jitter',
+      () async {
+        final continuous = await ProviderPlaybackFixture.load(
+          manifestAsset: 'assets/fixtures/$provider/continuous/manifest.json',
+        );
+        final jitter = await ProviderPlaybackFixture.load(
+          manifestAsset: 'assets/fixtures/$provider/jitter/manifest.json',
+        );
+        expect(
+          continuous.audioSpec,
+          TtsAudioSpec.pcm(const PcmDescriptor.s16Mono24KHz()),
+        );
+        expect(continuous.chunks.length, greaterThan(1));
+        expect(jitter.chunks.length, continuous.chunks.length);
+        for (var i = 0; i < continuous.chunks.length; i++) {
+          expect(jitter.chunks[i].bytes, continuous.chunks[i].bytes);
+          expect(
+            jitter.chunks[i].arrivalOffset,
+            continuous.chunks[i].arrivalOffset +
+                Duration(milliseconds: i == 0 ? 0 : 850),
+          );
+        }
+        await expectLater(
+          ProviderPlaybackFixture.load(
+            manifestAsset: 'assets/fixtures/$provider/invalid/manifest.json',
+          ),
+          throwsFormatException,
+        );
+      },
+    );
+  }
 
   test('loads a fixture and replays captured arrival offsets', () async {
     final fixture = await ProviderPlaybackFixture.load(

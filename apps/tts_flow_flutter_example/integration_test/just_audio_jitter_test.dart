@@ -18,6 +18,57 @@ const _utteranceId = 'just-audio-jitter-regression';
 void main() {
   IntegrationTestWidgetsFlutterBinding.ensureInitialized();
 
+  group('Captured Gemini PCM', () {
+    test('long fixture plays to completion', () async {
+      final fixture = await ProviderPlaybackFixture.load(
+        manifestAsset: 'assets/fixtures/gemini/long_continuous/manifest.json',
+      );
+      final byteCount = fixture.chunks.fold<int>(
+        0,
+        (sum, chunk) => sum + chunk.bytes.length,
+      );
+      expect(byteCount / (24000 * 2), inInclusiveRange(30, 60));
+      final result = await _runReplay(
+        engine: ProviderPlaybackFixtureEngine(fixture),
+        playbackTimeout: const Duration(seconds: 75),
+      );
+      expect(result.playbackFailedEvents, isEmpty);
+      expect(result.playbackCompletedEvents, hasLength(1));
+      for (final waiting in result.waitingEvents) {
+        expect(waiting.requestKey, result.requestKey);
+      }
+    }, timeout: const Timeout(Duration(seconds: 100)));
+
+    for (final kind in ['continuous', 'jitter']) {
+      test('$kind replays recorded timing and completes once', () async {
+        final fixture = await ProviderPlaybackFixture.load(
+          manifestAsset: 'assets/fixtures/gemini/$kind/manifest.json',
+        );
+        final result = await _runReplay(
+          engine: ProviderPlaybackFixtureEngine(fixture),
+        );
+        expect(result.playbackFailedEvents, isEmpty);
+        expect(result.playbackCompletedEvents, hasLength(1));
+        // 录制中的短间隔是否触发等待取决于原生启动时机，不能固定次数。
+        // 每个等待都必须归属本次请求，且最终恢复到唯一的播放完成事件。
+        for (final waiting in result.waitingEvents) {
+          expect(waiting.requestKey, result.requestKey);
+        }
+        if (kind == 'jitter') {
+          expect(result.waitingEvents, isNotEmpty);
+        }
+      }, timeout: const Timeout(Duration(seconds: 30)));
+    }
+    test('invalid arrival metadata is rejected before playback', () async {
+      await expectLater(
+        ProviderPlaybackFixture.load(
+          manifestAsset: 'assets/fixtures/gemini/invalid/manifest.json',
+        ),
+        throwsFormatException,
+      );
+    });
+  });
+
   test(
     'Gemini SDK mock transport plays existing PCM through TtsFlow',
     () async {

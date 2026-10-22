@@ -70,14 +70,36 @@ With an exported `GEMINI_API_KEY`, run from the repository root:
 dart run packages/tts_flow_gemini/tool/live_contract_check.dart
 # Optional: also save sanitized audio chunks and adapter-output timing.
 dart run packages/tts_flow_gemini/tool/live_contract_check.dart --capture-fixture
+# Capture a separate 30–60 second sample using a fixed test passage.
+dart run packages/tts_flow_gemini/tool/live_contract_check.dart --capture-fixture --long
 ```
 
-These commands send only the fixed phrase `This is a provider fixture.`.
+By default these commands send only the fixed phrase `This is a provider fixture.`.
+`--long` instead sends the fixed, non-user test passage defined in the capture
+tool, saves to `gemini/long_continuous/`, and checks the decoded PCM duration
+is between 30 and 60 seconds before writing any fixture. It does not overwrite
+the short sample. Out-of-range output fails rather than padding, trimming, or
+repeating audio to manufacture the requested duration.
 Capture refuses to overwrite an existing fixture. No API key, request headers,
 user text, or account metadata is serialized. Timing records adapter emission
 after SDK decoding, relative to the first emitted audio chunk; it is not a
 record of raw HTTP arrival times. Add the captured directory explicitly to the
 Flutter asset list and perform native replay before marking it verified.
 
-No live Gemini request or Gemini audio capture has been verified as part of
-the initial offline integration.
+The live contract was verified on 2026-10-21 using the default model and voice:
+63 chunks, 120960 PCM bytes (2.52 seconds), and valid TtsFlow WAV output.
+The sanitized capture is stored under `assets/fixtures/gemini/continuous/` in
+the Flutter example; see [capture details](../../docs/provider_playback_fixtures.md).
+On 2026-10-22, the same model and voice also produced a 48.40 second long sample:
+1210 chunks and 2323200 PCM bytes in `gemini/long_continuous/`.
+
+During this local verification, direct API connections timed out. The existing
+local HTTP proxy worked when selected only for the command's environment:
+
+```fish
+env https_proxy=http://127.0.0.1:7890 \
+  dart run packages/tts_flow_gemini/tool/live_contract_check.dart
+```
+
+Use your own proxy address if needed. This setting is optional and is not
+hardcoded into the adapter or saved by the capture tool.

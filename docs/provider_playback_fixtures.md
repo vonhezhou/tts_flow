@@ -136,14 +136,48 @@ See [Azure setup](azure_speech_setup.md) for the next provider's credentials.
 `tts_flow_gemini` uses `googleai_dart` to decode Gemini 3.1 Flash TTS streams.
 The native regression includes a simulated Gemini SSE response containing the
 existing MiMo PCM fixture, verifying SDK → adapter → TtsFlow → JustAudio
-playback offline. This is not captured Gemini audio and does not satisfy the
-live capture requirement. No real Gemini provider output has been collected.
+playback offline. This mock transport case remains distinct from the real
+Gemini provider capture described below.
 The SDK mock transport playback was verified on macOS on 2026-10-21:
 one completion, no waiting, and no playback failure. Other native platforms
 have not been verified for this adapter path.
-The opt-in [live contract tool](../packages/tts_flow_gemini/tool/live_contract_check.dart)
-can later capture sanitized PCM and adapter-output timing with
-`--capture-fixture`; see the [adapter guide](../packages/tts_flow_gemini/README.md).
+
+### Captured Gemini samples
+
+On 2026-10-21, the [live contract tool](../packages/tts_flow_gemini/tool/live_contract_check.dart)
+successfully called `gemini-3.1-flash-tts-preview` with voice `Kore` and the
+fixed phrase `This is a provider fixture.` through the actual SDK and TtsFlow.
+It verified both the PCM stream and the WAV output header and length.
+`assets/fixtures/gemini/continuous/` contains 63 chunks totaling 120960 bytes
+(24 kHz, 16-bit mono PCM, 2.52 seconds). Arrival offsets measure adapter output
+relative to the first emitted audio chunk, not raw HTTP boundaries. The
+recorded offsets are retained, including early 196 ms and 235 ms supply gaps.
+Whether these short gaps produce waiting depends on native-player startup:
+local runs observed both zero and two waiting events, each completing once
+without playback failure. Consequently the normal capture test verifies
+completion and attribution/recovery of any waiting events, without prescribing
+their count. The derived jitter case requires a waiting event.
+
+`jitter` has identical audio with an additional derived 850 ms gap after chunk
+zero. Its provenance explicitly marks it as derived. `invalid` is hand-authored
+metadata starting at 1 ms, rejected before playback; it does not test corrupt
+PCM decoding. No credentials, request headers, or account metadata are stored.
+Verified on macOS on 2026-10-21: both audio fixtures complete exactly once
+without playback failure, derived jitter emits waiting and recovers, and the
+invalid fixture is rejected before playback. Other platforms remain unverified.
+See the [adapter guide](../packages/tts_flow_gemini/README.md) to recapture.
+
+On 2026-10-22, a separate fixed, non-user test passage produced
+`gemini/long_continuous/`: 1210 real audio chunks, 2323200 bytes of PCM24K
+(48.40 seconds, approximately 2.22 MiB of audio). The passage is defined in
+`packages/tts_flow_gemini/tool/live_contract_check.dart`; regenerate with
+`--capture-fixture --long`. The captured audio was not trimmed, padded, or
+repeated. Original adapter-output offsets are preserved. This is a separate
+sample; the short fixtures remain unchanged. The offline asset test checks
+the 30–60 second range and PCM sample integrity, and the native regression
+replays the recorded timing and checks one completion with no playback failure.
+The long sample passed native macOS replay on 2026-10-22; other platforms have
+not been verified for this sample.
 
 ### Offline Azure-format samples
 

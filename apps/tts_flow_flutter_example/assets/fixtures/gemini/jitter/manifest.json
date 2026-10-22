@@ -1,0 +1,270 @@
+{
+  "provider": "gemini",
+  "format": "pcm",
+  "sampleRateHz": 24000,
+  "channels": 1,
+  "kind": "jitter",
+  "verifiedPlatforms": ["macos"],
+  "chunks": [
+    {
+      "file": "000.bin",
+      "arrivalOffsetMs": 0
+    },
+    {
+      "file": "001.bin",
+      "arrivalOffsetMs": 1046
+    },
+    {
+      "file": "002.bin",
+      "arrivalOffsetMs": 1281
+    },
+    {
+      "file": "003.bin",
+      "arrivalOffsetMs": 1282
+    },
+    {
+      "file": "004.bin",
+      "arrivalOffsetMs": 1282
+    },
+    {
+      "file": "005.bin",
+      "arrivalOffsetMs": 1282
+    },
+    {
+      "file": "006.bin",
+      "arrivalOffsetMs": 1282
+    },
+    {
+      "file": "007.bin",
+      "arrivalOffsetMs": 1283
+    },
+    {
+      "file": "008.bin",
+      "arrivalOffsetMs": 1699
+    },
+    {
+      "file": "009.bin",
+      "arrivalOffsetMs": 1699
+    },
+    {
+      "file": "010.bin",
+      "arrivalOffsetMs": 1700
+    },
+    {
+      "file": "011.bin",
+      "arrivalOffsetMs": 1700
+    },
+    {
+      "file": "012.bin",
+      "arrivalOffsetMs": 1700
+    },
+    {
+      "file": "013.bin",
+      "arrivalOffsetMs": 1700
+    },
+    {
+      "file": "014.bin",
+      "arrivalOffsetMs": 1701
+    },
+    {
+      "file": "015.bin",
+      "arrivalOffsetMs": 1701
+    },
+    {
+      "file": "016.bin",
+      "arrivalOffsetMs": 1759
+    },
+    {
+      "file": "017.bin",
+      "arrivalOffsetMs": 1760
+    },
+    {
+      "file": "018.bin",
+      "arrivalOffsetMs": 1879
+    },
+    {
+      "file": "019.bin",
+      "arrivalOffsetMs": 2080
+    },
+    {
+      "file": "020.bin",
+      "arrivalOffsetMs": 2080
+    },
+    {
+      "file": "021.bin",
+      "arrivalOffsetMs": 2080
+    },
+    {
+      "file": "022.bin",
+      "arrivalOffsetMs": 2081
+    },
+    {
+      "file": "023.bin",
+      "arrivalOffsetMs": 2081
+    },
+    {
+      "file": "024.bin",
+      "arrivalOffsetMs": 2293
+    },
+    {
+      "file": "025.bin",
+      "arrivalOffsetMs": 2293
+    },
+    {
+      "file": "026.bin",
+      "arrivalOffsetMs": 2294
+    },
+    {
+      "file": "027.bin",
+      "arrivalOffsetMs": 2294
+    },
+    {
+      "file": "028.bin",
+      "arrivalOffsetMs": 2513
+    },
+    {
+      "file": "029.bin",
+      "arrivalOffsetMs": 2514
+    },
+    {
+      "file": "030.bin",
+      "arrivalOffsetMs": 2514
+    },
+    {
+      "file": "031.bin",
+      "arrivalOffsetMs": 2514
+    },
+    {
+      "file": "032.bin",
+      "arrivalOffsetMs": 2515
+    },
+    {
+      "file": "033.bin",
+      "arrivalOffsetMs": 2515
+    },
+    {
+      "file": "034.bin",
+      "arrivalOffsetMs": 2516
+    },
+    {
+      "file": "035.bin",
+      "arrivalOffsetMs": 2516
+    },
+    {
+      "file": "036.bin",
+      "arrivalOffsetMs": 2516
+    },
+    {
+      "file": "037.bin",
+      "arrivalOffsetMs": 2517
+    },
+    {
+      "file": "038.bin",
+      "arrivalOffsetMs": 2517
+    },
+    {
+      "file": "039.bin",
+      "arrivalOffsetMs": 2517
+    },
+    {
+      "file": "040.bin",
+      "arrivalOffsetMs": 2518
+    },
+    {
+      "file": "041.bin",
+      "arrivalOffsetMs": 2519
+    },
+    {
+      "file": "042.bin",
+      "arrivalOffsetMs": 2519
+    },
+    {
+      "file": "043.bin",
+      "arrivalOffsetMs": 2520
+    },
+    {
+      "file": "044.bin",
+      "arrivalOffsetMs": 2520
+    },
+    {
+      "file": "045.bin",
+      "arrivalOffsetMs": 2521
+    },
+    {
+      "file": "046.bin",
+      "arrivalOffsetMs": 2521
+    },
+    {
+      "file": "047.bin",
+      "arrivalOffsetMs": 2522
+    },
+    {
+      "file": "048.bin",
+      "arrivalOffsetMs": 2522
+    },
+    {
+      "file": "049.bin",
+      "arrivalOffsetMs": 2522
+    },
+    {
+      "file": "050.bin",
+      "arrivalOffsetMs": 2523
+    },
+    {
+      "file": "051.bin",
+      "arrivalOffsetMs": 2523
+    },
+    {
+      "file": "052.bin",
+      "arrivalOffsetMs": 2523
+    },
+    {
+      "file": "053.bin",
+      "arrivalOffsetMs": 2524
+    },
+    {
+      "file": "054.bin",
+      "arrivalOffsetMs": 2524
+    },
+    {
+      "file": "055.bin",
+      "arrivalOffsetMs": 2524
+    },
+    {
+      "file": "056.bin",
+      "arrivalOffsetMs": 2524
+    },
+    {
+      "file": "057.bin",
+      "arrivalOffsetMs": 2525
+    },
+    {
+      "file": "058.bin",
+      "arrivalOffsetMs": 2525
+    },
+    {
+      "file": "059.bin",
+      "arrivalOffsetMs": 2525
+    },
+    {
+      "file": "060.bin",
+      "arrivalOffsetMs": 2525
+    },
+    {
+      "file": "061.bin",
+      "arrivalOffsetMs": 2526
+    },
+    {
+      "file": "062.bin",
+      "arrivalOffsetMs": 2527
+    }
+  ],
+  "bitsPerSample": 16,
+  "encoding": "signedInt",
+  "provenance": {
+    "type": "derived",
+    "source": "../continuous/manifest.json",
+    "gapAfterChunk": 0,
+    "gapMs": 850
+  }
+}

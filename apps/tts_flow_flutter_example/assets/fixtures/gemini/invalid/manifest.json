@@ -1,0 +1,19 @@
+{
+  "provider": "gemini",
+  "format": "pcm",
+  "sampleRateHz": 24000,
+  "bitsPerSample": 16,
+  "channels": 1,
+  "encoding": "signedInt",
+  "kind": "invalid",
+  "chunks": [
+    {
+      "file": "000.bin",
+      "arrivalOffsetMs": 1
+    }
+  ],
+  "provenance": {
+    "type": "hand-authored",
+    "purpose": "reject nonzero first arrival offset before playback"
+  }
+}
