@@ -1,0 +1,94 @@
+{
+  "capturedOn": "2026-10-22",
+  "model": "mimo-v2.5-tts",
+  "voice": "mimo_default",
+  "format": "mp3",
+  "scope": "FFmpeg decoded frame properties, not acoustic recording or exhaustive provider guarantee",
+  "method": "FFmpeg 7.1 ashowinfo: independently decode every provider SSE audio fragment and their byte concatenation; no handcrafted MP3 parser",
+  "rawCaptureDirectory": "/private/tmp/tts-flow-mimo-mp3-recheck-20261022",
+  "samples": [
+    {
+      "name": "narrative",
+      "inputSha256": "5279863d1bfb9d20f9812e573406fce6d8be7c09ac4257da49a276ac70d778e6",
+      "audioSha256": "f112d08dcdd3719fde108ba329baf6c9365968f545246bc1715431de8db491c5",
+      "bytes": 448032,
+      "audioEvents": 137,
+      "arrivalSpanMs": 8883,
+      "concatenated": {
+        "exitCode": 0,
+        "decodedFrames": 2326,
+        "decodedSamples": 1339247,
+        "parameters": [
+          {
+            "sampleRateHz": 24000,
+            "channels": 1,
+            "sampleFormat": "fltp"
+          }
+        ],
+        "warnings": [
+          "invalid concatenated file detected - using bitrate for duration"
+        ],
+        "decodedDurationSeconds": 55.80195833333333
+      },
+      "independentFragments": {
+        "decodedFrames": 2054,
+        "decodedSamples": 1052160,
+        "decodedDurationSeconds": 43.84,
+        "decodeFailures": 0,
+        "emptyDecodedFragments": 0,
+        "parameters": [
+          {
+            "channels": 1,
+            "sampleFormat": "fltp",
+            "sampleRateHz": 24000
+          }
+        ]
+      }
+    },
+    {
+      "name": "mixed",
+      "inputSha256": "ce6346cf637aeddef3ea8d627a24f5f41dd17bb95fec2b296e1baf8c917fd8f0",
+      "audioSha256": "71d04398bb0e5998ab65496fe325542deff3cb2d4a2333e65cebd8b47f700226",
+      "bytes": 279480,
+      "audioEvents": 86,
+      "arrivalSpanMs": 5530,
+      "concatenated": {
+        "exitCode": 0,
+        "decodedFrames": 1466,
+        "decodedSamples": 843887,
+        "parameters": [
+          {
+            "sampleRateHz": 24000,
+            "channels": 1,
+            "sampleFormat": "fltp"
+          }
+        ],
+        "warnings": [
+          "invalid concatenated file detected - using bitrate for duration"
+        ],
+        "decodedDurationSeconds": 35.16195833333333
+      },
+      "independentFragments": {
+        "decodedFrames": 1296,
+        "decodedSamples": 664320,
+        "decodedDurationSeconds": 27.68,
+        "decodeFailures": 0,
+        "emptyDecodedFragments": 0,
+        "parameters": [
+          {
+            "channels": 1,
+            "sampleFormat": "fltp",
+            "sampleRateHz": 24000
+          }
+        ]
+      }
+    }
+  ],
+  "findings": [
+    "No sample-rate or channel change observed in decoded output for either concatenation or any of the 223 provider fragments in this run.",
+    "Every fragment decoded successfully; decoding each fragment separately produces a different duration than decoding its concatenation.",
+    "FFmpeg reports repeated-file metadata on concatenation. A checked fragment has encoder trimming side data: skip 1105 samples and discard 431 samples.",
+    "This does not prove absence of all source anomalies, compatibility with every continuous decoder, or absence of audible glitches.",
+    "A change in frame bitrate alone is not a sample-rate/channel change and is not classified as a source defect."
+  ]
+}

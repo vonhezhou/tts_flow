@@ -288,6 +288,17 @@ output and do not certify the absence of audible clipping or glitches.
 
 ### Arbitrary network fragmentation of one encoded stream
 
+These cases deliberately split a single file at arbitrary byte offsets. They
+do not model the maintainer's prior MiMo TTS and edge-tts MP3 observations,
+where provider audio fragments were aligned to complete MP3 frames. That
+experience motivated the default finite-source playback design. It is not a
+universal provider guarantee: edge-tts has no corresponding repository fixture
+or platform regression, and native AAC/Opus provider chunk boundaries remain
+unverified. See the [backend boundary and mode-selection guide](just_audio_backend.md)
+for the distinction between transport reads, provider audio fragments, and
+finite playback sources. Frame alignment still requires platform validation;
+it alone does not prove that every fragment is independently decodable.
+
 `ProviderPlaybackFixture.fragmented()` reuses each existing `derived_aac` or
 `derived_opus` continuous file without re-encoding it or adding container
 headers. At test time it cuts at byte offsets 1, 2, 5, 13, 26, 27, 28, and 31,
@@ -305,6 +316,9 @@ submits one complete source, with a default 64 MiB per-request bound. It does
 not transcode or introduce a codec dependency; PCM remains progressive.
 This is whole-payload playback, **not a low-latency incremental decoder**.
 An input delay becomes a first-playback delay rather than an underflow event.
+This fallback does not replace the default progressive path for verified
+provider segments, and its success does not establish support for arbitrary
+compressed-byte fragmentation with low-latency playback.
 
 Verified on macOS on 2026-10-22: four cases (AAC/Opus × regular/delayed supply)
 complete once, without playback failure or waiting; each reports 2600–3000 ms
