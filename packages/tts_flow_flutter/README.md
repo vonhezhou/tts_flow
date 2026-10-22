@@ -50,10 +50,29 @@ run with a bundled fixture, MiMo, or Azure Speech.
 ## Streaming playback contract
 
 `JustAudioBackend` appends finite `StreamAudioSource` segments to a source
-list. It preserves encoded provider audio rather than decoding or packetizing
+list. Each frozen segment must be independently decodable; arbitrary network
+fragments of a single AAC/Opus file do not satisfy that requirement.
+It preserves encoded provider audio rather than decoding or packetizing
 it in Dart. A provider must therefore keep encoding parameters compatible for
 the lifetime of one response; provider-specific discontinuities belong in that
 provider adapter or in an application fallback.
+
+For one compressed file arriving in arbitrary network fragments, opt into
+complete-payload playback:
+
+```dart
+final output = SpeakerOutput(
+  backend: JustAudioBackend(bufferEncodedAudio: true),
+);
+```
+
+This buffers MP3/AAC/Opus bytes until `finalizePlayback()`, then submits one
+finite source with the original bytes. It does not decode or re-encode audio.
+It trades first-audio latency for safe frame/container reassembly, and is not
+low-latency streaming playback. PCM keeps the normal progressive path.
+`maxBufferedEncodedBytes` limits each encoded request to 64 MiB by default;
+exceeding the limit stops that session without playing a partial prefix.
+Cancellation before finalization discards the buffered bytes.
 
 Platform errors after audio has reached `just_audio` are exposed through
 `JustAudioBackend.playbackErrorStream` and the core request event

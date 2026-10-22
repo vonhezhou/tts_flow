@@ -36,7 +36,8 @@ extension TtsAudioFormatX on TtsAudioFormat {
       case TtsAudioFormat.mp3:
         return 'audio/mpeg';
       case TtsAudioFormat.opus:
-        return 'audio/opus';
+        // Opus 数据使用 Ogg 容器，原生解复用器需要匹配的 MIME。
+        return 'audio/ogg';
       case TtsAudioFormat.aac:
         return 'audio/aac';
     }

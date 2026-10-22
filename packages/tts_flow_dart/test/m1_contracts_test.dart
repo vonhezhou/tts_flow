@@ -56,6 +56,8 @@ void main() {
       expect(_pcmSpec.pcm, _pcmDescriptor);
       expect(_pcmSpec.requirePcm, _pcmDescriptor);
       expect(mp3Spec.format, TtsAudioFormat.mp3);
+      // Opus 使用 Ogg 容器；错误的 MIME 会使原生播放器拒绝有效音频。
+      expect(TtsAudioFormat.opus.mimeType, 'audio/ogg');
       expect(mp3Spec.pcm, isNull);
       expect(() => mp3Spec.requirePcm, throwsStateError);
     });

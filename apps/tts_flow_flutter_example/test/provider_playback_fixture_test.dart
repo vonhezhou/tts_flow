@@ -9,6 +9,80 @@ import '../integration_test/support/provider_playback_fixture.dart';
 void main() {
   TestWidgetsFlutterBinding.ensureInitialized();
 
+  for (final provider in ['derived_aac', 'derived_opus']) {
+    test(
+      '$provider fragmentation preserves one complete encoded stream',
+      () async {
+        final source = await ProviderPlaybackFixture.load(
+          manifestAsset: 'assets/fixtures/$provider/continuous/manifest.json',
+        );
+        final normal = source.fragmented();
+        final delayed = source.fragmented(
+          supplyGap: const Duration(milliseconds: 2500),
+        );
+        final originalBytes = source.chunks.expand((c) => c.bytes).toList();
+        expect(normal.chunks.expand((c) => c.bytes), originalBytes);
+        expect(delayed.chunks.expand((c) => c.bytes), originalBytes);
+        expect(normal.chunks.take(3).map((c) => c.bytes.length), [1, 1, 3]);
+        expect(normal.audioSpec, source.audioSpec);
+        var cursor = 0;
+        for (var i = 0; i < normal.chunks.length; i++) {
+          expect(
+            delayed.chunks[i].arrivalOffset,
+            normal.chunks[i].arrivalOffset +
+                Duration(
+                  milliseconds: cursor >= originalBytes.length ~/ 2 ? 2500 : 0,
+                ),
+          );
+          cursor += normal.chunks[i].bytes.length;
+        }
+        expect(source.chunks, hasLength(1));
+      },
+    );
+  }
+
+  for (final entry in {
+    'mimo_mp3': TtsAudioFormat.mp3,
+    'derived_aac': TtsAudioFormat.aac,
+    'derived_opus': TtsAudioFormat.opus,
+  }.entries) {
+    test(
+      '${entry.key} assets carry encoded audio with capture metadata',
+      () async {
+        final fixture = await ProviderPlaybackFixture.load(
+          manifestAsset:
+              'assets/fixtures/${entry.key}/continuous/manifest.json',
+        );
+        expect(fixture.audioSpec.format, entry.value);
+        expect(fixture.channels, 1);
+        expect(
+          fixture.sampleRateHz,
+          entry.value == TtsAudioFormat.opus ? 48000 : 24000,
+        );
+        final bytes = Uint8List.fromList(
+          fixture.chunks.expand((c) => c.bytes).toList(),
+        );
+        switch (entry.value) {
+          case TtsAudioFormat.mp3:
+            final header = Mp3FrameHeader.parse(bytes);
+            expect(header.sampleRateHz, fixture.sampleRateHz);
+            expect(header.channelCount, fixture.channels);
+          case TtsAudioFormat.aac:
+            expect(bytes[0], 0xff);
+            expect(bytes[1] & 0xf6, 0xf0); // ADTS 同步字与 layer。
+          case TtsAudioFormat.opus:
+            expect(ascii.decode(bytes.sublist(0, 4)), 'OggS');
+            expect(
+              latin1.decode(bytes.take(200).toList()),
+              contains('OpusHead'),
+            );
+          case TtsAudioFormat.pcm:
+            fail('Encoded fixture must not masquerade as PCM.');
+        }
+      },
+    );
+  }
+
   test('captured Gemini long asset is 30 to 60 seconds of PCM24K', () async {
     final fixture = await ProviderPlaybackFixture.load(
       manifestAsset: 'assets/fixtures/gemini/long_continuous/manifest.json',

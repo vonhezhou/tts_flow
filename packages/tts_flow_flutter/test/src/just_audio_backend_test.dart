@@ -16,6 +16,7 @@ TtsAudioChunk _audioChunk({
   required String requestKey,
   required int sequenceNumber,
   required List<int> bytes,
+  TtsAudioSpec audioSpec = const TtsAudioSpec.mp3(),
 }) {
   return TtsAudioChunk(
     bytes: Uint8List.fromList(bytes),
@@ -23,7 +24,7 @@ TtsAudioChunk _audioChunk({
     sequenceNumber: sequenceNumber,
     isLastChunk: false,
     timestamp: DateTime.now(),
-    audioSpec: const TtsAudioSpec.mp3(),
+    audioSpec: audioSpec,
   );
 }
 
@@ -111,6 +112,163 @@ void main() {
       await durationController.close();
       await positionController.close();
       await errorController.close();
+    });
+
+    for (final spec in [
+      const TtsAudioSpec.aac(),
+      const TtsAudioSpec.opus(),
+      const TtsAudioSpec.mp3(),
+    ]) {
+      test(
+        'buffered ${spec.format.name} keeps all fragments until finalize',
+        () async {
+          final backend = JustAudioBackend.testing(
+            player: player,
+            bufferEncodedAudio: true,
+          );
+          addTearDown(backend.dispose);
+          final id = await backend.startPlayback(
+            requestKey: 'buffered',
+            audioSpec: spec,
+          );
+          final first = _audioChunk(
+            requestKey: 'buffered',
+            sequenceNumber: 0,
+            bytes: [1],
+            audioSpec: spec,
+          );
+          await backend.appendChunk(playbackId: id, chunk: first);
+          first.bytes[0] = 99;
+          await backend.appendChunk(
+            playbackId: id,
+            chunk: _audioChunk(
+              requestKey: 'buffered',
+              sequenceNumber: 1,
+              bytes: [2, 3],
+              audioSpec: spec,
+            ),
+          );
+          expect(sources, isEmpty);
+          verifyNever(() => player.play());
+          await backend.finalizePlayback(playbackId: id);
+          final source = sources.single as ChunkAudioSource;
+          final response = await source.request();
+          expect(await response.stream.expand((bytes) => bytes).toList(), [
+            1,
+            2,
+            3,
+          ]);
+          expect(response.contentLength, 3);
+          expect(response.contentType, spec.format.mimeType);
+          expect(source.isTerminalSegment, isTrue);
+          await backend.finalizePlayback(playbackId: id);
+          expect(sources, hasLength(1));
+          verify(() => player.play()).called(1);
+          await expectLater(
+            backend.appendChunk(playbackId: id, chunk: first),
+            throwsStateError,
+          );
+        },
+      );
+    }
+
+    test(
+      'buffer limit rejects excess bytes without submitting partial audio',
+      () async {
+        final backend = JustAudioBackend.testing(
+          player: player,
+          bufferEncodedAudio: true,
+          maxBufferedEncodedBytes: 2,
+        );
+        addTearDown(backend.dispose);
+        final id = await backend.startPlayback(
+          requestKey: 'limited',
+          audioSpec: const TtsAudioSpec.aac(),
+        );
+        await backend.appendChunk(
+          playbackId: id,
+          chunk: _audioChunk(
+            requestKey: 'limited',
+            sequenceNumber: 0,
+            bytes: [1, 2],
+            audioSpec: const TtsAudioSpec.aac(),
+          ),
+        );
+        await expectLater(
+          backend.appendChunk(
+            playbackId: id,
+            chunk: _audioChunk(
+              requestKey: 'limited',
+              sequenceNumber: 1,
+              bytes: [3],
+              audioSpec: const TtsAudioSpec.aac(),
+            ),
+          ),
+          throwsStateError,
+        );
+        expect(sources, isEmpty);
+        await expectLater(
+          backend.finalizePlayback(playbackId: id),
+          throwsStateError,
+        );
+        await backend.stopPlayback(playbackId: id);
+        verifyNever(() => player.play());
+      },
+    );
+
+    test(
+      'stopping buffered audio discards it before native playback',
+      () async {
+        final backend = JustAudioBackend.testing(
+          player: player,
+          bufferEncodedAudio: true,
+        );
+        addTearDown(backend.dispose);
+        final id = await backend.startPlayback(
+          requestKey: 'canceled',
+          audioSpec: const TtsAudioSpec.opus(),
+        );
+        await backend.appendChunk(
+          playbackId: id,
+          chunk: _audioChunk(
+            requestKey: 'canceled',
+            sequenceNumber: 0,
+            bytes: [1, 2],
+            audioSpec: const TtsAudioSpec.opus(),
+          ),
+        );
+        await backend.stopPlayback(playbackId: id);
+        await expectLater(
+          backend.finalizePlayback(playbackId: id),
+          throwsStateError,
+        );
+        expect(sources, isEmpty);
+        verifyNever(() => player.play());
+      },
+    );
+
+    test('buffer option preserves progressive PCM playback', () async {
+      final backend = JustAudioBackend.testing(
+        player: player,
+        bufferEncodedAudio: true,
+      );
+      addTearDown(backend.dispose);
+      const spec = TtsAudioSpec.pcm(PcmDescriptor.s16Mono24KHz());
+      final id = await backend.startPlayback(
+        requestKey: 'pcm',
+        audioSpec: spec,
+      );
+      await backend.appendChunk(
+        playbackId: id,
+        chunk: _audioChunk(
+          requestKey: 'pcm',
+          sequenceNumber: 0,
+          bytes: [1, 2],
+          audioSpec: spec,
+        ),
+      );
+      expect(sources, hasLength(1));
+      verify(() => player.play()).called(1);
     });
 
     test(

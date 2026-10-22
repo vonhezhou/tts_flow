@@ -5,14 +5,17 @@ part of 'just_audio_backend.dart';
 /// Every caller already executes through the backend's serialized
 /// player-operation queue; these helpers must not introduce a second queue.
 extension _JustAudioSourceListOperations on JustAudioBackend {
-  Future<ChunkAudioSource> _createSegment(_PlaybackSession session) async {
+  Future<ChunkAudioSource> _createSegment(
+    _PlaybackSession session, {
+    List<int>? initialBytes,
+  }) async {
     final sourceIndex = session.nextIndex;
     final source = ChunkAudioSource(
       audioSpec: session.audioSpec,
       playbackId: session.playbackId,
       index: sourceIndex,
       requestKey: session.requestKey,
-      isTerminalSegment: false,
+      isTerminalSegment: session.isFinalized,
       onStarted: () {
         if (_disposeRequested) {
           return;
@@ -27,6 +30,8 @@ extension _JustAudioSourceListOperations on JustAudioBackend {
         );
       },
     );
+    // 完整流先填好字节再交给播放器，避免预加载时读取到空文件。
+    if (initialBytes != null) source.addChunk(initialBytes);
     session.nextIndex++;
 
     session.tailSource = source;

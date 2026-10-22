@@ -18,6 +18,82 @@ const _utteranceId = 'just-audio-jitter-regression';
 void main() {
   IntegrationTestWidgetsFlutterBinding.ensureInitialized();
 
+  group('Fragmented encoded stream', () {
+    for (final provider in ['derived_aac', 'derived_opus']) {
+      for (final gap in [Duration.zero, const Duration(milliseconds: 2500)]) {
+        test('$provider gap=${gap.inMilliseconds}ms completes', () async {
+          final source = await ProviderPlaybackFixture.load(
+            manifestAsset: 'assets/fixtures/$provider/continuous/manifest.json',
+          );
+          final result = await _runReplay(
+            engine: ProviderPlaybackFixtureEngine(
+              source.fragmented(supplyGap: gap),
+            ),
+            bufferEncodedAudio: true,
+          );
+          expect(result.playbackFailedEvents, isEmpty);
+          expect(result.playbackCompletedEvents, hasLength(1));
+          // 必须播放完整语音，不能仅解码到第一帧/页就报告成功。
+          expect(
+            result
+                .playbackCompletedEvents
+                .single
+                .playedDuration
+                ?.inMilliseconds,
+            inInclusiveRange(2600, 3000),
+          );
+          // 此路径在收齐后才播放，供给延迟体现为首播延迟而非播放欠载。
+          expect(result.waitingEvents, isEmpty);
+        }, timeout: const Timeout(Duration(seconds: 30)));
+      }
+      test('$provider corrupt buffered payload fails once', () async {
+        final fixture = await ProviderPlaybackFixture.load(
+          manifestAsset: 'assets/fixtures/$provider/invalid/manifest.json',
+        );
+        final result = await _runReplay(
+          engine: ProviderPlaybackFixtureEngine(fixture),
+          bufferEncodedAudio: true,
+        );
+        expect(result.playbackFailedEvents, hasLength(1));
+        expect(result.playbackCompletedEvents, isEmpty);
+      }, timeout: const Timeout(Duration(seconds: 30)));
+    }
+  });
+
+  group('Encoded speech fixtures', () {
+    for (final provider in ['mimo_mp3', 'derived_aac', 'derived_opus']) {
+      for (final kind in ['continuous', 'jitter', 'invalid']) {
+        test('$provider $kind native playback', () async {
+          final fixture = await ProviderPlaybackFixture.load(
+            manifestAsset: 'assets/fixtures/$provider/$kind/manifest.json',
+          );
+          final result = await _runReplay(
+            engine: ProviderPlaybackFixtureEngine(fixture),
+          );
+          if (kind == 'invalid') {
+            expect(result.playbackFailedEvents, hasLength(1));
+            expect(result.playbackCompletedEvents, isEmpty);
+          } else {
+            expect(
+              result.playbackFailedEvents,
+              isEmpty,
+              reason: _describeRequestFailures(
+                result.playbackFailedEvents,
+              ).join('; '),
+            );
+            expect(result.playbackCompletedEvents, hasLength(1));
+            for (final waiting in result.waitingEvents) {
+              expect(waiting.requestKey, result.requestKey);
+            }
+            if (kind == 'jitter') {
+              expect(result.waitingEvents, isNotEmpty);
+            }
+          }
+        }, timeout: const Timeout(Duration(seconds: 30)));
+      }
+    }
+  });
+
   group('Captured Gemini PCM', () {
     test('long fixture plays to completion', () async {
       final fixture = await ProviderPlaybackFixture.load(
@@ -215,12 +291,13 @@ void main() {
 
 Future<_ReplayResult> _runReplay({
   Duration playbackTimeout = const Duration(seconds: 15),
+  bool bufferEncodedAudio = false,
   _PcmSample? sample,
   int firstChunkBytes = 0,
   Duration delayAfterReady = Duration.zero,
   TtsEngine? engine,
 }) async {
-  final backend = JustAudioBackend();
+  final backend = JustAudioBackend(bufferEncodedAudio: bufferEncodedAudio);
   final firstSourceStarted = Completer<void>();
   final waitingEvents = <JustAudioPlaybackWaitingEvent>[];
   final playbackCompletedEvents = <TtsRequestEvent>[];

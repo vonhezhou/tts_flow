@@ -28,6 +28,41 @@ final class ProviderPlaybackFixture {
   final TtsAudioSpec audioSpec;
   final List<ProviderPlaybackFixtureChunk> chunks;
 
+  /// 将同一条编码流切成不对齐帧/页的网络块，不重编码或复制容器头。
+  ProviderPlaybackFixture fragmented({Duration supplyGap = Duration.zero}) {
+    final bytes = Uint8List.fromList(
+      chunks.expand((chunk) => chunk.bytes).toList(),
+    );
+    // 首部按字节拆开，后续固定切片还会跨越 ADTS 帧和 Ogg 页。
+    final cuts = <int>[
+      0,
+      ...[1, 2, 5, 13, 26, 27, 28, 31].where((cut) => cut < bytes.length),
+    ];
+    for (var offset = 389; offset < bytes.length; offset += 389) {
+      cuts.add(offset);
+    }
+    cuts.add(bytes.length);
+    final fragments = <ProviderPlaybackFixtureChunk>[];
+    for (var i = 0; i < cuts.length - 1; i++) {
+      fragments.add(
+        ProviderPlaybackFixtureChunk(
+          bytes: Uint8List.sublistView(bytes, cuts[i], cuts[i + 1]),
+          arrivalOffset:
+              Duration(milliseconds: i * 10) +
+              (cuts[i] >= bytes.length ~/ 2 ? supplyGap : Duration.zero),
+        ),
+      );
+    }
+    return ProviderPlaybackFixture._(
+      provider: provider,
+      kind: 'fragmented',
+      sampleRateHz: sampleRateHz,
+      channels: channels,
+      audioSpec: audioSpec,
+      chunks: fragments,
+    );
+  }
+
   /// Loads [manifestAsset] and its neighboring raw audio chunk assets.
   static Future<ProviderPlaybackFixture> load({
     required String manifestAsset,

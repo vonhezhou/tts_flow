@@ -1,0 +1,25 @@
+{
+  "provider": "derived_opus",
+  "format": "opus",
+  "sampleRateHz": 48000,
+  "channels": 1,
+  "kind": "invalid",
+  "chunks": [
+    {
+      "file": "000.bin",
+      "arrivalOffsetMs": 0
+    }
+  ],
+  "provenance": {
+    "type": "hand-authored",
+    "source": "../../mimo/continuous/manifest.json",
+    "sourcePcmSha256": "9c28b994d4de15ecec1e77c271e5fe3da16e0f49076ac7e374e55b484d4b973b",
+    "generator": "tool/generate_encoded_playback_fixtures.py",
+    "encoder": "libopus",
+    "container": "ogg",
+    "timing": "simulated playlist supply; independently encoded segments"
+  },
+  "verifiedPlatforms": [
+    "macos"
+  ]
+}

@@ -83,6 +83,15 @@ flutter:
     - assets/fixtures/gemini/long_continuous/
     - assets/fixtures/gemini/jitter/
     - assets/fixtures/gemini/invalid/
+    - assets/fixtures/mimo_mp3/continuous/
+    - assets/fixtures/mimo_mp3/jitter/
+    - assets/fixtures/mimo_mp3/invalid/
+    - assets/fixtures/derived_aac/continuous/
+    - assets/fixtures/derived_aac/jitter/
+    - assets/fixtures/derived_aac/invalid/
+    - assets/fixtures/derived_opus/continuous/
+    - assets/fixtures/derived_opus/jitter/
+    - assets/fixtures/derived_opus/invalid/
 
   # The following line ensures that the Material Icons font is
   # included with your application, so that you can use the icons in

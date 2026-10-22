@@ -1,0 +1,46 @@
+{
+  "provider": "mimo",
+  "format": "mp3",
+  "sampleRateHz": 24000,
+  "channels": 1,
+  "kind": "jitter",
+  "chunks": [
+    {
+      "file": "000.bin",
+      "arrivalOffsetMs": 0
+    },
+    {
+      "file": "001.bin",
+      "arrivalOffsetMs": 1544
+    },
+    {
+      "file": "002.bin",
+      "arrivalOffsetMs": 1595
+    },
+    {
+      "file": "003.bin",
+      "arrivalOffsetMs": 1645
+    },
+    {
+      "file": "004.bin",
+      "arrivalOffsetMs": 1799
+    },
+    {
+      "file": "005.bin",
+      "arrivalOffsetMs": 1799
+    },
+    {
+      "file": "006.bin",
+      "arrivalOffsetMs": 1854
+    }
+  ],
+  "provenance": {
+    "type": "derived",
+    "source": "../continuous/manifest.json",
+    "gapAfterChunk": 0,
+    "gapMs": 1500
+  },
+  "verifiedPlatforms": [
+    "macos"
+  ]
+}

@@ -215,3 +215,100 @@ markers, cancellation, authorization failures, throttling/server errors,
 timeouts, and format rejection. Real credentials, service acceptance of SSML,
 actual Azure MP3 encoder behavior and network timing remain unverified until
 the opt-in live contract and real captures can run.
+
+### Compressed speech coverage (2026-10-22)
+
+The committed fixtures now cover PCM, MP3, AAC (ADTS), and Opus (Ogg).
+AAC/Opus are explicitly **locally transcoded derivatives**, not native provider
+responses. They exercise the playback format paths without a new subscription.
+
+| Source / request | Result |
+| --- | --- |
+| MiMo `mimo-v2.5-tts`, streaming `audio.format=mp3` | Success; 7 original SSE audio chunks, 23400 bytes |
+| MiMo `audio.format=aac`, streaming and non-streaming | HTTP 400, `Param Incorrect` |
+| Gemini Interactions `gemini-3.1-flash-tts-preview`, `audio/mp3`, streaming and non-streaming | HTTP 400, `Audio MIME type AUDIO_MP3 is not supported` |
+| Same Gemini model, streaming `audio/ogg_opus` | HTTP 400, `Audio MIME type AUDIO_OGG_OPUS is not supported` |
+| Gemini Interactions `gemini-3.8-flash-tts`, streaming Ogg Opus | HTTP 400, `Audio MIME type AUDIO_OGG_OPUS is not supported` |
+
+Gemini probes used API revision `2026-05-20`. These results describe the tested
+model/API combinations; a generic API format enum does not guarantee that a
+particular model accepts it. [Google Cloud Text-to-Speech Gemini TTS](https://docs.cloud.google.com/text-to-speech/docs/gemini-tts)
+is a separate product and was not enabled or tested here.
+
+The [MiMo API reference](https://mimo.mi.com/static/docs/api/audio/tts.md)
+lists `wav`, `mp3`, `pcm`, and `pcm16`; it does not advertise AAC or Opus.
+Its [speech synthesis guide](https://mimo.mi.com/static/docs/quick-start/usage-guide/audio/speech-synthesis-v2.5.md)
+recommends PCM16 for streaming. The production MiMo adapter therefore keeps
+its PCM contract; only the capture helper gains an explicit MP3 option:
+
+```sh
+# Reads MIMO_API_KEY from the environment; uses a fixed test phrase.
+python3 tool/capture_provider_fixture.py capture mimo --format mp3
+```
+
+This writes `mimo_mp3/continuous`, preserving the existing PCM capture.
+`mimo_mp3/jitter` retains identical bytes and adds 1500 ms after chunk zero;
+`invalid` contains deliberately corrupt bytes with valid manifest metadata.
+The original MP3 fragments contain independent encoder metadata. FFmpeg 7.1
+successfully decoded all 123 frames at 24 kHz mono, but reported
+`invalid concatenated file detected - using bitrate for duration` when reading
+the concatenation. This sample does not reproduce the previously observed
+sample-rate/channel changes, nor prove that other MiMo MP3 responses avoid them.
+Original bytes are retained without repairing or re-encoding the capture.
+
+`derived_aac` and `derived_opus` encode the existing 2.72-second MiMo PCM
+fixture with FFmpeg 7.1: AAC at 24 kHz mono / 48 kbps in ADTS, and Opus at
+48 kHz mono / 48 kbps in Ogg. Manifests retain source SHA-256, container,
+encoder, and explicit provenance. Regenerate from the repository root:
+
+```sh
+python3 tool/generate_encoded_playback_fixtures.py --ffmpeg /path/to/ffmpeg --overwrite
+```
+
+FFmpeg is needed only for regeneration, with `aac` and `libopus` encoders;
+ordinary playback tests need neither FFmpeg nor credentials. No runtime codec
+dependency was added. The new binary samples total approximately 112 KiB and
+are stored directly in Git.
+
+Each derivative has a whole-file `continuous`, a two-file `jitter` supplied
+at 0 and 2500 ms, and corrupt `invalid` audio. Jitter segments are independently
+encoded and self-contained (including OpusHead/Tags for each Ogg file). This
+covers delayed playlist supply, **not arbitrary network fragmentation of one
+Ogg bitstream**. Provider-native AAC/Opus streaming acceptance remains untested.
+
+All nine compressed cases passed native macOS replay on 2026-10-22: valid
+samples complete once with no playback failure; deliberate supply gaps emit
+attributed waiting and recover; corrupt samples emit one failure and no
+completion. Other platforms remain unverified. Ogg Opus required correcting
+`TtsAudioFormat.opus.mimeType` from `audio/opus` to the container MIME
+`audio/ogg`; with the old MIME, macOS rejected the valid fixture with
+`-11828 Cannot Open`. Playback event assertions do not measure recorded speaker
+output and do not certify the absence of audible clipping or glitches.
+
+
+### Arbitrary network fragmentation of one encoded stream
+
+`ProviderPlaybackFixture.fragmented()` reuses each existing `derived_aac` or
+`derived_opus` continuous file without re-encoding it or adding container
+headers. At test time it cuts at byte offsets 1, 2, 5, 13, 26, 27, 28, and 31,
+then at multiples of 389. This splits ADTS sync/header/payload bytes and Ogg
+header/lacing/packet data; chunks are not independent audio files. A second
+schedule adds 2500 ms to chunks starting in the latter half of the same file.
+The asset regression checks byte-for-byte reconstruction and timing. No new
+binary fixtures or speech sources are added for these cases.
+
+The native regression revealed that the default finite-segment playback path
+cannot accept these arbitrary boundaries: freezing an incomplete segment can
+cause native decode errors. The new explicit `JustAudioBackend(bufferEncodedAudio:
+true)` mode accumulates the original encoded bytes until finalization and
+submits one complete source, with a default 64 MiB per-request bound. It does
+not transcode or introduce a codec dependency; PCM remains progressive.
+This is whole-payload playback, **not a low-latency incremental decoder**.
+An input delay becomes a first-playback delay rather than an underflow event.
+
+Verified on macOS on 2026-10-22: four cases (AAC/Opus × regular/delayed supply)
+complete once, without playback failure or waiting; each reports 2600–3000 ms
+of audio, rejecting success after only an early frame/page. Two additional
+corrupt-payload cases fail once without completion. Existing nine compressed
+independent-segment cases still pass. Other platforms remain unverified, and
+none of these event tests certify recorded speaker waveform quality.

@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'dart:typed_data';
 
 import 'package:flutter/foundation.dart';
 import 'package:just_audio/just_audio.dart';
@@ -92,7 +93,14 @@ class JustAudioBackend
         SpeakerPlaybackFailureAwareBackend,
         PlaybackTimelineReporter {
   /// constructor
-  JustAudioBackend() : _player = _createPlayer() {
+  JustAudioBackend({
+    this.bufferEncodedAudio = false,
+    this.maxBufferedEncodedBytes = 64 * 1024 * 1024,
+  }) : assert(
+         maxBufferedEncodedBytes > 0,
+         'maxBufferedEncodedBytes must be positive.',
+       ),
+       _player = _createPlayer() {
     _processingStateSubscription = _player.processingStateStream.listen((
       state,
     ) {
@@ -114,7 +122,15 @@ class JustAudioBackend
 
   /// Testing constructor that injects a preconfigured player.
   @visibleForTesting
-  JustAudioBackend.testing({required AudioPlayer player}) : _player = player {
+  JustAudioBackend.testing({
+    required AudioPlayer player,
+    this.bufferEncodedAudio = false,
+    this.maxBufferedEncodedBytes = 64 * 1024 * 1024,
+  }) : assert(
+         maxBufferedEncodedBytes > 0,
+         'maxBufferedEncodedBytes must be positive.',
+       ),
+       _player = player {
     _processingStateSubscription = _player.processingStateStream.listen((
       state,
     ) {
@@ -132,6 +148,15 @@ class JustAudioBackend
       unawaited(_enqueuePlayerOperation(() => _onPlayerError(error)));
     });
   }
+
+  /// 收齐一个请求的压缩流后再提交单个文件，适用于任意网络分块。
+  ///
+  /// 默认有限片段模式要求每段可独立解码；此选项保留编码字节，
+  /// 不解码或重编码，但会增加首播延迟。PCM 仍使用原有渐进播放。
+  final bool bufferEncodedAudio;
+
+  /// 完整压缩流模式下每个请求最多缓存的字节数，默认 64 MiB。
+  final int maxBufferedEncodedBytes;
 
   static bool _isInitialized = false;
 
@@ -253,6 +278,19 @@ class JustAudioBackend
       throw StateError('Playback is stopped: $playbackId');
     }
 
+    final buffer = session.encodedBuffer;
+    if (buffer != null) {
+      if (buffer.length + chunk.bytes.length > maxBufferedEncodedBytes) {
+        // 超限后终止此会话，避免调用方将残缺前缀当成完整音频提交。
+        buffer.clear();
+        session.isStopped = true;
+        throw StateError('Encoded playback exceeds maxBufferedEncodedBytes.');
+      }
+      buffer.add(chunk.bytes);
+      session.totalBytes += chunk.bytes.length;
+      return;
+    }
+
     var target = session.tailSource;
     if (target == null || target.hasStarted) {
       target = await _createSegment(session);
@@ -286,10 +324,16 @@ class JustAudioBackend
     }
 
     session.isFinalized = true;
+    final buffer = session.encodedBuffer;
+    if (buffer != null && buffer.isNotEmpty) {
+      await _createSegment(session, initialBytes: buffer.takeBytes());
+    }
     final tail = session.tailSource;
     tail?.isTerminalSegment = true;
     if (tail == null || session.completedSourceIndexes.contains(tail.index)) {
       await _completePlayback(session);
+    } else if (buffer != null) {
+      await _ensurePlaybackRunning();
     }
   }
 
@@ -348,6 +392,10 @@ class JustAudioBackend
       playbackId: playbackId,
       requestKey: requestKey,
       audioSpec: audioSpec,
+      encodedBuffer:
+          bufferEncodedAudio && audioSpec.format != TtsAudioFormat.pcm
+          ? BytesBuilder()
+          : null,
     );
     _completedPlaybackIds.remove(playbackId);
     return playbackId;

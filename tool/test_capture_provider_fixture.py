@@ -1,9 +1,11 @@
 #!/usr/bin/env python3
 import importlib.util
 import io
+import json
 import sys
 import tempfile
 import unittest
+from unittest.mock import patch
 from pathlib import Path
 
 
@@ -17,6 +19,28 @@ _SPEC.loader.exec_module(capture)
 
 
 class CaptureProviderFixtureTest(unittest.TestCase):
+    def test_mimo_mp3_capture_requests_mp3_and_preserves_encoded_metadata(self):
+        args = capture.parser().parse_args(["capture", "mimo", "--format", "mp3"])
+        with patch.object(capture, "_require_env", return_value="fake-key"), patch.object(
+            capture, "_post", return_value=io.BytesIO(),
+        ) as post:
+            metadata, _, is_sse = capture._request_for(args)
+        self.assertEqual(json.loads(post.call_args.kwargs["body"])["audio"]["format"], "mp3")
+        self.assertEqual(metadata.format, "mp3")
+        self.assertEqual(metadata.sample_rate_hz, 24000)
+        self.assertIsNone(metadata.bits_per_sample)
+        self.assertTrue(is_sse)
+
+    def test_mimo_unsupported_formats_never_send_a_request(self):
+        for audio_format in ("aac", "opus"):
+            args = capture.parser().parse_args(["capture", "mimo", "--format", audio_format])
+            with patch.object(capture, "_require_env", return_value="fake-key"), patch.object(
+                capture, "_post",
+            ) as post:
+                with self.assertRaisesRegex(ValueError, "pcm and mp3 only"):
+                    capture._request_for(args)
+                post.assert_not_called()
+
     def test_normalizes_offsets_and_writes_pcm_manifest(self):
         chunks = capture._normalize_offsets(
             [capture.CapturedChunk(b"a", 12), capture.CapturedChunk(b"b", 4)],

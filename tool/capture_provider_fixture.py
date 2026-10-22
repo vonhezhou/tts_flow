@@ -203,11 +203,14 @@ def _request_for(args: argparse.Namespace) -> tuple[AudioMetadata, BinaryIO, boo
         return metadata, response, False
 
     api_key = _require_env("MIMO_API_KEY")
-    metadata = _metadata("mimo", "pcm", args)
+    audio_format = args.format or "pcm"
+    if audio_format not in ("pcm", "mp3"):
+        raise ValueError("MiMo capture supports pcm and mp3 only; AAC/Opus are not advertised.")
+    metadata = _metadata("mimo", audio_format, args)
     payload = {
         "model": args.model or "mimo-v2.5-tts",
         "messages": [{"role": "assistant", "content": args.text}],
-        "audio": {"format": "pcm16", "voice": args.voice or "mimo_default"},
+        "audio": {"format": "pcm16" if audio_format == "pcm" else "mp3", "voice": args.voice or "mimo_default"},
         "stream": True,
     }
     response = _post(
@@ -219,7 +222,7 @@ def _request_for(args: argparse.Namespace) -> tuple[AudioMetadata, BinaryIO, boo
 
 
 def _metadata(provider: str, audio_format: str, args: argparse.Namespace) -> AudioMetadata:
-    if provider == "mimo":
+    if provider == "mimo" and audio_format == "pcm":
         return AudioMetadata(provider, "pcm", 24000, 1, 16, "signedInt")
     return AudioMetadata(
         provider,
@@ -280,7 +283,8 @@ def capture(args: argparse.Namespace) -> None:
     metadata, response, is_sse = _request_for(args)
     with response:
         chunks = _capture_mimo_sse(response) if is_sse else _capture_binary(response)
-    destination = args.root / metadata.provider / "continuous"
+    directory = "mimo_mp3" if metadata.provider == "mimo" and metadata.format == "mp3" else metadata.provider
+    destination = args.root / directory / "continuous"
     _write_fixture(destination, metadata, "continuous", chunks, overwrite=args.overwrite)
     print(f"Wrote {len(chunks)} chunks ({sum(len(chunk.data) for chunk in chunks)} bytes) to {destination}")
 

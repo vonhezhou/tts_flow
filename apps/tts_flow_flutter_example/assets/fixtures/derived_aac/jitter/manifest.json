@@ -1,0 +1,29 @@
+{
+  "provider": "derived_aac",
+  "format": "aac",
+  "sampleRateHz": 24000,
+  "channels": 1,
+  "kind": "jitter",
+  "chunks": [
+    {
+      "file": "000.bin",
+      "arrivalOffsetMs": 0
+    },
+    {
+      "file": "001.bin",
+      "arrivalOffsetMs": 2500
+    }
+  ],
+  "provenance": {
+    "type": "transcoded",
+    "source": "../../mimo/continuous/manifest.json",
+    "sourcePcmSha256": "9c28b994d4de15ecec1e77c271e5fe3da16e0f49076ac7e374e55b484d4b973b",
+    "generator": "tool/generate_encoded_playback_fixtures.py",
+    "encoder": "aac",
+    "container": "adts",
+    "timing": "simulated playlist supply; independently encoded segments"
+  },
+  "verifiedPlatforms": [
+    "macos"
+  ]
+}

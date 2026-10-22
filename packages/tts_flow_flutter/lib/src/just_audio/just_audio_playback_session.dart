@@ -9,11 +9,14 @@ final class _PlaybackSession {
     required this.playbackId,
     required this.requestKey,
     required this.audioSpec,
+    this.encodedBuffer,
   });
 
   final String playbackId;
   final String requestKey;
   final TtsAudioSpec audioSpec;
+
+  final BytesBuilder? encodedBuffer;
 
   ChunkAudioSource? tailSource;
   int totalBytes = 0;

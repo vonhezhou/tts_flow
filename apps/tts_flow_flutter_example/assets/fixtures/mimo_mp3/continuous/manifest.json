@@ -1,0 +1,48 @@
+{
+  "provider": "mimo",
+  "format": "mp3",
+  "sampleRateHz": 24000,
+  "channels": 1,
+  "kind": "continuous",
+  "chunks": [
+    {
+      "file": "000.bin",
+      "arrivalOffsetMs": 0
+    },
+    {
+      "file": "001.bin",
+      "arrivalOffsetMs": 44
+    },
+    {
+      "file": "002.bin",
+      "arrivalOffsetMs": 95
+    },
+    {
+      "file": "003.bin",
+      "arrivalOffsetMs": 145
+    },
+    {
+      "file": "004.bin",
+      "arrivalOffsetMs": 299
+    },
+    {
+      "file": "005.bin",
+      "arrivalOffsetMs": 299
+    },
+    {
+      "file": "006.bin",
+      "arrivalOffsetMs": 354
+    }
+  ],
+  "provenance": {
+    "type": "captured",
+    "model": "mimo-v2.5-tts",
+    "voice": "mimo_default",
+    "capturedOn": "2026-10-22",
+    "timing": "decoded provider SSE events relative to first audio",
+    "warning": "Provider MP3 fragments include independent encoder metadata; kept unchanged."
+  },
+  "verifiedPlatforms": [
+    "macos"
+  ]
+}

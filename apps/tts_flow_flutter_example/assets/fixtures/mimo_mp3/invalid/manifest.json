@@ -1,0 +1,19 @@
+{
+  "provider": "mimo",
+  "format": "mp3",
+  "sampleRateHz": 24000,
+  "channels": 1,
+  "kind": "invalid",
+  "chunks": [
+    {
+      "file": "000.bin",
+      "arrivalOffsetMs": 0
+    }
+  ],
+  "provenance": {
+    "type": "hand-authored"
+  },
+  "verifiedPlatforms": [
+    "macos"
+  ]
+}
