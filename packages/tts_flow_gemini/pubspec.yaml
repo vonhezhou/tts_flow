@@ -8,7 +8,7 @@ environment:
   sdk: ^3.11.0
 
 dependencies:
-  googleai_dart: ^12.0.2
+  googleai_dart: ^13.0.0
   http: ^1.6.0
   tts_flow_dart: ^0.2.0
 
