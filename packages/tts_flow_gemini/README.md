@@ -2,9 +2,9 @@
 
 Pure Dart Gemini text-to-speech adapter for `tts_flow_dart` and Flutter. Uses
 the maintained community SDK [`googleai_dart`](https://pub.dev/packages/googleai_dart)
-12.x for authentication, typed requests, SSE parsing, and response decoding.
-The adapter retains the 12.x API; CI uses Flutter 3.47.7, while this
-package keeps its Dart 3.11 runtime minimum.
+13.x for authentication, typed requests, SSE parsing, and response decoding.
+The 13.0 upgrade retains the synthesis API and raises the package's minimum
+Dart version to 3.12, matching the SDK requirement. CI uses Flutter 3.47.7.
 The deprecated `google_generative_ai` package is not used. Google's official
 [`firebase_ai`](https://firebase.google.com/docs/ai-logic/generate-speech) is
 another option for Flutter apps already configured with Firebase; this adapter
