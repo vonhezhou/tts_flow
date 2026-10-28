@@ -25,10 +25,9 @@ final class ReadingHighlight {
 /// Connects request-level TTS timing to offsets in a book passage.
 final class ReadingSession {
   ReadingSession({
-    required TtsFlow flow,
-    required PlaybackTimelineReporter? timelineReporter,
-  }) : _flow = flow,
-       _timelineReporter = timelineReporter {
+    required this._flow,
+    required this._timelineReporter,
+  }) {
     _timelineSubscription = _timelineReporter?.playbackPositionEvents.listen(
       _onPlaybackPosition,
     );

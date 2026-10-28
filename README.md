@@ -28,6 +28,12 @@ an experimental Edge source, restricted to the demonstration app.
 
 ## Automated checks
 
+Workspace development requires Dart 3.13 / Flutter 3.47 or newer because
+`very_good_analysis 11` requires Dart 3.13; CI uses Flutter 3.47.7.
+This tooling requirement does not raise the published core/Flutter libraries'
+runtime SDK minimum. The Gemini adapter separately requires Dart 3.12 for
+`googleai_dart 13`.
+
 - `CI` runs static analysis, package unit tests, and example asset/reader tests
   plus Python fixture-tool tests on pull requests and pushes to `main`.
   It uploads Dart-core and Flutter-adapter LCOV reports as a workflow artifact

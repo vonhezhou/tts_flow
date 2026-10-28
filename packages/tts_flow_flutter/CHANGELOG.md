@@ -4,6 +4,8 @@
 
 - Upgrade `audio_decoder` to 0.8.1; keep the complete-payload conversion API.
 - Add native MP3 decoding and 24/16 kHz PCM resampling regressions.
+- Upgrade development lint rules to `very_good_analysis` 11 (Dart 3.13 tooling).
+  The library's runtime Dart minimum remains unchanged.
 
 ## 0.2.0
 
