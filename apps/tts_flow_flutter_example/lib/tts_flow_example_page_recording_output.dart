@@ -13,7 +13,7 @@ final class _RecordingAuxiliaryOutput implements TtsAuxiliaryOutput {
   var _hasSession = false;
 
   @override
-  String get outputId => 'example-wav-recorder';
+  String get outputId => 'example-audio-recorder';
 
   @override
   void init() {

@@ -171,6 +171,42 @@ replays the recorded timing and checks one completion with no playback failure.
 The long sample passed native macOS replay on 2026-10-22; other platforms have
 not been verified for this sample.
 
+### Captured Edge MP3 samples (2026-10-28)
+
+`edge_mp3/continuous` was captured through
+[`dart_edge_tts`](https://github.com/vonhezhou/dart_edge_tts) at commit
+`cd02058c512e1beca5ec69eb83889304e97ea182`, using its restored v2 authentication
+and voice `zh-CN-XiaoxiaoNeural`. The fixed, original test phrase is:
+
+> 你好，这是语音合成测试。我们正在验证音频分片和流式播放是否正常。
+
+The capture retains all 65 SDK audio events: 46656 bytes of 24 kHz mono MP3,
+7.776 seconds of encoded frames, with arrival offsets spanning 412 ms.
+The asset test walks every frame of every original event and checks matching
+sample rate/channels and complete frame boundaries. This verifies this sample's
+alignment; it does not establish a universal Edge transport guarantee.
+`jitter` retains identical audio with a derived 2500 ms gap after event zero.
+`invalid` contains hand-authored corrupt MP3 with valid manifest metadata.
+Only audio, arrival offsets, and public provenance are saved.
+
+Edge uses an unofficial service interface whose availability can change.
+`dart_edge_tts` is allowed only in the Flutter demonstration app, behind the
+explicit `edge` source selection; it must not become a dependency or maintained
+provider of the published framework packages. The example pins the Git revision
+above. Future captures should import sanitized audio events and arrival offsets
+using the manifest contract above. Ordinary playback checks replay committed
+fixtures without contacting Edge; the example's live acceptance test requires
+`--dart-define=RUN_EDGE_LIVE=true`.
+
+Recapturing may change byte/chunk counts and duration; inspect the new frames
+and update the asset expectations accordingly. The upstream package specifies
+non-commercial use; these samples are retained for offline testing.
+
+Verified on macOS on 2026-10-28: continuous and jitter each complete once
+without playback failure; jitter emits attributed waiting and recovers.
+Corrupt MP3 fails once without completion. Other platforms remain unverified;
+these event checks do not certify acoustic quality.
+
 ### Offline synthetic MP3 samples
 
 `assets/fixtures/synthetic_mp3/` contains a locally generated 440 Hz tone,
@@ -286,9 +322,9 @@ These cases deliberately split a single file at arbitrary byte offsets. They
 do not model the maintainer's prior MiMo TTS and edge-tts MP3 observations,
 where provider audio fragments were aligned to complete MP3 frames. That
 experience motivated the default finite-source playback design. It is not a
-universal provider guarantee: edge-tts has no corresponding repository fixture
-or platform regression, and native AAC/Opus provider chunk boundaries remain
-unverified. See the [backend boundary and mode-selection guide](just_audio_backend.md)
+universal provider guarantee: the Edge sample above now has a repository fixture
+and native playback regression, while native AAC/Opus provider chunk boundaries
+remain unverified. See the [backend boundary and mode-selection guide](just_audio_backend.md)
 for the distinction between transport reads, provider audio fragments, and
 finite playback sources. Frame alignment still requires platform validation;
 it alone does not prove that every fragment is independently decodable.

@@ -22,6 +22,10 @@ The maintained online adapters are MiMo and Gemini. Azure and OpenAI adapters
 are no longer included; third-party providers can implement `TtsEngine`.
 Ordinary checks use committed fixtures and do not consume provider quota.
 
+The [Flutter example](./apps/tts_flow_flutter_example/README.md) can switch
+sources in the UI and save development MiMo/Gemini keys locally. It also has
+an experimental Edge source, restricted to the demonstration app.
+
 ## Automated checks
 
 - `CI` runs static analysis, package unit tests, and example asset/reader tests

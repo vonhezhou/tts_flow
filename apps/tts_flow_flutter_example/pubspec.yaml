@@ -45,6 +45,12 @@ dependencies:
   path: ^1.9.1
   path_provider: ^2.1.5
   url_launcher: ^6.3.2
+  shared_preferences: ^2.5.3
+  # Unofficial Edge integration is restricted to this demonstration app.
+  dart_edge_tts:
+    git:
+      url: https://github.com/vonhezhou/dart_edge_tts.git
+      ref: cd02058c512e1beca5ec69eb83889304e97ea182
 
 dev_dependencies:
   http: ^1.6.0
@@ -86,6 +92,9 @@ flutter:
     - assets/fixtures/mimo_mp3/continuous/
     - assets/fixtures/mimo_mp3/jitter/
     - assets/fixtures/mimo_mp3/invalid/
+    - assets/fixtures/edge_mp3/continuous/
+    - assets/fixtures/edge_mp3/jitter/
+    - assets/fixtures/edge_mp3/invalid/
     - assets/fixtures/derived_aac/continuous/
     - assets/fixtures/derived_aac/jitter/
     - assets/fixtures/derived_aac/invalid/

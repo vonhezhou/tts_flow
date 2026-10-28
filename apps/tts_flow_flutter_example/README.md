@@ -34,6 +34,10 @@ This app is a deterministic playback and output-lifecycle demonstration for
 `tts_flow_flutter`. By default it uses a bundled WAV fixture through
 `FileTtsEngine`, so it can run without an online TTS account or API key.
 
+The Speaker tab has a `TTS source` selector for Bundled WAV, MiMo, Gemini and
+experimental Edge. Switching sources stops the previous service and initializes
+the selected engine. Playback controls remain scrollable on smaller windows.
+
 ## Android release signing
 
 The checked-in application ID belongs to this demonstration app. A release
@@ -56,9 +60,7 @@ Speaker tab. It streams 24 kHz PCM from MiMo and plays it through
 flutter run --dart-define=MIMO_API_KEY=your_key_here
 ```
 
-Without that define, the example remains in deterministic bundled-WAV mode.
-The key is deliberately not persisted or entered in the UI; do not bundle a
-production key in a client app.
+Without that define, select MiMo in the app to configure a development key.
 
 ## Google Gemini live source
 
@@ -72,14 +74,40 @@ flutter run -d macos \
   --dart-define=GEMINI_API_KEY="$GEMINI_API_KEY"
 ```
 
-Gemini is explicitly selected; a key alone does not enable it. A missing key
-falls back to the bundled sample with a configuration notice. Use development
-credentials only; do not distribute API keys in a production client. See
+Gemini is explicitly selected in the app or through `TTS_SOURCE`; a key alone
+does not enable it. See
 [adapter setup, offline tests and live capture](../../packages/tts_flow_gemini/README.md).
 
-It demonstrates speaker playback, physical playback events, output writing,
-and WAV export. It intentionally does not embed an online-provider
-credential flow; provider credentials remain application-owned.
+## API Key 输入与本地保存
+
+MiMo、Gemini 的 Key 按以下优先级读取：`--dart-define`、应用进程环境变量、
+本地 SharedPreferences。桌面进程可以读取继承的环境变量；从 IDE、手机或桌面图标
+启动时建议使用 `--dart-define`，或直接在 App 中输入。
+
+选中 MiMo/Gemini 且没有可用 Key 时弹出输入框。保存成功后启用该来源，下次选择时
+直接复用；两者的 Key 分开存储。取消输入保留当前来源，首次启动取消则使用内置 WAV。
+`API Key` 按钮可以修改或删除本地 Key；删除后切回离线样本。环境注入的 Key 优先，
+不会自动持久化，也不能通过本地设置覆盖。
+
+SharedPreferences 不加密，适合这台设备上的开发测试 Key。不要把生产 Key 随 App
+分发；本例不会打印 Key 或把它写入音频样本。
+
+## Edge 示例来源
+
+选择 `Edge (experimental)`，或通过 `--dart-define=TTS_SOURCE=edge` 启动。
+无需 API Key。示例使用固定 Git 版本的 `dart_edge_tts`，把原始 MP3 音频事件传给
+`TtsFlow` 和 `JustAudioBackend`，辅助输出保存为 MP3；其他来源继续保存 WAV。
+该服务接口非正式且可能失效，接入仅限示例 App，不加入框架的正式 Provider 包。
+上游包注明仅限非商业使用。
+
+显式联网验收（默认测试不访问 Edge）：
+
+```sh
+flutter test integration_test/edge_example_live_test.dart -d macos \
+  --dart-define=RUN_EDGE_LIVE=true
+```
+
+此用例验证示例页面初始化、固定语句合成和原生播放完成，不验证声学质量。
 
 See the repository [architecture](../../docs/architecture.md) and the
 [JustAudio backend notes](../../docs/just_audio_backend.md) for scope and

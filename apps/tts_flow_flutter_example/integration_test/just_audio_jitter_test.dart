@@ -61,7 +61,12 @@ void main() {
   });
 
   group('Encoded speech fixtures', () {
-    for (final provider in ['mimo_mp3', 'derived_aac', 'derived_opus']) {
+    for (final provider in [
+      'edge_mp3',
+      'mimo_mp3',
+      'derived_aac',
+      'derived_opus',
+    ]) {
       for (final kind in ['continuous', 'jitter', 'invalid']) {
         test('$provider $kind native playback', () async {
           final fixture = await ProviderPlaybackFixture.load(
@@ -82,6 +87,17 @@ void main() {
               ).join('; '),
             );
             expect(result.playbackCompletedEvents, hasLength(1));
+            if (provider == 'edge_mp3') {
+              // 防止只播放前几个分片便误报整句完成。
+              expect(
+                result
+                    .playbackCompletedEvents
+                    .single
+                    .playedDuration
+                    ?.inMilliseconds,
+                inInclusiveRange(7500, 8100),
+              );
+            }
             for (final waiting in result.waitingEvents) {
               expect(waiting.requestKey, result.requestKey);
             }

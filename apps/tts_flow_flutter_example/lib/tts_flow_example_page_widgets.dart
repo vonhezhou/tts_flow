@@ -1,37 +1,33 @@
 part of 'tts_flow_example_page.dart';
 
 class _SourceNotice extends StatelessWidget {
-  const _SourceNotice({
-    required this.usesGemini,
-    required this.usesMimo,
-    required this.requestedSource,
-  });
+  const _SourceNotice({required this.source});
 
-  final bool usesMimo;
-  final bool usesGemini;
-  final String requestedSource;
+  final ExampleTtsSource source;
 
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
-    final message = usesGemini
-        ? 'Live source: Google Gemini Flash TTS. Audio streams to the speaker.'
-        : requestedSource == 'gemini'
-        ? 'Gemini source was requested, but GEMINI_API_KEY is missing. Using the bundled WAV sample.'
-        : usesMimo
-        ? 'Live source: Xiaomi MiMo V2.5 TTS. Audio is synthesized remotely and streamed to the speaker.'
-        : 'Demo source: bundled WAV sample. Launch with --dart-define=MIMO_API_KEY=... for MiMo, or --dart-define=TTS_SOURCE=gemini --dart-define=GEMINI_API_KEY=... for Gemini.';
+    final live = source != ExampleTtsSource.sample;
+    final message = switch (source) {
+      ExampleTtsSource.gemini =>
+        'Live source: Google Gemini Flash TTS. Audio streams to the speaker.',
+      ExampleTtsSource.mimo =>
+        'Live source: Xiaomi MiMo V2.5 TTS. Audio streams to the speaker.',
+      ExampleTtsSource.edge =>
+        'Experimental Edge source: unofficial service, availability may change. No API Key required.',
+      ExampleTtsSource.sample =>
+        'Demo source: bundled WAV sample. Select an online source above to synthesize your text.',
+    };
     return Card(
-      color: (usesMimo || usesGemini)
+      color: live
           ? theme.colorScheme.primaryContainer
           : theme.colorScheme.surfaceContainerHighest,
       child: Padding(
         padding: const EdgeInsets.all(12),
         child: Row(
           children: [
-            Icon(
-              (usesMimo || usesGemini) ? Icons.cloud_done : Icons.info_outline,
-            ),
+            Icon(live ? Icons.cloud_done : Icons.info_outline),
             const SizedBox(width: 8),
             Expanded(child: Text(message)),
           ],

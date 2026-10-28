@@ -1,0 +1,277 @@
+{
+  "provider": "edge_mp3",
+  "format": "mp3",
+  "sampleRateHz": 24000,
+  "channels": 1,
+  "kind": "continuous",
+  "chunks": [
+    {
+      "file": "000.bin",
+      "arrivalOffsetMs": 0
+    },
+    {
+      "file": "001.bin",
+      "arrivalOffsetMs": 10
+    },
+    {
+      "file": "002.bin",
+      "arrivalOffsetMs": 14
+    },
+    {
+      "file": "003.bin",
+      "arrivalOffsetMs": 26
+    },
+    {
+      "file": "004.bin",
+      "arrivalOffsetMs": 29
+    },
+    {
+      "file": "005.bin",
+      "arrivalOffsetMs": 30
+    },
+    {
+      "file": "006.bin",
+      "arrivalOffsetMs": 30
+    },
+    {
+      "file": "007.bin",
+      "arrivalOffsetMs": 32
+    },
+    {
+      "file": "008.bin",
+      "arrivalOffsetMs": 38
+    },
+    {
+      "file": "009.bin",
+      "arrivalOffsetMs": 39
+    },
+    {
+      "file": "010.bin",
+      "arrivalOffsetMs": 45
+    },
+    {
+      "file": "011.bin",
+      "arrivalOffsetMs": 81
+    },
+    {
+      "file": "012.bin",
+      "arrivalOffsetMs": 81
+    },
+    {
+      "file": "013.bin",
+      "arrivalOffsetMs": 81
+    },
+    {
+      "file": "014.bin",
+      "arrivalOffsetMs": 94
+    },
+    {
+      "file": "015.bin",
+      "arrivalOffsetMs": 99
+    },
+    {
+      "file": "016.bin",
+      "arrivalOffsetMs": 110
+    },
+    {
+      "file": "017.bin",
+      "arrivalOffsetMs": 110
+    },
+    {
+      "file": "018.bin",
+      "arrivalOffsetMs": 110
+    },
+    {
+      "file": "019.bin",
+      "arrivalOffsetMs": 110
+    },
+    {
+      "file": "020.bin",
+      "arrivalOffsetMs": 110
+    },
+    {
+      "file": "021.bin",
+      "arrivalOffsetMs": 183
+    },
+    {
+      "file": "022.bin",
+      "arrivalOffsetMs": 183
+    },
+    {
+      "file": "023.bin",
+      "arrivalOffsetMs": 186
+    },
+    {
+      "file": "024.bin",
+      "arrivalOffsetMs": 204
+    },
+    {
+      "file": "025.bin",
+      "arrivalOffsetMs": 204
+    },
+    {
+      "file": "026.bin",
+      "arrivalOffsetMs": 264
+    },
+    {
+      "file": "027.bin",
+      "arrivalOffsetMs": 264
+    },
+    {
+      "file": "028.bin",
+      "arrivalOffsetMs": 336
+    },
+    {
+      "file": "029.bin",
+      "arrivalOffsetMs": 336
+    },
+    {
+      "file": "030.bin",
+      "arrivalOffsetMs": 337
+    },
+    {
+      "file": "031.bin",
+      "arrivalOffsetMs": 337
+    },
+    {
+      "file": "032.bin",
+      "arrivalOffsetMs": 337
+    },
+    {
+      "file": "033.bin",
+      "arrivalOffsetMs": 337
+    },
+    {
+      "file": "034.bin",
+      "arrivalOffsetMs": 352
+    },
+    {
+      "file": "035.bin",
+      "arrivalOffsetMs": 352
+    },
+    {
+      "file": "036.bin",
+      "arrivalOffsetMs": 352
+    },
+    {
+      "file": "037.bin",
+      "arrivalOffsetMs": 353
+    },
+    {
+      "file": "038.bin",
+      "arrivalOffsetMs": 353
+    },
+    {
+      "file": "039.bin",
+      "arrivalOffsetMs": 353
+    },
+    {
+      "file": "040.bin",
+      "arrivalOffsetMs": 353
+    },
+    {
+      "file": "041.bin",
+      "arrivalOffsetMs": 353
+    },
+    {
+      "file": "042.bin",
+      "arrivalOffsetMs": 353
+    },
+    {
+      "file": "043.bin",
+      "arrivalOffsetMs": 353
+    },
+    {
+      "file": "044.bin",
+      "arrivalOffsetMs": 353
+    },
+    {
+      "file": "045.bin",
+      "arrivalOffsetMs": 354
+    },
+    {
+      "file": "046.bin",
+      "arrivalOffsetMs": 354
+    },
+    {
+      "file": "047.bin",
+      "arrivalOffsetMs": 355
+    },
+    {
+      "file": "048.bin",
+      "arrivalOffsetMs": 355
+    },
+    {
+      "file": "049.bin",
+      "arrivalOffsetMs": 355
+    },
+    {
+      "file": "050.bin",
+      "arrivalOffsetMs": 355
+    },
+    {
+      "file": "051.bin",
+      "arrivalOffsetMs": 355
+    },
+    {
+      "file": "052.bin",
+      "arrivalOffsetMs": 355
+    },
+    {
+      "file": "053.bin",
+      "arrivalOffsetMs": 355
+    },
+    {
+      "file": "054.bin",
+      "arrivalOffsetMs": 355
+    },
+    {
+      "file": "055.bin",
+      "arrivalOffsetMs": 406
+    },
+    {
+      "file": "056.bin",
+      "arrivalOffsetMs": 406
+    },
+    {
+      "file": "057.bin",
+      "arrivalOffsetMs": 406
+    },
+    {
+      "file": "058.bin",
+      "arrivalOffsetMs": 406
+    },
+    {
+      "file": "059.bin",
+      "arrivalOffsetMs": 406
+    },
+    {
+      "file": "060.bin",
+      "arrivalOffsetMs": 407
+    },
+    {
+      "file": "061.bin",
+      "arrivalOffsetMs": 407
+    },
+    {
+      "file": "062.bin",
+      "arrivalOffsetMs": 407
+    },
+    {
+      "file": "063.bin",
+      "arrivalOffsetMs": 407
+    },
+    {
+      "file": "064.bin",
+      "arrivalOffsetMs": 412
+    }
+  ],
+  "provenance": {
+    "type": "captured",
+    "repository": "https://github.com/vonhezhou/dart_edge_tts",
+    "revision": "cd02058c512e1beca5ec69eb83889304e97ea182",
+    "voice": "zh-CN-XiaoxiaoNeural",
+    "capturedAt": "2026-10-28T02:58:23.441780Z",
+    "timing": "original SDK audio events relative to first audio event"
+  }
+}

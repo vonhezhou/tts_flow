@@ -12,6 +12,9 @@ import 'package:tts_flow_mimo/tts_flow_mimo.dart';
 import 'package:tts_flow_gemini/tts_flow_gemini.dart';
 import 'package:url_launcher/url_launcher.dart';
 
+import 'edge_example_tts_engine.dart';
+import 'example_source_selector.dart';
+
 part 'tts_flow_example_page_recording_output.dart';
 part 'tts_flow_example_page_service_factory.dart';
 part 'tts_flow_example_page_value_helpers.dart';
@@ -19,7 +22,7 @@ part 'tts_flow_example_page_widgets.dart';
 
 const _sampleAudioAsset = 'assets/audio/test_audio_yanfei.wav';
 
-class TtsFlowExamplePage extends StatefulWidget {
+class TtsFlowExamplePage extends StatelessWidget {
   const TtsFlowExamplePage({
     this.geminiApiKey = '',
     this.mimoApiKey = '',
@@ -35,14 +38,31 @@ class TtsFlowExamplePage extends StatefulWidget {
   /// Development-only key supplied with `--dart-define=GEMINI_API_KEY=...`.
   final String geminiApiKey;
 
-  /// Optional live source selector: `mimo` or `gemini`.
+  /// Optional source selector: `sample`, `mimo`, `gemini`, or `edge`.
   final String ttsSource;
 
   @override
-  State<TtsFlowExamplePage> createState() => _TtsFlowExamplePageState();
+  Widget build(BuildContext context) => Material(
+    child: ExampleSourceSelector(
+      mimoApiKey: mimoApiKey,
+      geminiApiKey: geminiApiKey,
+      ttsSource: ttsSource,
+      builder: (context, configuration) =>
+          _SpeakerPlaybackPage(configuration: configuration),
+    ),
+  );
 }
 
-class _TtsFlowExamplePageState extends State<TtsFlowExamplePage> {
+class _SpeakerPlaybackPage extends StatefulWidget {
+  const _SpeakerPlaybackPage({required this.configuration});
+
+  final ExampleSourceConfiguration configuration;
+
+  @override
+  State<_SpeakerPlaybackPage> createState() => _TtsFlowExamplePageState();
+}
+
+class _TtsFlowExamplePageState extends State<_SpeakerPlaybackPage> {
   final _log = Logger('TtsFlowExamplePage');
   final JustAudioBackend _backend = JustAudioBackend();
   final _textController = TextEditingController(
@@ -81,22 +101,15 @@ class _TtsFlowExamplePageState extends State<TtsFlowExamplePage> {
   double _minPitch = 0.0;
   double _maxPitch = 0.0;
 
-  String get _requestedSource => widget.ttsSource.trim().toLowerCase();
-
-  bool get _usesMimo =>
-      (_requestedSource.isEmpty || _requestedSource == 'mimo') &&
-      widget.mimoApiKey.trim().isNotEmpty;
-
-  bool get _usesGemini =>
-      _requestedSource == 'gemini' && widget.geminiApiKey.trim().isNotEmpty;
+  ExampleTtsSource get _source => widget.configuration.source;
 
   String get _engineLabel {
-    if (_usesGemini) return 'Google Gemini Flash TTS (live)';
-    if (_requestedSource == 'gemini') {
-      return 'Gemini TTS (configuration needed)';
-    }
-    if (_usesMimo) return 'Xiaomi MiMo V2.5 TTS (live)';
-    return 'Bundled WAV sample';
+    return switch (_source) {
+      ExampleTtsSource.gemini => 'Google Gemini Flash TTS (live)',
+      ExampleTtsSource.mimo => 'Xiaomi MiMo V2.5 TTS (live)',
+      ExampleTtsSource.edge => 'Edge TTS (experimental)',
+      ExampleTtsSource.sample => 'Bundled WAV sample',
+    };
   }
 
   @override
@@ -114,27 +127,43 @@ class _TtsFlowExamplePageState extends State<TtsFlowExamplePage> {
     unawaited(_playbackPosSub?.cancel());
     unawaited(_playerPosSub?.cancel());
     unawaited(_playerDurationSub?.cancel());
-    unawaited(_service?.dispose());
+    unawaited(_releaseResources(_service));
     _textController.dispose();
     super.dispose();
+  }
+
+  Future<void> _releaseResources(TtsFlow? service) async {
+    try {
+      await service?.dispose();
+    } finally {
+      // 引擎初始化失败时，输出尚未被 TtsFlow 接管，仍需释放播放器。
+      await _backend.dispose();
+    }
   }
 
   Future<void> _initService() async {
     TtsFlow? service;
     try {
       final resources = await _ExampleServiceFactory(
-        usesGemini: _usesGemini,
-        geminiApiKey: widget.geminiApiKey,
-        usesMimo: _usesMimo,
-        mimoApiKey: widget.mimoApiKey,
+        configuration: widget.configuration,
       ).create(backend: _backend, log: _log);
       service = resources.service;
+      if (!mounted) {
+        await _releaseResources(service);
+        return;
+      }
       final engine = resources.engine;
       _outputDirPath = resources.outputDirectoryPath;
       _outputAudioPath = resources.outputAudioPath;
 
       await service.init();
-      service.preferredFormat = TtsAudioFormat.pcm;
+      if (!mounted) {
+        await _releaseResources(service);
+        return;
+      }
+      service.preferredFormat = _source == ExampleTtsSource.edge
+          ? TtsAudioFormat.mp3
+          : TtsAudioFormat.pcm;
 
       _minVolume = engine.minVolume;
       _maxVolume = engine.maxVolume;
@@ -154,6 +183,10 @@ class _TtsFlowExamplePageState extends State<TtsFlowExamplePage> {
       final voices = await service.getAvailableVoices();
       final selectedVoiceId = service.voice.voiceId;
 
+      if (!mounted) {
+        await _releaseResources(service);
+        return;
+      }
       _queueSub = service.queueEvents.listen(_onQueueEvent);
       _requestSub = service.requestEvents.listen(_onRequestEvent);
       _playbackPosSub = _backend.playbackPositionEvents.listen((event) {
@@ -185,7 +218,7 @@ class _TtsFlowExamplePageState extends State<TtsFlowExamplePage> {
       });
 
       if (!mounted) {
-        await service.dispose();
+        await _releaseResources(service);
         return;
       }
 
@@ -200,7 +233,7 @@ class _TtsFlowExamplePageState extends State<TtsFlowExamplePage> {
       });
     } catch (error, stackTrace) {
       _log.severe('Failed to initialize TtsFlow.', error, stackTrace);
-      await service?.dispose();
+      await _releaseResources(service);
       if (!mounted) {
         return;
       }
@@ -437,16 +470,12 @@ class _TtsFlowExamplePageState extends State<TtsFlowExamplePage> {
         title: Text('TtsFlow + JustAudioBackend ($_engineLabel)'),
         backgroundColor: Theme.of(context).colorScheme.inversePrimary,
       ),
-      body: Padding(
+      body: SingleChildScrollView(
         padding: const EdgeInsets.fromLTRB(16, 16, 16, 24),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            _SourceNotice(
-              usesGemini: _usesGemini,
-              usesMimo: _usesMimo,
-              requestedSource: _requestedSource,
-            ),
+            _SourceNotice(source: _source),
             const SizedBox(height: 12),
             TextField(
               controller: _textController,
@@ -545,7 +574,8 @@ class _TtsFlowExamplePageState extends State<TtsFlowExamplePage> {
             const SizedBox(height: 12),
             Text('Events', style: Theme.of(context).textTheme.titleMedium),
             const SizedBox(height: 8),
-            Expanded(
+            SizedBox(
+              height: 180,
               child: DecoratedBox(
                 decoration: BoxDecoration(
                   border: Border.all(color: Theme.of(context).dividerColor),

@@ -2,30 +2,28 @@ part of 'tts_flow_example_page.dart';
 
 /// Builds the example's source-specific TTS service and recording output.
 final class _ExampleServiceFactory {
-  const _ExampleServiceFactory({
-    required this.usesGemini,
-    required this.geminiApiKey,
-    required this.usesMimo,
-    required this.mimoApiKey,
-  });
+  const _ExampleServiceFactory({required this.configuration});
 
-  final bool usesMimo;
-  final bool usesGemini;
-  final String geminiApiKey;
-  final String mimoApiKey;
+  final ExampleSourceConfiguration configuration;
 
   Future<_ExampleServiceResources> create({
     required JustAudioBackend backend,
     required Logger log,
   }) async {
-    final outputDirectory = await getTemporaryDirectory();
+    final temporaryDirectory = await getTemporaryDirectory();
+    // 每次切换来源独立存放，避免旧服务的异步收尾覆盖新服务的录音文件。
+    final outputDirectory = await temporaryDirectory.createTemp(
+      'tts_flow_example_',
+    );
     final outputAudioPath = p.join(
       outputDirectory.path,
-      'tts_flow_example.wav',
+      configuration.source == ExampleTtsSource.edge
+          ? 'tts_flow_example.mp3'
+          : 'tts_flow_example.wav',
     );
-    final sampleAudioPath = (usesMimo || usesGemini)
-        ? null
-        : await _copySampleAudioToTemp(outputDirectory);
+    final sampleAudioPath = configuration.source == ExampleTtsSource.sample
+        ? await _copySampleAudioToTemp(outputDirectory)
+        : null;
     final engine = _createEngine(sampleAudioPath);
     final service = TtsFlow(
       engine: engine,
@@ -33,7 +31,9 @@ final class _ExampleServiceFactory {
         primary: SpeakerOutput(backend: backend),
         auxiliaries: [
           _RecordingAuxiliaryOutput(
-            output: WavFileOutput(outputAudioPath),
+            output: configuration.source == ExampleTtsSource.edge
+                ? Mp3FileOutput(outputAudioPath)
+                : WavFileOutput(outputAudioPath),
             log: log,
           ),
         ],
@@ -63,11 +63,14 @@ final class _ExampleServiceFactory {
   }
 
   TtsEngine _createEngine(String? sampleAudioPath) {
-    if (usesGemini) {
-      return GeminiTtsEngine(apiKey: geminiApiKey.trim());
+    if (configuration.source == ExampleTtsSource.edge) {
+      return EdgeExampleTtsEngine();
     }
-    if (usesMimo) {
-      return MimoTtsEngine(apiKey: mimoApiKey.trim());
+    if (configuration.source == ExampleTtsSource.gemini) {
+      return GeminiTtsEngine(apiKey: configuration.apiKey);
+    }
+    if (configuration.source == ExampleTtsSource.mimo) {
+      return MimoTtsEngine(apiKey: configuration.apiKey);
     }
     return FileTtsEngine(
       engineId: 'bundled-wav-file',

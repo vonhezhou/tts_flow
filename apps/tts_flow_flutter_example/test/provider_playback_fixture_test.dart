@@ -9,6 +9,49 @@ import '../integration_test/support/provider_playback_fixture.dart';
 void main() {
   TestWidgetsFlutterBinding.ensureInitialized();
 
+  test(
+    'Edge MP3 retains complete provider frames and derived timing',
+    () async {
+      final continuous = await ProviderPlaybackFixture.load(
+        manifestAsset: 'assets/fixtures/edge_mp3/continuous/manifest.json',
+      );
+      final jitter = await ProviderPlaybackFixture.load(
+        manifestAsset: 'assets/fixtures/edge_mp3/jitter/manifest.json',
+      );
+      expect(continuous.audioSpec.format, TtsAudioFormat.mp3);
+      expect(continuous.chunks, hasLength(65));
+      expect(jitter.chunks.length, continuous.chunks.length);
+      var totalBytes = 0;
+      var samples = 0;
+      for (var i = 0; i < continuous.chunks.length; i++) {
+        final bytes = continuous.chunks[i].bytes;
+        totalBytes += bytes.length;
+        expect(jitter.chunks[i].bytes, bytes);
+        expect(
+          jitter.chunks[i].arrivalOffset,
+          continuous.chunks[i].arrivalOffset +
+              Duration(milliseconds: i == 0 ? 0 : 2500),
+        );
+        var offset = 0;
+        while (offset < bytes.length) {
+          // 逐帧检查原始事件边界，不能只在拼接文件中搜索一个合法帧头。
+          expect(bytes[offset], 0xff);
+          expect(bytes[offset + 1] & 0xe0, 0xe0);
+          final header = Mp3FrameHeader.parse(
+            Uint8List.sublistView(bytes, offset),
+          );
+          expect(header.sampleRateHz, continuous.sampleRateHz);
+          expect(header.channelCount, continuous.channels);
+          offset += header.frameLengthBytes;
+          samples += header.samplesPerFrame;
+          expect(offset, lessThanOrEqualTo(bytes.length));
+        }
+      }
+      expect(totalBytes, 46656);
+      expect(samples / continuous.sampleRateHz, closeTo(7.776, 0.001));
+    },
+  );
+
   test('long MiMo MP3 capture retains all provider audio events', () async {
     final fixture = await ProviderPlaybackFixture.load(
       manifestAsset: 'assets/fixtures/mimo_mp3/long_continuous/manifest.json',

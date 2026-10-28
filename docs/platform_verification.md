@@ -38,3 +38,17 @@ Python fixture-tool tests passed. Dart-core line coverage was 76.59% and
 Flutter-adapter line coverage was 77.37%, both above the 76% CI baseline.
 These are local debug results; they do not establish Windows/mobile/Web
 playback support or acoustic quality. No live provider request was made.
+
+An additional explicit Edge TTS capture later on 2026-10-28 succeeded with
+`dart_edge_tts` commit `cd02058c512e1beca5ec69eb83889304e97ea182`.
+Its three new offline macOS cases pass: normal MP3 playback, derived supply-gap
+waiting/recovery, and corrupt MP3 rejection. The asset test verifies complete
+MP3 frame boundaries in all 65 captured events. See the
+[capture details](provider_playback_fixtures.md#captured-edge-mp3-samples-2026-10-28).
+
+The Flutter example's 28 unit/asset/configuration tests also pass after adding
+source selection and local development-key storage. Its explicitly enabled
+`edge_example_live_test.dart` passed on macOS, exercising voice loading,
+fixed-text online synthesis and native playback through the example UI.
+MiMo/Gemini credential interactions are tested offline; this change does not
+claim a new live acceptance result for either paid provider.

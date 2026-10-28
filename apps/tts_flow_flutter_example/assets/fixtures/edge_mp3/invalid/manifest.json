@@ -1,0 +1,21 @@
+{
+  "provider": "edge_mp3",
+  "format": "mp3",
+  "sampleRateHz": 24000,
+  "channels": 1,
+  "kind": "invalid",
+  "chunks": [
+    {
+      "file": "000.bin",
+      "arrivalOffsetMs": 0
+    }
+  ],
+  "provenance": {
+    "type": "hand-authored",
+    "repository": "https://github.com/vonhezhou/dart_edge_tts",
+    "revision": "cd02058c512e1beca5ec69eb83889304e97ea182",
+    "voice": "zh-CN-XiaoxiaoNeural",
+    "capturedAt": "2026-10-28T02:58:23.455079Z",
+    "timing": "deliberately corrupt bytes; valid manifest"
+  }
+}

@@ -1,3 +1,5 @@
+import 'dart:io';
+
 import 'package:flutter/material.dart';
 import 'package:logging/logging.dart';
 import 'package:logging_appenders/logging_appenders.dart';
@@ -14,13 +16,18 @@ void main(List<String> args) {
   PrintAppender(formatter: ColorFormatter()).attachToLogger(Logger.root);
 
   runApp(
-    const MyApp(
-      mimoApiKey: _mimoApiKey,
-      geminiApiKey: _geminiApiKey,
-      ttsSource: _ttsSource,
+    MyApp(
+      mimoApiKey: _environmentValue(_mimoApiKey, 'MIMO_API_KEY'),
+      geminiApiKey: _environmentValue(_geminiApiKey, 'GEMINI_API_KEY'),
+      ttsSource: _environmentValue(_ttsSource, 'TTS_SOURCE'),
     ),
   );
 }
+
+String _environmentValue(String defined, String name) =>
+    defined.trim().isNotEmpty
+    ? defined.trim()
+    : Platform.environment[name] ?? '';
 
 class MyApp extends StatelessWidget {
   const MyApp({
