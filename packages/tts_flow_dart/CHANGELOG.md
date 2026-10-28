@@ -1,5 +1,10 @@
 # Changelog
 
+## Unreleased
+
+- Refresh `meta`, test, lint and coverage dependency constraints to the current
+  workspace-compatible versions; coverage uses 1.16.
+
 ## 0.2.0
 
 - Removed the Azure and OpenAI adapter packages and their example integrations;

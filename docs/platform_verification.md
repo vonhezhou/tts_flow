@@ -52,3 +52,35 @@ source selection and local development-key storage. Its explicitly enabled
 fixed-text online synthesis and native playback through the example UI.
 MiMo/Gemini credential interactions are tested offline; this change does not
 claim a new live acceptance result for either paid provider.
+
+## SDK refresh (2026-10-28)
+
+The workspace now pins Flutter 3.47.8 / Dart 3.13.7 in `.fvmrc`; all CI setup
+steps read that file. Melos 8.10 recognizes all six workspace packages and runs
+the existing scripts without configuration migration. Direct dependencies
+were upgraded and their constraints tightened to the newest jointly resolvable
+versions. SDK/upstream-pinned transitive dependencies remain compatible without
+`dependency_overrides`; published-library SDK minimums are unchanged.
+
+All 258 Dart/Flutter tests, nine Python fixture-tool tests and strict workspace
+analysis passed on the new SDK. The upgraded coverage 1.16 collector and LCOV
+formatter produced 76.59% Dart-core and 77.37% Flutter-adapter line coverage,
+both above the unchanged 76% baseline.
+
+The first sequential native control run passed four short cases, then failed
+while ingesting the long MiMo MP3 with a generic `internalError`. That initial
+error did not retain enough diagnostic detail to establish its underlying
+cause. The regression now reports the nested cause, recent Source reads,
+waiting indices and native player state on failure, without changing its
+timeouts or success assertions. An isolated diagnostic run passed: all 137
+Sources were read, played duration was 43.840 seconds, and gaps after Sources
+34, 69 and 104 recovered. This isolated pass alone does not establish that the
+first failure has been fixed.
+
+The subsequent complete control sequence also passed all five cases, including
+the same 137-Source long sample and all three recoveries. Final native results
+on Flutter 3.47.8: 34 jitter/format cases, five playback-control cases, two
+native Decoder cases and one example UI/control case passed (42 total).
+The initial failure remains unattributed; neither timeouts nor assertions were
+relaxed to obtain these results. These local macOS checks do not establish
+Windows/mobile/Web playback support or acoustic quality.

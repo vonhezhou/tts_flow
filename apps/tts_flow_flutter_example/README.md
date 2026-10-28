@@ -4,7 +4,9 @@ Deterministic playback and online-TTS integration example for
 `tts_flow_flutter`.
 
 Development in this workspace requires Flutter 3.47 / Dart 3.13 or newer
-(analysis-tooling baseline). CI and local native regressions use Flutter 3.47.7.
+(analysis-tooling baseline). CI and local native regressions use Flutter 3.47.8
+/ Dart 3.13.7, pinned by the repository's `.fvmrc`. Prefix Flutter/Dart commands
+below with `fvm` when your global SDK differs.
 
 ## JustAudio 受控抖动回归
 

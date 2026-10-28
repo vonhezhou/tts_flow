@@ -29,10 +29,19 @@ an experimental Edge source, restricted to the demonstration app.
 ## Automated checks
 
 Workspace development requires Dart 3.13 / Flutter 3.47 or newer because
-`very_good_analysis 11` requires Dart 3.13; CI uses Flutter 3.47.7.
+`very_good_analysis 11` requires Dart 3.13. Local development and CI share the
+Flutter 3.47.8 pin in [`.fvmrc`](./.fvmrc) (Dart 3.13.7).
 This tooling requirement does not raise the published core/Flutter libraries'
 runtime SDK minimum. The Gemini adapter separately requires Dart 3.12 for
 `googleai_dart 13`.
+
+Use `fvm flutter pub get` and `fvm dart run melos run check` in this workspace.
+Install the pinned SDK with `fvm install` first. CI reads `.fvmrc` through
+`flutter-action`; it does not require installing FVM. The shared workspace
+resolution uses Melos 8.10 and coverage 1.16. Flutter SDK-pinned dependencies
+remain on the compatible versions reported by `fvm flutter pub outdated`.
+If a configured artifact mirror has not synchronized this patch yet, install
+with `FLUTTER_STORAGE_BASE_URL=https://storage.flutter-io.cn fvm install`.
 
 - `CI` runs static analysis, package unit tests, and example asset/reader tests
   plus Python fixture-tool tests on pull requests and pushes to `main`.

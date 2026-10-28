@@ -114,7 +114,21 @@ void main() {
     await probe.flow.init();
     final request = probe.speak();
     // 交付受播放门控，合成回放本身约 44 秒，不能沿用短样本的 15 秒期限。
-    await request.chunks.drain<void>().timeout(const Duration(seconds: 75));
+    try {
+      await request.chunks.drain<void>().timeout(const Duration(seconds: 75));
+    } catch (error) {
+      fail(
+        'Long MP3 ingestion failed: $error; '
+        'cause=${error is TtsError ? error.cause : null}; '
+        'readCount=${probe.reads.length}, '
+        'lastReads=${probe.reads.reversed.take(5).map((e) => e.index).toList()}, '
+        'waiting=${probe.waits.map((e) => e.index).toList()}, '
+        'state=${probe.backend.player.processingState}, '
+        'playing=${probe.backend.player.playing}, '
+        'position=${probe.backend.player.position}, '
+        'sourceCount=${probe.backend.player.audioSources.length}',
+      );
+    }
     await probe.waitForCompletion(request);
     expect(probe.failures, isEmpty);
     expect(probe.reads, hasLength(fixture.chunks.length));
