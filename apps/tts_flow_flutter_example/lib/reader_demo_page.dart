@@ -3,6 +3,8 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:tts_flow_dart/tts_flow_dart.dart';
 import 'package:tts_flow_flutter/tts_flow_flutter.dart';
+
+import 'example_ui.dart';
 import 'package:tts_flow_flutter_example/reader/demo_sentence_cue_engine.dart';
 import 'package:tts_flow_flutter_example/reader/reading_session.dart';
 
@@ -90,50 +92,92 @@ class _ReaderDemoPageState extends State<ReaderDemoPage> {
   @override
   Widget build(BuildContext context) {
     final session = _readingSession;
-    return Scaffold(
-      appBar: AppBar(title: const Text('Reader timing demo')),
-      body: Padding(
-        padding: const EdgeInsets.all(24),
-        child: session == null
-            ? Center(child: Text(_status))
-            : Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(_status),
-                  const SizedBox(height: 24),
-                  ValueListenableBuilder<ReadingHighlight?>(
-                    valueListenable: session.highlight,
-                    builder: (context, highlight, _) {
-                      return Text.rich(
-                        _passageSpan(context, highlight),
-                        style: Theme.of(context).textTheme.headlineSmall,
-                      );
-                    },
-                  ),
-                  const SizedBox(height: 16),
-                  Text(
-                    'The demo engine emits sentence cues. Providers without '
-                    'timing fall back to highlighting the request group.',
-                    style: Theme.of(context).textTheme.bodySmall,
-                  ),
-                  const Spacer(),
-                  Wrap(
-                    spacing: 12,
-                    children: [
-                      FilledButton.icon(
-                        onPressed: _isReady ? _startReading : null,
-                        icon: const Icon(Icons.play_arrow),
-                        label: const Text('Read passage'),
-                      ),
-                      OutlinedButton.icon(
-                        onPressed: _isReady ? _stopReading : null,
-                        icon: const Icon(Icons.stop),
-                        label: const Text('Stop'),
-                      ),
-                    ],
-                  ),
-                ],
+    final theme = Theme.of(context);
+    return SingleChildScrollView(
+      padding: const EdgeInsets.fromLTRB(24, 24, 24, 40),
+      child: Center(
+        child: ConstrainedBox(
+          constraints: const BoxConstraints(maxWidth: 960),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                'Follow every sentence.',
+                style: theme.textTheme.headlineSmall,
               ),
+              const SizedBox(height: 8),
+              Text(
+                'A reading demo with playback-synchronized highlighting.',
+                style: theme.textTheme.bodyMedium?.copyWith(
+                  color: theme.colorScheme.onSurfaceVariant,
+                ),
+              ),
+              const SizedBox(height: 28),
+              ExampleSection(
+                title: 'Morning, after the rain',
+                icon: Icons.menu_book_rounded,
+                child: session == null
+                    ? Padding(
+                        padding: const EdgeInsets.symmetric(vertical: 48),
+                        child: Center(child: Text(_status)),
+                      )
+                    : Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          const SizedBox(height: 12),
+                          ValueListenableBuilder<ReadingHighlight?>(
+                            valueListenable: session.highlight,
+                            builder: (context, highlight, _) => Text.rich(
+                              _passageSpan(context, highlight),
+                              style: theme.textTheme.headlineSmall?.copyWith(
+                                height: 1.9,
+                                fontWeight: FontWeight.w400,
+                                letterSpacing: 0,
+                              ),
+                            ),
+                          ),
+                          const SizedBox(height: 32),
+                          Divider(color: theme.colorScheme.outlineVariant),
+                          const SizedBox(height: 16),
+                          Wrap(
+                            spacing: 12,
+                            runSpacing: 12,
+                            children: [
+                              FilledButton.icon(
+                                onPressed: _isReady ? _startReading : null,
+                                icon: const Icon(Icons.play_arrow_rounded),
+                                label: const Text('Read passage'),
+                              ),
+                              OutlinedButton.icon(
+                                onPressed: _isReady ? _stopReading : null,
+                                icon: const Icon(Icons.stop_rounded),
+                                label: const Text('Stop'),
+                              ),
+                            ],
+                          ),
+                        ],
+                      ),
+              ),
+              const SizedBox(height: 20),
+              ExampleSection(
+                title: 'Reading status',
+                icon: Icons.schedule_rounded,
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(_status, style: theme.textTheme.bodyMedium),
+                    const SizedBox(height: 8),
+                    Text(
+                      'The demo engine emits sentence cues. Providers without '
+                      'timing fall back to highlighting the request group.',
+                      style: theme.textTheme.bodySmall,
+                    ),
+                  ],
+                ),
+              ),
+            ],
+          ),
+        ),
       ),
     );
   }
@@ -143,8 +187,10 @@ class _ReaderDemoPageState extends State<ReaderDemoPage> {
       return const TextSpan(text: _passage);
     }
     final activeStyle = TextStyle(
-      backgroundColor: Theme.of(context).colorScheme.primaryContainer,
-      color: Theme.of(context).colorScheme.onPrimaryContainer,
+      backgroundColor: Theme.of(
+        context,
+      ).colorScheme.primary.withValues(alpha: 0.18),
+      color: Theme.of(context).colorScheme.primary,
       fontWeight: FontWeight.w700,
     );
     return TextSpan(

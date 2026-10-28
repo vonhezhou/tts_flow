@@ -38,6 +38,18 @@ The Speaker tab has a `TTS source` selector for Bundled WAV, MiMo, Gemini and
 experimental Edge. Switching sources stops the previous service and initializes
 the selected engine. Playback controls remain scrollable on smaller windows.
 
+The dark workspace uses a two-column Speaker layout on wide windows and a
+single scrollable column on compact screens. Text/playback actions, voice
+settings, playback timelines and event diagnostics are grouped into separate
+panels. The Reader tab shares the same theme and keeps sentence highlighting.
+
+Native UI/control regression (offline; covers 1280 px and 390 px layouts,
+reader controls, speaker pause/resume/stop and source switching):
+
+```sh
+flutter test integration_test/example_ui_test.dart -d macos
+```
+
 ## Android release signing
 
 The checked-in application ID belongs to this demonstration app. A release

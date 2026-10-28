@@ -14,6 +14,7 @@ import 'package:url_launcher/url_launcher.dart';
 
 import 'edge_example_tts_engine.dart';
 import 'example_source_selector.dart';
+import 'example_ui.dart';
 
 part 'tts_flow_example_page_recording_output.dart';
 part 'tts_flow_example_page_service_factory.dart';
@@ -229,7 +230,7 @@ class _TtsFlowExamplePageState extends State<_SpeakerPlaybackPage> {
         _voices = voices;
         _selectedVoiceId = selectedVoiceId;
         _status =
-            'Ready using $_engineLabel. Tap "Speak" to play it through the device speaker. Auxiliary audio: $_outputAudioPath';
+            'Ready using $_engineLabel. Tap "Speak" to play it through the device speaker.';
       });
     } catch (error, stackTrace) {
       _log.severe('Failed to initialize TtsFlow.', error, stackTrace);
@@ -327,10 +328,11 @@ class _TtsFlowExamplePageState extends State<_SpeakerPlaybackPage> {
     }
     _log.info('Stopping current request.');
     final request = _playbackRequest;
+    // 先取消生产，避免关闭播放器期间仍有新分片写入已停止的输出。
+    await request?.stopSynthesis();
     if (request?.hasActivePlayback ?? false) {
       await request!.stopPlayback();
     }
-    await request?.stopSynthesis();
     if (!mounted) {
       return;
     }
@@ -465,132 +467,226 @@ class _TtsFlowExamplePageState extends State<_SpeakerPlaybackPage> {
 
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
-      appBar: AppBar(
-        title: Text('TtsFlow + JustAudioBackend ($_engineLabel)'),
-        backgroundColor: Theme.of(context).colorScheme.inversePrimary,
+    final theme = Theme.of(context);
+    final textPanel = ExampleSection(
+      title: 'Text to speech',
+      icon: Icons.notes_rounded,
+      trailing: Text(
+        _isReady ? 'Ready' : 'Preparing…',
+        style: theme.textTheme.labelMedium?.copyWith(
+          color: _isReady
+              ? theme.colorScheme.primary
+              : theme.colorScheme.onSurfaceVariant,
+        ),
       ),
-      body: SingleChildScrollView(
-        padding: const EdgeInsets.fromLTRB(16, 16, 16, 24),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            _SourceNotice(source: _source),
-            const SizedBox(height: 12),
-            TextField(
-              controller: _textController,
-              minLines: 2,
-              maxLines: 4,
-              decoration: const InputDecoration(
-                border: OutlineInputBorder(),
-                labelText: 'Text to synthesize',
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          _SourceNotice(source: _source),
+          const SizedBox(height: 20),
+          TextField(
+            controller: _textController,
+            minLines: 6,
+            maxLines: 9,
+            style: theme.textTheme.bodyLarge?.copyWith(height: 1.7),
+            decoration: const InputDecoration(
+              labelText: 'Text to synthesize',
+              alignLabelWithHint: true,
+              hintText: 'Write something you would like to hear…',
+            ),
+          ),
+          const SizedBox(height: 20),
+          Wrap(
+            spacing: 10,
+            runSpacing: 10,
+            children: [
+              FilledButton.icon(
+                onPressed: (_isReady && !_isBusy) ? _speak : null,
+                icon: const Icon(Icons.volume_up_rounded, size: 20),
+                label: const Text('Speak'),
               ),
-            ),
-            const SizedBox(height: 12),
-            _VoiceAndAudioControls(
-              isReady: _isReady,
-              voices: _voices,
-              selectedVoiceId: _selectedVoiceId,
-              voiceLabel: _voiceLabel,
-              onVoiceChanged: _onVoiceChanged,
-              volume: _volume,
-              minVolume: _minVolume,
-              maxVolume: _maxVolume,
-              onVolumeChanged: _onVolumeChanged,
-              speed: _speed,
-              minSpeed: _minSpeed,
-              maxSpeed: _maxSpeed,
-              onSpeedChanged: _onSpeedChanged,
-              pitch: _pitch,
-              minPitch: _minPitch,
-              maxPitch: _maxPitch,
-              onPitchChanged: _onPitchChanged,
-              supportsControl: _supportsControl,
-              sliderValue: _sliderValue,
-              sliderDivisions: _sliderDivisions,
-            ),
-            const SizedBox(height: 12),
-            Wrap(
-              spacing: 8,
-              runSpacing: 8,
-              children: [
-                FilledButton.icon(
-                  onPressed: (_isReady && !_isBusy) ? _speak : null,
-                  icon: const Icon(Icons.volume_up),
-                  label: const Text('Speak'),
+              OutlinedButton.icon(
+                onPressed: _isReady
+                    ? (_isPaused ? _resumePlayback : _pausePlayback)
+                    : null,
+                icon: Icon(
+                  _isPaused ? Icons.play_arrow_rounded : Icons.pause_rounded,
+                  size: 20,
                 ),
-                OutlinedButton.icon(
-                  onPressed: _isReady ? _stopCurrent : null,
-                  icon: const Icon(Icons.stop),
-                  label: const Text('Stop Current'),
+                label: Text(_isPaused ? 'Resume' : 'Pause'),
+              ),
+              OutlinedButton.icon(
+                onPressed: _isReady ? _stopCurrent : null,
+                icon: const Icon(Icons.stop_rounded, size: 20),
+                label: const Text('Stop Current'),
+              ),
+            ],
+          ),
+        ],
+      ),
+    );
+    final voicePanel = _VoiceAndAudioControls(
+      isReady: _isReady,
+      voices: _voices,
+      selectedVoiceId: _selectedVoiceId,
+      voiceLabel: _voiceLabel,
+      onVoiceChanged: _onVoiceChanged,
+      volume: _volume,
+      minVolume: _minVolume,
+      maxVolume: _maxVolume,
+      onVolumeChanged: _onVolumeChanged,
+      speed: _speed,
+      minSpeed: _minSpeed,
+      maxSpeed: _maxSpeed,
+      onSpeedChanged: _onSpeedChanged,
+      pitch: _pitch,
+      minPitch: _minPitch,
+      maxPitch: _maxPitch,
+      onPitchChanged: _onPitchChanged,
+      supportsControl: _supportsControl,
+      sliderValue: _sliderValue,
+      sliderDivisions: _sliderDivisions,
+    );
+    final outputPanel = ExampleSection(
+      title: 'Session & output',
+      icon: Icons.audio_file_outlined,
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(_engineLabel, style: theme.textTheme.labelLarge),
+          const SizedBox(height: 8),
+          Text(_status, style: theme.textTheme.bodySmall),
+          const SizedBox(height: 16),
+          Divider(height: 1, color: theme.colorScheme.outlineVariant),
+          const SizedBox(height: 16),
+          SelectableText(
+            'Audio output: ${_outputAudioPath ?? 'resolving...'}',
+            style: theme.textTheme.bodySmall?.copyWith(
+              fontFamily: 'monospace',
+              fontSize: 11,
+            ),
+          ),
+          const SizedBox(height: 12),
+          TextButton.icon(
+            onPressed: _outputDirPath == null ? null : _openTempOutputDir,
+            icon: const Icon(Icons.folder_open_rounded, size: 18),
+            label: const Text('Open Temp Dir'),
+          ),
+        ],
+      ),
+    );
+    final monitorPanel = ExampleSection(
+      title: 'Playback monitor',
+      icon: Icons.equalizer_rounded,
+      child: Column(
+        children: [
+          _PlaybackTimeline(
+            label: 'PlaybackTimelineReporter',
+            position: _backendPos,
+            duration: _playerDuration,
+          ),
+          const SizedBox(height: 24),
+          _PlaybackTimeline(
+            label: 'just_audio player.positionStream',
+            position: _playerPos,
+            duration: _playerDuration,
+          ),
+        ],
+      ),
+    );
+    return SingleChildScrollView(
+      padding: const EdgeInsets.fromLTRB(24, 8, 24, 32),
+      child: Center(
+        child: ConstrainedBox(
+          constraints: const BoxConstraints(maxWidth: 1232),
+          child: Column(
+            children: [
+              LayoutBuilder(
+                builder: (context, constraints) {
+                  if (constraints.maxWidth < 980) {
+                    return Column(
+                      children: [
+                        textPanel,
+                        const SizedBox(height: 20),
+                        voicePanel,
+                        const SizedBox(height: 20),
+                        monitorPanel,
+                        const SizedBox(height: 20),
+                        outputPanel,
+                      ],
+                    );
+                  }
+                  return Row(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Expanded(
+                        flex: 3,
+                        child: Column(
+                          children: [
+                            textPanel,
+                            const SizedBox(height: 20),
+                            outputPanel,
+                          ],
+                        ),
+                      ),
+                      const SizedBox(width: 20),
+                      Expanded(
+                        flex: 2,
+                        child: Column(
+                          children: [
+                            voicePanel,
+                            const SizedBox(height: 20),
+                            monitorPanel,
+                          ],
+                        ),
+                      ),
+                    ],
+                  );
+                },
+              ),
+              const SizedBox(height: 20),
+              ExampleSection(
+                title: 'Events',
+                icon: Icons.terminal_rounded,
+                trailing: Text(
+                  '${_eventLog.length} events',
+                  style: theme.textTheme.bodySmall,
                 ),
-                OutlinedButton.icon(
-                  onPressed: _isReady
-                      ? (_isPaused ? _resumePlayback : _pausePlayback)
-                      : null,
-                  icon: Icon(_isPaused ? Icons.play_arrow : Icons.pause),
-                  label: Text(_isPaused ? 'Resume' : 'Pause'),
-                ),
-                OutlinedButton.icon(
-                  onPressed: _outputDirPath == null ? null : _openTempOutputDir,
-                  icon: const Icon(Icons.folder_open),
-                  label: const Text('Open Temp Dir'),
-                ),
-              ],
-            ),
-            const SizedBox(height: 12),
-            Text(_status, style: Theme.of(context).textTheme.bodyMedium),
-            const SizedBox(height: 6),
-            SelectableText(
-              'Audio output: ${_outputAudioPath ?? 'resolving...'}',
-              style: Theme.of(context).textTheme.bodySmall,
-            ),
-            const SizedBox(height: 12),
-            Text(
-              'PlaybackTimelineReporter',
-              style: Theme.of(context).textTheme.titleSmall,
-            ),
-            LinearProgressIndicator(
-              value: _progressValue(_backendPos, _playerDuration),
-            ),
-            const SizedBox(height: 4),
-            Text(
-              '${_formatDuration(_backendPos)} / ${_formatDuration(_playerDuration)}',
-              style: Theme.of(context).textTheme.bodySmall,
-            ),
-            const SizedBox(height: 12),
-            Text(
-              'just_audio player.positionStream',
-              style: Theme.of(context).textTheme.titleSmall,
-            ),
-            LinearProgressIndicator(
-              value: _progressValue(_playerPos, _playerDuration),
-            ),
-            const SizedBox(height: 4),
-            Text(
-              '${_formatDuration(_playerPos)} / ${_formatDuration(_playerDuration)}',
-              style: Theme.of(context).textTheme.bodySmall,
-            ),
-            const SizedBox(height: 12),
-            Text('Events', style: Theme.of(context).textTheme.titleMedium),
-            const SizedBox(height: 8),
-            SizedBox(
-              height: 180,
-              child: DecoratedBox(
-                decoration: BoxDecoration(
-                  border: Border.all(color: Theme.of(context).dividerColor),
-                  borderRadius: BorderRadius.circular(8),
-                ),
-                child: ListView.builder(
-                  padding: const EdgeInsets.all(8),
-                  itemCount: _eventLog.length,
-                  itemBuilder: (context, index) {
-                    return Text(_eventLog[index]);
-                  },
+                child: SizedBox(
+                  height: 180,
+                  child: _eventLog.isEmpty
+                      ? Center(
+                          child: Column(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              Icon(
+                                Icons.waves_rounded,
+                                color: theme.colorScheme.outline,
+                                size: 28,
+                              ),
+                              const SizedBox(height: 8),
+                              Text(
+                                'Playback events will appear here.',
+                                style: theme.textTheme.bodySmall,
+                              ),
+                            ],
+                          ),
+                        )
+                      : ListView.separated(
+                          itemCount: _eventLog.length,
+                          separatorBuilder: (_, _) => const SizedBox(height: 8),
+                          itemBuilder: (context, index) => Text(
+                            _eventLog[index],
+                            style: theme.textTheme.bodySmall?.copyWith(
+                              fontFamily: 'monospace',
+                              fontSize: 11,
+                            ),
+                          ),
+                        ),
                 ),
               ),
-            ),
-          ],
+            ],
+          ),
         ),
       ),
     );

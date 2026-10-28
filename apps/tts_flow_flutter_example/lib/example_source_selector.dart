@@ -135,47 +135,107 @@ class _ExampleSourceSelectorState extends State<ExampleSourceSelector> {
     final source = configuration?.source;
     return Column(
       children: [
-        Padding(
-          padding: const EdgeInsets.all(12),
-          child: Row(
-            children: [
-              Expanded(
-                child: DropdownButtonFormField<ExampleTtsSource>(
-                  key: ValueKey(source),
-                  initialValue: source,
-                  decoration: const InputDecoration(labelText: 'TTS source'),
-                  items: ExampleTtsSource.values
-                      .map(
-                        (source) => DropdownMenuItem(
-                          value: source,
-                          child: Text(source.label),
+        Align(
+          alignment: Alignment.center,
+          child: ConstrainedBox(
+            constraints: const BoxConstraints(maxWidth: 1280),
+            child: Padding(
+              padding: const EdgeInsets.fromLTRB(24, 16, 24, 12),
+              child: LayoutBuilder(
+                builder: (context, constraints) => Row(
+                  children: [
+                    if (constraints.maxWidth >= 920) ...[
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(
+                              'Speech playground',
+                              style: Theme.of(context).textTheme.headlineSmall,
+                            ),
+                            const SizedBox(height: 4),
+                            Text(
+                              'Choose a voice. Bring your text to life.',
+                              style: Theme.of(context).textTheme.bodySmall,
+                            ),
+                          ],
                         ),
-                      )
-                      .toList(),
-                  onChanged: _changing
-                      ? null
-                      : (source) {
-                          if (source != null &&
-                              source != configuration?.source) {
-                            _select(source);
-                          }
-                        },
+                      ),
+                      const SizedBox(width: 32),
+                    ],
+                    Expanded(
+                      child: Row(
+                        children: [
+                          Expanded(
+                            child: DropdownButtonFormField<ExampleTtsSource>(
+                              key: ValueKey(source),
+                              initialValue: source,
+                              isExpanded: true,
+                              decoration: const InputDecoration(
+                                labelText: 'TTS source',
+                                prefixIcon: Icon(Icons.hub_outlined, size: 20),
+                              ),
+                              items: ExampleTtsSource.values
+                                  .map(
+                                    (source) => DropdownMenuItem(
+                                      value: source,
+                                      child: Text(source.label),
+                                    ),
+                                  )
+                                  .toList(),
+                              onChanged: _changing
+                                  ? null
+                                  : (source) {
+                                      if (source != null &&
+                                          source != configuration?.source) {
+                                        _select(source);
+                                      }
+                                    },
+                            ),
+                          ),
+                          if (source != null && source.needsApiKey) ...[
+                            const SizedBox(width: 12),
+                            if (constraints.maxWidth < 500)
+                              IconButton.outlined(
+                                tooltip: _environmentKey(source).isNotEmpty
+                                    ? 'Key from environment'
+                                    : 'API Key',
+                                onPressed:
+                                    _changing ||
+                                        _environmentKey(source).isNotEmpty
+                                    ? null
+                                    : () => _select(source, editKey: true),
+                                icon: Icon(
+                                  _environmentKey(source).isNotEmpty
+                                      ? Icons.lock_outline_rounded
+                                      : Icons.key_rounded,
+                                ),
+                              )
+                            else
+                              TextButton.icon(
+                                onPressed:
+                                    _changing ||
+                                        _environmentKey(source).isNotEmpty
+                                    ? null
+                                    : () => _select(source, editKey: true),
+                                icon: const Icon(Icons.key),
+                                label: Text(
+                                  _environmentKey(source).isNotEmpty
+                                      ? 'Key from environment'
+                                      : 'API Key',
+                                  style: Theme.of(
+                                    context,
+                                  ).textTheme.labelMedium,
+                                ),
+                              ),
+                          ],
+                        ],
+                      ),
+                    ),
+                  ],
                 ),
               ),
-              const SizedBox(width: 12),
-              if (source != null && source.needsApiKey)
-                TextButton.icon(
-                  onPressed: _changing || _environmentKey(source).isNotEmpty
-                      ? null
-                      : () => _select(source, editKey: true),
-                  icon: const Icon(Icons.key),
-                  label: Text(
-                    _environmentKey(source).isNotEmpty
-                        ? 'Key from environment'
-                        : 'API Key',
-                  ),
-                ),
-            ],
+            ),
           ),
         ),
         if (_error != null)
