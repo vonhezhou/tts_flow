@@ -60,8 +60,7 @@ may still enforce their own documented provider limits.
 
 `TtsOptions` deliberately has no `timeout` field. A synthesis deadline belongs
 to the transport that can actually cancel it: configure the adapter's own
-`requestTimeout` (`OpenAiClientConfig`, `AzureSpeechConfig`, or
-`MimoTtsEngine`) instead. Use `TtsRequestHandle.stopSynthesis()` for explicit
+`requestTimeout` (`MimoTtsEngine` or `GeminiTtsEngine`) instead. Use `TtsRequestHandle.stopSynthesis()` for explicit
 request cancellation.
 
 ## Audio Negotiation
@@ -275,24 +274,12 @@ Future<void> playWavOrPcm() async {
 
 ## Example
 
-See example flow in example/main.dart.
+See the [Dart example](../../apps/tts_flow_dart_example/lib/main.dart).
+By default it uses `SineTtsEngine`; setting `MIMO_API_KEY` opts into a real
+MiMo request. From `apps/tts_flow_dart_example`, run:
 
-By default the example uses SineTtsEngine. It also depends on the optional
-`tts_flow_openai` adapter and switches to OpenAiTtsEngine when
-OPENAI_API_KEY is set.
-
-Run it with:
-
-```bash
-dart run example/main.dart
-```
-
-Run with OpenAI mode:
-
-```bash
-# PowerShell
-$env:OPENAI_API_KEY="your_key_here"
-dart run example/main.dart
+```sh
+dart run lib/main.dart
 ```
 
 ## MulticastOutput (Multi-output Fanout)

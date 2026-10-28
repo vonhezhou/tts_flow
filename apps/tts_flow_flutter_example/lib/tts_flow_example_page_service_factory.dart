@@ -6,19 +6,13 @@ final class _ExampleServiceFactory {
     required this.usesGemini,
     required this.geminiApiKey,
     required this.usesMimo,
-    required this.usesAzure,
     required this.mimoApiKey,
-    required this.azureSpeechKey,
-    required this.azureSpeechRegion,
   });
 
   final bool usesMimo;
   final bool usesGemini;
   final String geminiApiKey;
-  final bool usesAzure;
   final String mimoApiKey;
-  final String azureSpeechKey;
-  final String azureSpeechRegion;
 
   Future<_ExampleServiceResources> create({
     required JustAudioBackend backend,
@@ -27,9 +21,9 @@ final class _ExampleServiceFactory {
     final outputDirectory = await getTemporaryDirectory();
     final outputAudioPath = p.join(
       outputDirectory.path,
-      usesAzure ? 'tts_flow_example.mp3' : 'tts_flow_example.wav',
+      'tts_flow_example.wav',
     );
-    final sampleAudioPath = (usesMimo || usesAzure || usesGemini)
+    final sampleAudioPath = (usesMimo || usesGemini)
         ? null
         : await _copySampleAudioToTemp(outputDirectory);
     final engine = _createEngine(sampleAudioPath);
@@ -39,9 +33,7 @@ final class _ExampleServiceFactory {
         primary: SpeakerOutput(backend: backend),
         auxiliaries: [
           _RecordingAuxiliaryOutput(
-            output: usesAzure
-                ? Mp3FileOutput(outputAudioPath)
-                : WavFileOutput(outputAudioPath),
+            output: WavFileOutput(outputAudioPath),
             log: log,
           ),
         ],
@@ -73,14 +65,6 @@ final class _ExampleServiceFactory {
   TtsEngine _createEngine(String? sampleAudioPath) {
     if (usesGemini) {
       return GeminiTtsEngine(apiKey: geminiApiKey.trim());
-    }
-    if (usesAzure) {
-      return AzureSpeechTtsEngine(
-        config: AzureSpeechConfig(
-          subscriptionKey: azureSpeechKey.trim(),
-          region: azureSpeechRegion.trim(),
-        ),
-      );
     }
     if (usesMimo) {
       return MimoTtsEngine(apiKey: mimoApiKey.trim());

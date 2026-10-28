@@ -13,13 +13,15 @@ Upgrade the core, Flutter adapter, and any provider adapters together:
 dependencies:
   tts_flow_dart: ^0.2.0
   tts_flow_flutter: ^0.2.0 # Flutter apps only
-  tts_flow_openai: ^0.2.0 # only when used
-  tts_flow_azure: ^0.2.0  # only when used
   tts_flow_mimo: ^0.2.0   # only when used
+  tts_flow_gemini: ^0.2.0 # only when used
 ```
 
 `tts_flow_flutter` is now a publishable public adapter package. It is no
 longer marked `publish_to: none`.
+
+The repository now maintains MiMo and Gemini adapters. Azure and OpenAI
+adapters have been removed from the workspace, examples, and release jobs.
 
 ## Request and output API changes
 

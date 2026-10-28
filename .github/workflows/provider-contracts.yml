@@ -13,49 +13,13 @@ jobs:
   configuration:
     runs-on: ubuntu-latest
     outputs:
-      openai: ${{ steps.availability.outputs.openai }}
-      azure: ${{ steps.availability.outputs.azure }}
       mimo: ${{ steps.availability.outputs.mimo }}
     steps:
       - id: availability
         env:
-          OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
-          AZURE_SPEECH_KEY: ${{ secrets.AZURE_SPEECH_KEY }}
-          AZURE_SPEECH_REGION: ${{ secrets.AZURE_SPEECH_REGION }}
           MIMO_API_KEY: ${{ secrets.MIMO_API_KEY }}
         run: |
-          if [ -n "$OPENAI_API_KEY" ]; then echo 'openai=true' >> "$GITHUB_OUTPUT"; else echo 'openai=false' >> "$GITHUB_OUTPUT"; fi
-          if [ -n "$AZURE_SPEECH_KEY" ] && [ -n "$AZURE_SPEECH_REGION" ]; then echo 'azure=true' >> "$GITHUB_OUTPUT"; else echo 'azure=false' >> "$GITHUB_OUTPUT"; fi
           if [ -n "$MIMO_API_KEY" ]; then echo 'mimo=true' >> "$GITHUB_OUTPUT"; else echo 'mimo=false' >> "$GITHUB_OUTPUT"; fi
-
-  openai:
-    needs: configuration
-    if: ${{ needs.configuration.outputs.openai == 'true' }}
-    runs-on: ubuntu-latest
-    timeout-minutes: 10
-    steps:
-      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
-      - uses: dart-lang/setup-dart@6afc89df92d6eb3834022f73cd65adc8cdfcb92d # v1.8.1
-      - run: dart pub get
-      - run: dart run tool/live_contract_check.dart
-        working-directory: packages/tts_flow_openai
-        env:
-          OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
-
-  azure:
-    needs: configuration
-    if: ${{ needs.configuration.outputs.azure == 'true' }}
-    runs-on: ubuntu-latest
-    timeout-minutes: 10
-    steps:
-      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
-      - uses: dart-lang/setup-dart@6afc89df92d6eb3834022f73cd65adc8cdfcb92d # v1.8.1
-      - run: dart pub get
-      - run: dart run tool/live_contract_check.dart
-        working-directory: packages/tts_flow_azure
-        env:
-          AZURE_SPEECH_KEY: ${{ secrets.AZURE_SPEECH_KEY }}
-          AZURE_SPEECH_REGION: ${{ secrets.AZURE_SPEECH_REGION }}
 
   mimo:
     needs: configuration
@@ -64,8 +28,11 @@ jobs:
     timeout-minutes: 10
     steps:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
-      - uses: dart-lang/setup-dart@6afc89df92d6eb3834022f73cd65adc8cdfcb92d # v1.8.1
-      - run: dart pub get
+      - uses: subosito/flutter-action@1508160852fb97248640997f7cfb38da241df0ba # v2.9.1
+        with:
+          flutter-version: 3.47.7
+          cache: true
+      - run: flutter pub get
       - run: dart run tool/live_contract_check.dart
         working-directory: packages/tts_flow_mimo
         env:

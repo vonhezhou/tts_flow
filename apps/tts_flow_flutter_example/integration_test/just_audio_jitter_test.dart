@@ -165,11 +165,11 @@ void main() {
     timeout: const Timeout(Duration(seconds: 30)),
   );
 
-  group('Synthetic Azure-format MP3 (no live Azure service)', () {
+  group('Synthetic MP3 (offline)', () {
     for (final kind in ['continuous', 'jitter', 'invalid']) {
       test('$kind MP3 replay', () async {
         final fixture = await ProviderPlaybackFixture.load(
-          manifestAsset: 'assets/fixtures/azure_simulated/$kind/manifest.json',
+          manifestAsset: 'assets/fixtures/synthetic_mp3/$kind/manifest.json',
         );
         final result = await _runReplay(
           engine: ProviderPlaybackFixtureEngine(fixture),

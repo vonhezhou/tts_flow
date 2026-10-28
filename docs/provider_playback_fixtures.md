@@ -21,7 +21,7 @@ Each sample has a neighboring JSON manifest with this shape:
 
 ```json
 {
-  "provider": "azure",
+  "provider": "mimo_mp3",
   "format": "mp3",
   "sampleRateHz": 24000,
   "channels": 1,
@@ -71,13 +71,6 @@ shapes used by this repository:
 ```sh
 # Use a dedicated low-privilege test credential. Do not put it in a command,
 # fixture, shell profile committed to Git, or chat message.
-export OPENAI_API_KEY='...'
-python3 tool/capture_provider_fixture.py capture openai
-
-export AZURE_SPEECH_KEY='...'
-export AZURE_SPEECH_REGION='eastasia'
-python3 tool/capture_provider_fixture.py capture azure
-
 export MIMO_API_KEY='...'
 python3 tool/capture_provider_fixture.py capture mimo
 ```
@@ -90,7 +83,7 @@ unreliable local connection:
 
 ```sh
 python3 tool/capture_provider_fixture.py jitter \
-  apps/tts_flow_flutter_example/assets/fixtures/openai/continuous/manifest.json \
+  apps/tts_flow_flutter_example/assets/fixtures/mimo/continuous/manifest.json \
   --gap-after 1 --gap-ms 850
 ```
 
@@ -129,7 +122,6 @@ invalid metadata rejection. The captured samples are also included in
 Verified on macOS on 2026-10-20: continuous playback completes without waiting;
 jitter emits waiting, recovers, and completes once; neither emits playback
 failure. Other native platforms have not been verified with these samples.
-See [Azure setup](azure_speech_setup.md) for the next provider's credentials.
 
 ### Gemini integration status
 
@@ -179,14 +171,14 @@ replays the recorded timing and checks one completion with no playback failure.
 The long sample passed native macOS replay on 2026-10-22; other platforms have
 not been verified for this sample.
 
-### Offline Azure-format samples
+### Offline synthetic MP3 samples
 
-`assets/fixtures/azure_simulated/` contains a locally generated 440 Hz tone,
-encoded to match the adapter's `audio-24khz-48kbitrate-mono-mp3` output
-specification. These are synthetic audio and timing fixtures, **not captured
-Azure responses**, and do not satisfy the live provider capture requirement.
+`assets/fixtures/synthetic_mp3/` contains a locally generated 440 Hz tone,
+encoded at 24 kHz mono / 48 kbps. These are synthetic audio and timing
+fixtures, **not captured provider responses**, and do not satisfy the live
+provider capture requirement.
 The manifests retain `provenance.type: synthetic` and use the distinct provider
-name `azure_simulated` to avoid confusing them with future live captures.
+name `synthetic_mp3` to avoid confusing them with future live captures.
 
 - `continuous`: two chunks, supplied at 0 and 30 ms.
 - `jitter`: the same audio, supplied at 0 and 1530 ms; the first chunk contains
@@ -200,21 +192,14 @@ To regenerate, install `lameenc==1.8.1` in an isolated Python environment and
 run from the repository root:
 
 ```sh
-python3 tool/generate_azure_simulated_fixture.py --overwrite
+python3 tool/generate_synthetic_mp3_fixture.py --overwrite
 ```
 
 Ordinary tests only read the committed fixtures; they do not need the encoder,
-Azure credentials, an Azure subscription, or network access.
+provider credentials or network access.
 Verified on macOS on 2026-10-21: continuous playback completes without waiting;
 jitter emits waiting and recovers to one completion; invalid MP3 emits one
 playback failure and no completion. Other platforms remain unverified.
-
-The Azure package's offline HTTP tests cover request construction, voice-list
-handling, multi-chunk delivery before response completion, sequence/final
-markers, cancellation, authorization failures, throttling/server errors,
-timeouts, and format rejection. Real credentials, service acceptance of SSML,
-actual Azure MP3 encoder behavior and network timing remain unverified until
-the opt-in live contract and real captures can run.
 
 ### Compressed speech coverage (2026-10-22)
 

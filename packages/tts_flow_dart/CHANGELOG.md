@@ -2,6 +2,10 @@
 
 ## 0.2.0
 
+- Removed the Azure and OpenAI adapter packages and their example integrations;
+  maintained online providers are MiMo and Gemini. Historical entries below
+  describe earlier implementations.
+
 - Breaking: `TtsRequestHandle` no longer extends `Stream<TtsChunk>`.
   Consume its sole audio handoff through `handle.chunks`.
 - Breaking: `TtsEngine.maxInputByteSize` is now

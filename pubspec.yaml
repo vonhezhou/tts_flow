@@ -9,9 +9,7 @@ workspace:
   - apps/tts_flow_dart_example
   - apps/tts_flow_flutter_example
   - packages/tts_flow_dart
-  - packages/tts_flow_openai
   - packages/tts_flow_mimo
-  - packages/tts_flow_azure
   - packages/tts_flow_gemini
   - packages/tts_flow_flutter
 
@@ -36,23 +34,23 @@ melos:
       run: dart run melos exec --dir-exists=test --no-flutter -- dart test
 
     test:flutter:
-      run: dart run melos exec --dir-exists=test --scope=tts_flow_flutter -- flutter test
+      run: dart run melos exec --dir-exists=test --flutter -- flutter test
 
     test:integration:macos:
-      run: cd apps/tts_flow_flutter_example && flutter test integration_test/just_audio_jitter_test.dart -d macos
-      description: Run the macOS JustAudio integration regression.
+      run: cd apps/tts_flow_flutter_example && flutter test integration_test/just_audio_jitter_test.dart -d macos && flutter test integration_test/playback_regression_test.dart -d macos
+      description: Run the macOS JustAudio jitter and playback-control regressions.
 
     test:integration:windows:
-      run: cd apps/tts_flow_flutter_example && flutter test integration_test/just_audio_jitter_test.dart -d windows
-      description: Run the Windows JustAudio integration regression.
+      run: cd apps/tts_flow_flutter_example && flutter test integration_test/just_audio_jitter_test.dart -d windows && flutter test integration_test/playback_regression_test.dart -d windows
+      description: Run the Windows JustAudio jitter and playback-control regressions.
 
     check:macos:
       run: >-
         dart run melos exec -- dart analyze . &&
         dart run melos exec --dir-exists=test --no-flutter -- dart test &&
-        dart run melos exec --dir-exists=test --scope=tts_flow_flutter -- flutter test &&
+        dart run melos exec --dir-exists=test --flutter -- flutter test &&
         cd apps/tts_flow_flutter_example &&
-        flutter test integration_test/just_audio_jitter_test.dart -d macos
+        flutter test integration_test/just_audio_jitter_test.dart -d macos && flutter test integration_test/playback_regression_test.dart -d macos
       description: Run all checks plus the macOS JustAudio integration regression.
 
     check:

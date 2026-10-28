@@ -41,7 +41,6 @@ dependencies:
   tts_flow_dart: ^0.2.0
   tts_flow_flutter: ^0.2.0
   tts_flow_mimo: ^0.2.0
-  tts_flow_azure: ^0.2.0
   tts_flow_gemini: ^0.2.0
   path: ^1.9.1
   path_provider: ^2.1.5
@@ -76,9 +75,9 @@ flutter:
     - assets/fixtures/mimo/long_continuous/
     - assets/fixtures/mimo/jitter/
     - assets/fixtures/mimo/invalid/
-    - assets/fixtures/azure_simulated/continuous/
-    - assets/fixtures/azure_simulated/jitter/
-    - assets/fixtures/azure_simulated/invalid/
+    - assets/fixtures/synthetic_mp3/continuous/
+    - assets/fixtures/synthetic_mp3/jitter/
+    - assets/fixtures/synthetic_mp3/invalid/
     - assets/fixtures/gemini/continuous/
     - assets/fixtures/gemini/long_continuous/
     - assets/fixtures/gemini/jitter/

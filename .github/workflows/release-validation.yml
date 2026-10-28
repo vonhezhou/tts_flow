@@ -19,17 +19,15 @@ jobs:
         package:
           - packages/tts_flow_dart
           - packages/tts_flow_flutter
-          - packages/tts_flow_openai
-          - packages/tts_flow_azure
           - packages/tts_flow_mimo
           - packages/tts_flow_gemini
     steps:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
       - uses: subosito/flutter-action@1508160852fb97248640997f7cfb38da241df0ba # v2.9.1
         with:
-          flutter-version: 3.41.0
+          flutter-version: 3.47.7
           cache: true
-      - run: dart pub get
+      - run: flutter pub get
       - run: dart pub publish --dry-run
         working-directory: ${{ matrix.package }}
 
@@ -41,7 +39,7 @@ jobs:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
       - uses: subosito/flutter-action@1508160852fb97248640997f7cfb38da241df0ba # v2.9.1
         with:
-          flutter-version: 3.41.0
+          flutter-version: 3.47.7
           cache: true
       - name: Match tag, pubspec, and changelog
         env:
@@ -50,8 +48,6 @@ jobs:
           case "$RELEASE_TAG" in
             tts_flow_dart-v*) package=packages/tts_flow_dart ;;
             tts_flow_flutter-v*) package=packages/tts_flow_flutter ;;
-            tts_flow_openai-v*) package=packages/tts_flow_openai ;;
-            tts_flow_azure-v*) package=packages/tts_flow_azure ;;
             tts_flow_mimo-v*) package=packages/tts_flow_mimo ;;
             tts_flow_gemini-v*) package=packages/tts_flow_gemini ;;
             *) echo "Unsupported release tag: $RELEASE_TAG" >&2; exit 1 ;;
@@ -61,6 +57,6 @@ jobs:
           test "$version" = "$pubspec_version"
           grep -Eq "^##[[:space:]]+\[?$version\]?([[:space:]]|$)" "$package/CHANGELOG.md"
           echo "PACKAGE=$package" >> "$GITHUB_ENV"
-      - run: dart pub get
+      - run: flutter pub get
       - run: dart pub publish --dry-run
         working-directory: ${{ env.PACKAGE }}

@@ -1,5 +1,5 @@
 {
-  "provider": "azure_simulated",
+  "provider": "synthetic_mp3",
   "format": "mp3",
   "sampleRateHz": 24000,
   "channels": 1,
@@ -16,7 +16,7 @@
   ],
   "provenance": {
     "type": "synthetic",
-    "generator": "tool/generate_azure_simulated_fixture.py",
+    "generator": "tool/generate_synthetic_mp3_fixture.py",
     "encoder": "lameenc==1.8.1",
     "timing": "simulated",
     "bitrateKbps": 48

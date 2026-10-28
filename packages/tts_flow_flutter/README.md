@@ -14,8 +14,8 @@ streaming decoder and should not sit on the latency-critical playback path.
 flutter pub add tts_flow_dart tts_flow_flutter
 ```
 
-Provider engines are separate optional packages, such as `tts_flow_openai`,
-`tts_flow_azure`, and `tts_flow_mimo`.
+Provider engines are separate optional packages, such as `tts_flow_mimo`
+and `tts_flow_gemini`.
 
 ## Quick start
 
@@ -45,7 +45,7 @@ Future<void> main() async {
 
 For a real Flutter application, see
 [`apps/tts_flow_flutter_example`](../../apps/tts_flow_flutter_example). It can
-run with a bundled fixture, MiMo, or Azure Speech.
+run with a bundled fixture, MiMo, or Gemini.
 
 ## Streaming playback contract
 

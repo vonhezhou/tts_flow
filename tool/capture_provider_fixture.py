@@ -20,7 +20,6 @@ import urllib.request
 from dataclasses import dataclass
 from pathlib import Path
 from typing import BinaryIO, Iterable
-from xml.sax.saxutils import escape as xml_escape
 
 
 DEFAULT_TEXT = "This is a provider fixture."
@@ -164,44 +163,6 @@ def _normalize_offsets(chunks: Iterable[CapturedChunk]) -> list[CapturedChunk]:
 
 
 def _request_for(args: argparse.Namespace) -> tuple[AudioMetadata, BinaryIO, bool]:
-    if args.provider == "openai":
-        api_key = _require_env("OPENAI_API_KEY")
-        audio_format = args.format or "mp3"
-        metadata = _metadata("openai", audio_format, args)
-        payload = {
-            "model": args.model or "gpt-4o-mini-tts",
-            "input": args.text,
-            "voice": args.voice or "alloy",
-            "response_format": audio_format,
-        }
-        response = _post(
-            os.environ.get("OPENAI_TTS_ENDPOINT", "https://api.openai.com/v1/audio/speech"),
-            headers={"Authorization": f"Bearer {api_key}", "Content-Type": "application/json"},
-            body=json.dumps(payload).encode(),
-        )
-        return metadata, response, False
-
-    if args.provider == "azure":
-        key = _require_env("AZURE_SPEECH_KEY")
-        region = _require_env("AZURE_SPEECH_REGION")
-        metadata = _metadata("azure", "mp3", args)
-        voice = args.voice or "zh-CN-XiaoxiaoNeural"
-        ssml = (
-            '<speak version="1.0" xml:lang="zh-CN">'
-            f'<voice name="{xml_escape(voice)}">{xml_escape(args.text)}</voice></speak>'
-        )
-        response = _post(
-            f"https://{region}.tts.speech.microsoft.com/cognitiveservices/v1",
-            headers={
-                "Ocp-Apim-Subscription-Key": key,
-                "Content-Type": "application/ssml+xml",
-                "X-Microsoft-OutputFormat": "audio-24khz-48kbitrate-mono-mp3",
-                "User-Agent": "tts-flow-fixture-capture/1.0",
-            },
-            body=ssml.encode(),
-        )
-        return metadata, response, False
-
     api_key = _require_env("MIMO_API_KEY")
     audio_format = args.format or "pcm"
     if audio_format not in ("pcm", "mp3"):
@@ -301,7 +262,7 @@ def parser() -> argparse.ArgumentParser:
     result = argparse.ArgumentParser(description=__doc__)
     commands = result.add_subparsers(dest="command", required=True)
     capture_parser = commands.add_parser("capture", help="Capture a sanitized continuous provider fixture.")
-    capture_parser.add_argument("provider", choices=("openai", "azure", "mimo"))
+    capture_parser.add_argument("provider", choices=("mimo",))
     capture_parser.add_argument("--root", type=Path, default=DEFAULT_ROOT)
     capture_parser.add_argument("--text", default=DEFAULT_TEXT, help="Use only a redistributable, non-user phrase.")
     capture_parser.add_argument("--voice")
