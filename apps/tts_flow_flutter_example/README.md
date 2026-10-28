@@ -3,6 +3,9 @@
 Deterministic playback and online-TTS integration example for
 `tts_flow_flutter`.
 
+Requires Flutter 3.44 / Dart 3.12 or newer (Cupertino Icons 2.0 baseline).
+CI and local native regressions use Flutter 3.47.7.
+
 ## JustAudio 受控抖动回归
 
 该 integration test 使用内置 PCM/WAV 样本，而非真实 Provider 或网络。它会等待
