@@ -9,7 +9,7 @@ environment:
   flutter: ">=3.41.0"
 
 dependencies:
-  audio_decoder: ^0.7.4
+  audio_decoder: ^0.8.1
   flutter:
     sdk: flutter
   just_audio: ^0.10.5

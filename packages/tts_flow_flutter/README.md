@@ -1,5 +1,12 @@
 # tts_flow_flutter
 
+Native complete-payload decoding can be checked offline from
+`apps/tts_flow_flutter_example` with
+`flutter test integration_test/decoder_regression_test.dart -d macos`.
+It uses captured MP3 and verifies full-duration, non-silent 24/16 kHz PCM through
+`audio_decoder 0.8.1`; platform unit tests continue to exercise the converter
+boundary without native plugins.
+
 Flutter playback and optional conversion adapters for `tts_flow_dart`.
 
 `JustAudioBackend` is the low-latency playback path: when the provider and
