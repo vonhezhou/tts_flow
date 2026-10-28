@@ -274,7 +274,10 @@ Future<void> playWavOrPcm() async {
 
 ## Example
 
-See the [Dart example](../../apps/tts_flow_dart_example/lib/main.dart).
+See the [Dart example guide](../../apps/tts_flow_dart_example/README.md) and
+[source](../../apps/tts_flow_dart_example/lib/main.dart). The example subscribes
+to each request's chunks immediately, checks `synthesisResult`, and reports the
+negotiated format. Its offline smoke test runs as part of workspace Dart tests.
 By default it uses `SineTtsEngine`; setting `MIMO_API_KEY` opts into a real
 MiMo request. From `apps/tts_flow_dart_example`, run:
 

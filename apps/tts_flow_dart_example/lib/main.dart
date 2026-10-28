@@ -17,7 +17,6 @@ Future<void> main() async {
         );
 
   final service = TtsFlow(engine: engine, defaultOutput: NullOutput());
-  await service.init();
 
   print(
     useMimo
@@ -38,25 +37,59 @@ Future<void> main() async {
     );
   });
 
-  service.preferredFormat = TtsAudioFormat.pcm;
-  final first = service.speak(
-    'First request uses preferred WAV.',
-    utteranceId: 'example-1',
-  );
+  try {
+    await service.init();
+    service.preferredFormat = TtsAudioFormat.pcm;
+    final first = service.speak(
+      'First request uses preferred PCM.',
+      utteranceId: 'example-1',
+    );
+    // chunks 只有一个消费者；每次 speak 后立即订阅，不缓存整段音频。
+    final firstDone = reportRequest(first);
 
-  service.preferredFormat = TtsAudioFormat.mp3;
-  final second = service.speak(
-    'Second request falls back to compatible format.',
-    utteranceId: 'example-2',
-  );
+    service.preferredFormat = TtsAudioFormat.mp3;
+    final second = service.speak(
+      'Second request falls back to compatible PCM.',
+      utteranceId: 'example-2',
+    );
+    final secondDone = reportRequest(second);
 
-  final firstChunks = await first.chunks.toList();
-  final secondChunks = await second.chunks.toList();
+    await Future.wait([firstDone, secondDone]);
+  } finally {
+    await queueSub.cancel();
+    await requestSub.cancel();
+    await service.dispose();
+  }
+}
 
-  print('first chunks: ${firstChunks.length}');
-  print('second chunks: ${secondChunks.length}');
+Future<void> reportRequest(TtsRequestHandle request) async {
+  var audioChunks = 0;
+  var audioBytes = 0;
+  try {
+    await for (final chunk in request.chunks) {
+      // 语义元数据块不计入音频统计。
+      if (chunk is TtsAudioChunk) {
+        audioChunks++;
+        audioBytes += chunk.bytes.length;
+      }
+    }
+  } catch (error) {
+    stderr.writeln('${request.utteranceId} chunk stream failed: $error');
+  }
 
-  await queueSub.cancel();
-  await requestSub.cancel();
-  await service.dispose();
+  // 流结束不等于输出写入成功，以 synthesisResult 判断终态。
+  switch (await request.synthesisResult) {
+    case TtsSynthesisCompletedResult(:final artifact):
+      print(
+        '${request.utteranceId} completed: '
+        'format=${artifact.audioSpec.format.name} '
+        'audioChunks=$audioChunks audioBytes=$audioBytes',
+      );
+    case TtsSynthesisStoppedResult(:final reason):
+      stderr.writeln('${request.utteranceId} stopped: ${reason.name}');
+      exitCode = 1;
+    case TtsSynthesisFailedResult(:final error):
+      stderr.writeln('${request.utteranceId} failed: $error');
+      exitCode = 1;
+  }
 }
