@@ -9,7 +9,7 @@ verified.
 | --- | --- | --- |
 | Linux | Flutter unit tests in CI | A real-device playback pass if platform-specific behavior changes |
 | macOS | Weekly/manual `macos-playback.yml` jitter and playback-control integration suites | Record workflow result for a release candidate |
-| Windows | Weekly/manual `windows-playback.yml` jitter and playback-control integration suites | Record workflow result for a release candidate |
+| Windows | Weekly/manual `windows-playback.yml` jitter and playback-control integration suites with OpenAL Soft null output | Record a passing workflow result and verify device output on a Windows host |
 | Android | None in CI | Run deterministic and Provider fixtures on a physical device or emulator |
 | iOS | None in CI | Run deterministic and Provider fixtures on a physical device or simulator |
 | Web | None in CI | Browser-specific manual or automated playback verification |
@@ -22,6 +22,27 @@ runner.
 For the jitter and playback-control regressions, use `dart run melos run
 test:integration:macos` or `dart run melos run test:integration:windows` on
 the corresponding desktop target.
+
+### Headless Windows CI output
+
+The 2026-10-29 Windows run built successfully, then passed 17 jitter/format
+cases and failed 17. The failures reported `There are no playback devices
+available` from WASAPI and `could not open device` from OpenAL, followed by
+`Could not open/initialize audio device -> no sound.` The playback-control
+suite did not run because the first suite failed.
+
+The Windows workflow now sets `ALSOFT_DRIVERS=null` for the regression step.
+After WASAPI finds no device, libmpv can use OpenAL Soft's `No Output` device.
+This backend consumes decoded samples using a real-time clock, preserving
+playback progress, pause/resume, completion and supply-gap checks without a
+physical audio device. `ALSOFT_LOGLEVEL=3` records backend selection for diagnosis.
+These settings are scoped to CI; local Windows runs retain normal device output.
+
+See OpenAL Soft's [environment variables](https://github.com/kcat/openal-soft/blob/master/docs/env-vars.txt)
+and [null backend implementation](https://github.com/kcat/openal-soft/blob/1.23.1/alc/backends/null.cpp).
+This configuration still requires a Windows workflow rerun; it does not establish
+WASAPI compatibility or audible output quality. Verify those on a Windows host
+with a playback device.
 
 ## Local verification (2026-10-28)
 

@@ -21,4 +21,10 @@ jobs:
           flutter-version-file: .fvmrc
           cache: true
       - run: flutter pub get
-      - run: dart run melos run test:integration:windows
+      - name: Run playback regressions with headless audio output
+        # 托管 runner 没有播放设备；OpenAL Soft 的 null 后端按实时时钟消费音频。
+        # 保留 libmpv 解码与播放控制，实际出声仍需有设备的 Windows 宿主验证。
+        env:
+          ALSOFT_DRIVERS: 'null'
+          ALSOFT_LOGLEVEL: '3'
+        run: dart run melos run test:integration:windows
