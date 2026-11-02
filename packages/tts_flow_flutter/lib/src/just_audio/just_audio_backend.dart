@@ -491,6 +491,12 @@ class JustAudioBackend
 
     session.completedSourceIndexes.add(source.index);
     if (!session.isFinalized || !identical(source, session.tailSource)) {
+      // completed 可能在追加操作检查状态后才送达；此时已有下一项，
+      // 必须继续播放，不能将仍有供给的列表留在 completed 状态。
+      if (index < _player.audioSources.length - 1) {
+        await _ensurePlaybackRunning();
+        return;
+      }
       if (!session.isFinalized && !session.isWaitingForNextSource) {
         _playbackWaitingController.add(
           JustAudioPlaybackWaitingEvent(

@@ -452,6 +452,51 @@ void main() {
     );
 
     test(
+      'recovers when completion arrives after the next source is queued',
+      () async {
+        final backend = JustAudioBackend.testing(player: player);
+        addTearDown(backend.dispose);
+        final waiting = <JustAudioPlaybackWaitingEvent>[];
+        final sub = backend.playbackWaitingStream.listen(waiting.add);
+        addTearDown(sub.cancel);
+        final id = await backend.startPlayback(
+          requestKey: 'late-completion',
+          audioSpec: const TtsAudioSpec.mp3(),
+        );
+        await backend.appendChunk(
+          playbackId: id,
+          chunk: _audioChunk(
+            requestKey: 'late-completion',
+            sequenceNumber: 0,
+            bytes: [1, 2],
+          ),
+        );
+        await (sources.single as ChunkAudioSource).request();
+        currentIndex = 0;
+        processingState = ProcessingState.ready;
+        await backend.appendChunk(
+          playbackId: id,
+          chunk: _audioChunk(
+            requestKey: 'late-completion',
+            sequenceNumber: 1,
+            bytes: [3, 4],
+          ),
+        );
+        verifyNever(() => player.seekToNext());
+
+        // 追加时仍为 ready；队列耗尽的通知随后才进入后端操作队列。
+        processingState = ProcessingState.completed;
+        processingController.add(ProcessingState.completed);
+        await Future<void>.delayed(Duration.zero);
+
+        expect(currentIndex, 1);
+        expect(playing, isTrue);
+        expect(waiting, isEmpty);
+        verify(() => player.seekToNext()).called(1);
+      },
+    );
+
+    test(
       'keeps the next segment queued without a waiting event when supply '
       'remains continuous',
       () async {

@@ -24,9 +24,9 @@ void main() {
 
       await request.pausePlayback();
       expect(probe.backend.player.playing, isFalse);
-      // 等待暂停回调落定，再观察位置是否保持；不要求原生时钟绝对不漂移。
-      await Future<void>.delayed(const Duration(milliseconds: 60));
-      final pausedAt = probe.backend.player.position;
+      // pause 返回前只保证本地 playing 更新；原生位置校正可能稍后送达。
+      // 有界等待位置稳定后，再独立观察暂停保持，不放宽漂移阈值。
+      final pausedAt = await probe.waitForPausedPosition();
       await Future<void>.delayed(const Duration(milliseconds: 250));
       expect(
         (probe.backend.player.position - pausedAt).abs().inMilliseconds,
@@ -267,6 +267,21 @@ final class _PlaybackProbe {
         backend.player.position > const Duration(milliseconds: 150),
     'native position advances',
   );
+
+  Future<Duration> waitForPausedPosition() async {
+    var position = backend.player.position;
+    final stable = Stopwatch()..start();
+    await _until(() {
+      expect(backend.player.playing, isFalse);
+      final current = backend.player.position;
+      if (current != position) {
+        position = current;
+        stable.reset();
+      }
+      return stable.elapsed >= const Duration(milliseconds: 300);
+    }, 'paused native position settles');
+    return position;
+  }
 
   Future<void> waitForRead(int index) => _until(
     () => reads.any((e) => e.index == index),
