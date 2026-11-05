@@ -55,6 +55,7 @@ dependencies:
 
 dev_dependencies:
   http: ^1.6.0
+  media_kit: ^1.2.6
   flutter_test:
     sdk: flutter
   integration_test:

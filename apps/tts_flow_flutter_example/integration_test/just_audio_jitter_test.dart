@@ -10,6 +10,7 @@ import 'package:tts_flow_gemini/tts_flow_gemini.dart';
 import 'package:tts_flow_dart/tts_flow_dart.dart';
 import 'package:tts_flow_flutter/tts_flow_flutter.dart';
 
+import 'support/native_test_audio.dart';
 import 'support/provider_playback_fixture.dart';
 
 const _sampleAudioAsset = 'assets/audio/test_audio_yanfei.wav';
@@ -17,6 +18,7 @@ const _utteranceId = 'just-audio-jitter-regression';
 
 void main() {
   IntegrationTestWidgetsFlutterBinding.ensureInitialized();
+  configureNativeTestAudio();
 
   group('Fragmented encoded stream', () {
     for (final provider in ['derived_aac', 'derived_opus']) {
@@ -246,6 +248,7 @@ void main() {
 
   group('JustAudioBackend controlled jitter', () {
     test('the PCM/WAV fixture plays through AssetAudioSource', () async {
+      JustAudioBackend.ensureInitialized();
       final player = AudioPlayer();
       addTearDown(player.dispose);
       final errors = <PlayerException>[];
@@ -253,7 +256,14 @@ void main() {
       addTearDown(errorSub.cancel);
 
       await player.setAsset(_sampleAudioAsset);
-      await player.play().timeout(const Duration(seconds: 15));
+      // Windows 适配器的 play Future 在启动后即返回，以状态流判断真正结束。
+      final completed = player.processingStateStream.firstWhere(
+        (state) => state == ProcessingState.completed,
+      );
+      await Future.wait<void>([
+        player.play(),
+        completed.then((_) {}),
+      ]).timeout(const Duration(seconds: 15));
 
       expect(errors, isEmpty);
       expect(player.processingState, ProcessingState.completed);
@@ -378,11 +388,25 @@ Future<_ReplayResult> _runReplay({
       );
     }
 
-    await _waitForPlaybackTerminalEvent(
-      timeout: playbackTimeout,
-      playbackCompletedEvents: playbackCompletedEvents,
-      playbackFailedEvents: playbackFailedEvents,
-    );
+    try {
+      await _waitForPlaybackTerminalEvent(
+        timeout: playbackTimeout,
+        playbackCompletedEvents: playbackCompletedEvents,
+        playbackFailedEvents: playbackFailedEvents,
+      );
+    } on TimeoutException catch (error) {
+      throw TimeoutException(
+        '${error.message}; states=$playerStates, '
+        'index=${backend.player.currentIndex}, '
+        'sources=${backend.player.audioSources.length}, '
+        'position=${backend.player.position}, '
+        'duration=${backend.player.duration}, '
+        'playing=${backend.player.playing}, '
+        'waiting=${waitingEvents.map((event) => event.sourceIndex).toList()}, '
+        'errors=${_describeBackendErrors(backendErrors)}',
+        playbackTimeout,
+      );
+    }
 
     return _ReplayResult(
       requestKey: requestKey,

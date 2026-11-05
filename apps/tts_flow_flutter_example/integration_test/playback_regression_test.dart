@@ -7,10 +7,12 @@ import 'package:integration_test/integration_test.dart';
 import 'package:tts_flow_dart/tts_flow_dart.dart';
 import 'package:tts_flow_flutter/tts_flow_flutter.dart';
 
+import 'support/native_test_audio.dart';
 import 'support/provider_playback_fixture.dart';
 
 void main() {
   IntegrationTestWidgetsFlutterBinding.ensureInitialized();
+  configureNativeTestAudio();
 
   for (final provider in ['mimo', 'mimo_mp3']) {
     test('$provider native pause resumes finalized audio', () async {

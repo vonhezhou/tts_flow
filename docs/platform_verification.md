@@ -9,7 +9,7 @@ verified.
 | --- | --- | --- |
 | Linux | Flutter unit tests in CI | A real-device playback pass if platform-specific behavior changes |
 | macOS | Weekly/manual `macos-playback.yml` jitter and playback-control integration suites | Record workflow result for a release candidate |
-| Windows | Weekly/manual `windows-playback.yml` jitter and playback-control integration suites with OpenAL Soft null output | Record a passing workflow result and verify device output on a Windows host |
+| Windows | Weekly/manual `windows-playback.yml` jitter and playback-control integration suites with libmpv null output | Record a passing workflow result and verify device output on a Windows host |
 | Android | None in CI | Run deterministic and Provider fixtures on a physical device or emulator |
 | iOS | None in CI | Run deterministic and Provider fixtures on a physical device or simulator |
 | Web | None in CI | Browser-specific manual or automated playback verification |
@@ -31,18 +31,34 @@ available` from WASAPI and `could not open device` from OpenAL, followed by
 `Could not open/initialize audio device -> no sound.` The playback-control
 suite did not run because the first suite failed.
 
-The Windows workflow now sets `ALSOFT_DRIVERS=null` for the regression step.
-After WASAPI finds no device, libmpv can use OpenAL Soft's `No Output` device.
-This backend consumes decoded samples using a real-time clock, preserving
-playback progress, pause/resume, completion and supply-gap checks without a
-physical audio device. `ALSOFT_LOGLEVEL=3` records backend selection for diagnosis.
-These settings are scoped to CI; local Windows runs retain normal device output.
+The initial workaround set `ALSOFT_DRIVERS=null`. On 2026-11-05, the jitter
+suite passed 24 cases and failed ten. OpenAL device initialization errors were
+absent, but playback-end timeouts, unexpected source-list underflows and native
+seek errors remained. This result confirms that the first workaround was
+insufficient; it does not establish the cause of every remaining failure.
 
-See OpenAL Soft's [environment variables](https://github.com/kcat/openal-soft/blob/master/docs/env-vars.txt)
-and [null backend implementation](https://github.com/kcat/openal-soft/blob/1.23.1/alc/backends/null.cpp).
-This configuration still requires a Windows workflow rerun; it does not establish
-WASAPI compatibility or audible output quality. Verify those on a Windows host
-with a playback device.
+The Windows workflow now passes `--dart-define=TTS_FLOW_HEADLESS_AUDIO=true`
+to both test files. Their shared setup enables media_kit's exported
+`NativePlayer.test` switch before player creation. In the resolved media_kit
+1.2.6 implementation, this selects libmpv's own `ao=null` and `vo=null` outputs
+instead of the OpenAL path. Native decoding and the real-time playback clock
+remain active. The startup log identifies this mode with `NATIVE_TEST_AUDIO`.
+The switch is restricted to the Windows tests; local runs without the define
+retain device output. This is an upstream testing API, so review its behavior
+when upgrading media_kit.
+
+The direct WAV test now waits for `ProcessingState.completed` as well as the
+play call: just_audio_media_kit 2.1.0 returns from its platform `play()` after
+starting playback, so that Future alone cannot establish playback completion.
+Playback-end timeouts now report source index/count, position, duration,
+playing state, processing-state history, underflows and native errors.
+The workflow runs the control suite even when the jitter suite fails, while
+preserving the job failure. Cancellation still stops subsequent tests.
+
+This revised configuration requires a Windows workflow rerun to determine
+which remaining failures it resolves. It does not establish WASAPI
+compatibility or audible output quality; verify those on a Windows host with
+a playback device.
 
 ## Local verification (2026-10-28)
 
