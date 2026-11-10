@@ -300,16 +300,9 @@ class JustAudioBackend
       return;
     }
 
-    var target = session.tailSource;
-    if (target == null || target.hasStarted) {
-      target = await _createSegment(session);
-    }
-
-    if (!target.addChunk(chunk.bytes)) {
-      target = await _createSegment(session);
-      if (!target.addChunk(chunk.bytes)) {
-        throw StateError('Unable to buffer bytes for playback: $playbackId');
-      }
+    final target = session.tailSource;
+    if (target == null || !target.addChunk(chunk.bytes)) {
+      await _createSegment(session, initialBytes: chunk.bytes);
     }
 
     session

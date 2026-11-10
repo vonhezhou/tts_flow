@@ -256,6 +256,45 @@ void main() {
       },
     );
 
+    test('PCM segments contain bytes before native preloading', () async {
+      final payloads = <List<int>>[];
+      // 模拟原生播放器在 addAudioSource 返回前立即请求并冻结新片段。
+      when(() => player.addAudioSource(any())).thenAnswer((invocation) async {
+        final source = invocation.positionalArguments.first as ChunkAudioSource;
+        sources.add(source);
+        final response = await source.request();
+        final bytes = await response.stream.expand((chunk) => chunk).toList();
+        payloads.add(bytes.sublist(44));
+      });
+      final backend = JustAudioBackend.testing(player: player);
+      addTearDown(backend.dispose);
+      const spec = TtsAudioSpec.pcm(PcmDescriptor.s16Mono24KHz());
+      final id = await backend.startPlayback(
+        requestKey: 'preloaded-pcm',
+        audioSpec: spec,
+      );
+      for (var index = 0; index < 3; index++) {
+        await backend.appendChunk(
+          playbackId: id,
+          chunk: _audioChunk(
+            requestKey: 'preloaded-pcm',
+            sequenceNumber: index,
+            bytes: [index, index + 1],
+            audioSpec: spec,
+          ),
+        );
+      }
+      await backend.finalizePlayback(playbackId: id);
+
+      expect(payloads, [
+        [0, 1],
+        [1, 2],
+        [2, 3],
+      ]);
+      expect(sources, hasLength(3));
+      expect((sources.last as ChunkAudioSource).isTerminalSegment, isTrue);
+    });
+
     test('buffer option preserves progressive PCM playback', () async {
       final backend = JustAudioBackend.testing(
         player: player,

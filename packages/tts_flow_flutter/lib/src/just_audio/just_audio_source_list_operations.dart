@@ -7,9 +7,10 @@ part of 'just_audio_backend.dart';
 extension _JustAudioSourceListOperations on JustAudioBackend {
   Future<ChunkAudioSource> _createSegment(
     _PlaybackSession session, {
-    List<int>? initialBytes,
+    required List<int> initialBytes,
   }) async {
     final sourceIndex = session.nextIndex;
+    // 原生播放器可能在 addAudioSource 返回前预加载，必须先填好字节。
     final source = ChunkAudioSource(
       audioSpec: session.audioSpec,
       playbackId: session.playbackId,
@@ -29,9 +30,7 @@ extension _JustAudioSourceListOperations on JustAudioBackend {
           ),
         );
       },
-    );
-    // 完整流先填好字节再交给播放器，避免预加载时读取到空文件。
-    if (initialBytes != null) source.addChunk(initialBytes);
+    )..addChunk(initialBytes);
     session.nextIndex++;
 
     session.tailSource = source;
