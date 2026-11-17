@@ -8,8 +8,8 @@ verified.
 | Target | Current regression coverage | Next evidence required |
 | --- | --- | --- |
 | Linux | Flutter unit tests in CI | A real-device playback pass if platform-specific behavior changes |
-| macOS | Weekly/manual `macos-playback.yml` jitter and playback-control integration suites | Record workflow result for a release candidate |
-| Windows | Weekly/manual `windows-playback.yml` jitter and playback-control integration suites with libmpv null output | Record a passing workflow result and verify device output on a Windows host |
+| macOS | Manual `macos-playback.yml` jitter and playback-control integration suites | Record workflow result for a release candidate |
+| Windows | Manual `windows-playback.yml` jitter and playback-control integration suites with libmpv null output | Record a passing workflow result and verify device output on a Windows host |
 | Android | None in CI | Run deterministic and Provider fixtures on a physical device or emulator |
 | iOS | None in CI | Run deterministic and Provider fixtures on a physical device or simulator |
 | Web | None in CI | Browser-specific manual or automated playback verification |
@@ -22,6 +22,106 @@ runner.
 For the jitter and playback-control regressions, use `dart run melos run
 test:integration:macos` or `dart run melos run test:integration:windows` on
 the corresponding desktop target.
+
+## Test boundaries (2026-11-12)
+
+PR and main-branch CI run `melos run check`, fixture-tool tests and coverage.
+Tests under each package's `test/` directory use controlled external boundaries.
+The following contracts are exercised offline.
+
+| Boundary | Controlled dependency | Assertions |
+| --- | --- | --- |
+| MiMo HTTP | Injected mock HTTP client | Endpoint, authentication, request payload, SSE audio decoding, error mapping and client ownership |
+| Gemini HTTP/SDK | Injected HTTP transport | Streaming audio, format validation, errors, cancellation and deadlines |
+| Example Edge client | Injected fake SDK client | Voice/options mapping, audio-event boundaries and cancellation |
+| JustAudioBackend | Injected mock `AudioPlayer`, explicit stream events and completion gates | Source preloading, underflow/recovery, late completion, pause acknowledgement, resume, cleanup, timeline and request attribution |
+| Stream audio source | Direct `ChunkAudioSource.request()` calls | Immutable bytes, MIME type, byte ranges and source-start notification |
+| Provider fixtures | Committed assets | Capture metadata, frame boundaries, byte preservation and arrival-offset validation |
+
+The playback contract covers both an immediately resolved `play()` Future and
+a Future that remains pending while source ingestion and finalization proceed.
+Completion comes from the platform processing-state stream. Pause waits for
+the player's acknowledgement, and resume preserves the queued source. These
+tests control callback ordering without a native audio device or media clock.
+Temporary-file tests also exercise file-output behavior in isolated directories.
+Some deadline, throttling and cancellation tests still use real Dart timers;
+the file-engine cancellation test includes a wall-clock upper bound. Those
+cases remain sensitive to host scheduling and are candidates for virtual-clock
+coverage.
+
+The native suites in `integration_test/` load real player implementations and
+system decoders. Their outcomes depend on runner audio configuration, codec
+support, playback clocks and callback delivery. Windows/macOS workflows now
+run through `workflow_dispatch`; use them for targeted platform diagnosis.
+Their assertions continue to report failures. The separate scheduled
+`Provider live contracts` workflow checks the configured MiMo service against
+its real endpoint.
+
+On the current `d6bc1d6` commit, main CI passed on November 10. The November 12
+Windows scheduled run passed 30 jitter/format cases and failed four; all five
+playback-control cases passed. The November 9 macOS run on `748601f` passed
+33 jitter/format cases and failed one, then skipped the control suite.
+
+The supplied Windows log archive `logs_117009826621.zip` identifies all four
+failures. Three cases completed playback and failed their zero-underflow
+assertion: Gemini SDK mock transport observed one waiting event; MiMo long PCM
+and MiMo continuous PCM each observed two. Captured arrival offsets and mock
+HTTP bodies still run against the native player's clock. These cases now
+validate waiting-event attribution, a unique completion and absence of playback
+failure, following the existing Gemini PCM replay checks. Mock-player unit
+tests cover zero underflow with explicitly controlled source availability.
+
+The fourth case, Gemini continuous PCM, timed out after 15 seconds with
+`index=3`, `sources=5`, `position=duration=320ms`, `playing=true`, and processing
+state `ready`. Its history contained three completed/underflow cycles; the
+diagnostic playback-error list was empty. Native logs also reported failed
+`seek 0 absolute` commands. This remains an unresolved playback stall. Its
+cause requires further platform diagnosis. The headless `ao=null` setup was
+active, and all five playback-control tests passed, including the 137-source
+MP3 case and its three forced-gap recoveries.
+
+- [Main CI run](https://github.com/vonhezhou/tts_flow/actions/runs/42733424877)
+- [Windows run](https://github.com/vonhezhou/tts_flow/actions/runs/43210550132)
+- [macOS run](https://github.com/vonhezhou/tts_flow/actions/runs/42612987219)
+
+### macOS AVFoundation failure (2026-11-16)
+
+The archive `logs_118737931561.zip` records the macOS run on `d6bc1d6` with
+Flutter 3.47.8 and the `macos-26-arm64` image `20261112.0504.1`. The jitter
+suite passed 33 cases and failed `Captured Gemini PCM long fixture plays to
+completion` during ingestion. AVFoundation reported `-11800`, `The operation
+could not be completed`, at source index 2. The processing-state history was
+`idle, loading, buffering, ready, idle`. The playback-control suite was skipped.
+This generic native error does not identify its underlying cause.
+
+The long fixture contains 1,210 PCM chunks of 1,920 bytes each. All chunks
+are aligned for the declared 16-bit mono format. On November 17, a local
+isolated replay and the complete 34-case jitter suite passed on macOS 27.2.1
+with Flutter 3.47.9 / Dart 3.13.7. All 33 Flutter-adapter unit tests also passed.
+The local OS and SDK differ from CI, so these results do not establish a fix
+for the runner failure.
+
+With the added diagnostics, the isolated Gemini long PCM case and both corrupt
+buffered-payload cases passed. Static analysis of both integration test files
+and the formatting check also passed.
+
+Replay failures now include a snapshot from the player's native error stream
+before backend cleanup, with the queue size, current index, position, duration,
+processing state and nearby source sizes/frozen flags. They also include the
+last twelve source-read notifications. macOS runs the playback-control suite
+after a jitter-suite failure unless the job is cancelled, retaining the failed
+job result.
+
+The local five-case control sequence passed four cases, then timed out waiting
+for source 128 in the long MiMo MP3 case. It had read 128 sources and recovered
+from all three forced gaps at sources 34, 69 and 104. Cleanup had already
+removed the queue when the original failure diagnostic ran. Source-read
+timeouts now retain the player's state before synthesis-error cleanup.
+An isolated follow-up passed with all 137 sources, 43.840 seconds of reported
+audio and all three recoveries. The sequence failure remains unresolved, and
+its relationship to the CI PCM failure is unconfirmed.
+
+- [macOS run](https://github.com/vonhezhou/tts_flow/actions/runs/43861592232)
 
 ### Headless Windows CI output
 

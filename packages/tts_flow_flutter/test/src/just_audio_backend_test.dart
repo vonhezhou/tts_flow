@@ -374,32 +374,101 @@ void main() {
       },
     );
 
-    test('does not block chunk ingestion on the play Future', () async {
-      final playCompleter = Completer<void>();
-      when(() => player.play()).thenAnswer((_) => playCompleter.future);
-      final backend = JustAudioBackend.testing(player: player);
-      addTearDown(() async {
-        playCompleter.complete();
-        await backend.dispose();
-      });
+    for (final playReturnsEarly in [true, false]) {
+      test(
+        'completion follows platform state when play Future '
+        '${playReturnsEarly ? 'returns early' : 'remains pending'}',
+        () async {
+          final playCompleter = Completer<void>();
+          if (playReturnsEarly) playCompleter.complete();
+          when(() => player.play()).thenAnswer((_) => playCompleter.future);
+          final backend = JustAudioBackend.testing(player: player);
+          addTearDown(() async {
+            if (!playCompleter.isCompleted) playCompleter.complete();
+            await backend.dispose();
+          });
+          final completions = <SpeakerPlaybackCompletedEvent>[];
+          final sub = backend.playbackCompletedEvents.listen(completions.add);
+          addTearDown(sub.cancel);
 
-      final playbackId = await backend.startPlayback(
-        requestKey: 'non-blocking-play',
-        audioSpec: const TtsAudioSpec.mp3(),
-      );
-      await backend
-          .appendChunk(
+          final playbackId = await backend.startPlayback(
+            requestKey: 'play-future-contract',
+            audioSpec: const TtsAudioSpec.mp3(),
+          );
+          // play 的 Future 可以一直挂起，追加和 finalize 仍须独立完成。
+          await backend.appendChunk(
             playbackId: playbackId,
             chunk: _audioChunk(
-              requestKey: 'non-blocking-play',
+              requestKey: 'play-future-contract',
               sequenceNumber: 0,
               bytes: [1, 2],
             ),
-          )
-          .timeout(const Duration(milliseconds: 100));
+          );
+          await backend.finalizePlayback(playbackId: playbackId);
 
-      expect(sources, hasLength(1));
-      verify(() => player.play()).called(1);
+          expect(sources, hasLength(1));
+          expect(completions, isEmpty);
+          verify(() => player.play()).called(1);
+
+          currentIndex = 0;
+          processingState = ProcessingState.completed;
+          processingController.add(ProcessingState.completed);
+          await Future<void>.delayed(Duration.zero);
+
+          expect(completions, hasLength(1));
+          expect(completions.single.requestKey, 'play-future-contract');
+          expect(completions.single.playbackId, playbackId);
+          expect(sources, isEmpty);
+        },
+      );
+    }
+
+    test('pause awaits acknowledgement and resume retains source', () async {
+      final pauseStarted = Completer<void>();
+      final pauseAcknowledged = Completer<void>();
+      when(() => player.pause()).thenAnswer((_) async {
+        pauseStarted.complete();
+        await pauseAcknowledged.future;
+        playing = false;
+      });
+      final backend = JustAudioBackend.testing(player: player);
+      addTearDown(() async {
+        if (!pauseAcknowledged.isCompleted) pauseAcknowledged.complete();
+        await backend.dispose();
+      });
+      final id = await backend.startPlayback(
+        requestKey: 'pause-resume',
+        audioSpec: const TtsAudioSpec.mp3(),
+      );
+      await backend.appendChunk(
+        playbackId: id,
+        chunk: _audioChunk(
+          requestKey: 'pause-resume',
+          sequenceNumber: 0,
+          bytes: [1, 2],
+        ),
+      );
+      await backend.finalizePlayback(playbackId: id);
+      final source = sources.single;
+      currentIndex = 0;
+      processingState = ProcessingState.ready;
+
+      var pauseReturned = false;
+      final paused = backend.pausePlayback(playbackId: id).then((_) {
+        pauseReturned = true;
+      });
+      await pauseStarted.future;
+      expect(pauseReturned, isFalse);
+      pauseAcknowledged.complete();
+      await paused;
+      expect(playing, isFalse);
+
+      await backend.resumePlayback(playbackId: id);
+      expect(playing, isTrue);
+      expect(sources.single, same(source));
+      verify(() => player.pause()).called(1);
+      verify(() => player.play()).called(2);
+      verifyNever(() => player.seekToNext());
     });
 
     test('stopPlayback is idempotent after an asynchronous cleanup', () async {

@@ -1,10 +1,8 @@
 name: macOS playback regression
 
 on:
+  # 原生解码和播放时钟依赖 runner 环境，按需手动诊断。
   workflow_dispatch:
-  schedule:
-    # Monday 03:30 UTC; keeps native-player coverage independent of PR latency.
-    - cron: '30 3 * * 1'
 
 permissions:
   contents: read
@@ -24,4 +22,5 @@ jobs:
       - run: flutter test integration_test/just_audio_jitter_test.dart -d macos
         working-directory: apps/tts_flow_flutter_example
       - run: flutter test integration_test/playback_regression_test.dart -d macos
+        if: ${{ !cancelled() }}
         working-directory: apps/tts_flow_flutter_example

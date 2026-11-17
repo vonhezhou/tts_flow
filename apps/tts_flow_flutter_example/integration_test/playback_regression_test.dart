@@ -285,10 +285,21 @@ final class _PlaybackProbe {
     return position;
   }
 
-  Future<void> waitForRead(int index) => _until(
-    () => reads.any((e) => e.index == index),
-    'source $index is requested',
-  );
+  Future<void> waitForRead(int index) =>
+      _until(
+        () => reads.any((e) => e.index == index),
+        'source $index is requested',
+      ).onError<TimeoutException>((error, stackTrace) {
+        // 合成失败会触发清理，必须在等待超时的边界保存播放器状态。
+        final player = backend.player;
+        throw TimeoutException(
+          '${error.message}; '
+          'index=${player.currentIndex}, sources=${player.audioSources.length}, '
+          'position=${player.position}, duration=${player.duration}, '
+          'playing=${player.playing}, state=${player.processingState.name}',
+          error.duration,
+        );
+      });
 
   Future<void> waitForUnderflow(int index) => _until(
     () => waits.any((e) => e.index == index),

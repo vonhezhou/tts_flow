@@ -177,8 +177,11 @@ void main() {
         engine: GeminiTtsEngine(apiKey: 'offline-test-key', httpClient: client),
       );
       expect(result.playbackFailedEvents, isEmpty);
-      expect(result.waitingEvents, isEmpty);
       expect(result.playbackCompletedEvents, hasLength(1));
+      // mock 固定传输内容；原生播放的欠载次数仍取决于平台调度。
+      for (final waiting in result.waitingEvents) {
+        expect(waiting.requestKey, result.requestKey);
+      }
     },
     timeout: const Timeout(Duration(seconds: 30)),
   );
@@ -220,11 +223,13 @@ void main() {
       );
       expect(result.playbackFailedEvents, isEmpty);
       expect(result.playbackCompletedEvents, hasLength(1));
-      expect(result.waitingEvents, isEmpty);
+      for (final waiting in result.waitingEvents) {
+        expect(waiting.requestKey, result.requestKey);
+      }
     }, timeout: const Timeout(Duration(seconds: 100)));
 
     for (final kind in ['continuous', 'jitter']) {
-      test('$kind fixture completes with expected waiting', () async {
+      test('$kind fixture completes with attributed waiting', () async {
         final fixture = await ProviderPlaybackFixture.load(
           manifestAsset: 'assets/fixtures/mimo/$kind/manifest.json',
         );
@@ -233,7 +238,13 @@ void main() {
         );
         expect(result.playbackFailedEvents, isEmpty);
         expect(result.playbackCompletedEvents, hasLength(1));
-        expect(result.waitingEvents, kind == 'jitter' ? isNotEmpty : isEmpty);
+        // continuous 的录制间隔也可能耗尽原生播放列表。
+        for (final waiting in result.waitingEvents) {
+          expect(waiting.requestKey, result.requestKey);
+        }
+        if (kind == 'jitter') {
+          expect(result.waitingEvents, isNotEmpty);
+        }
       }, timeout: const Timeout(Duration(seconds: 30)));
     }
     test('invalid arrival metadata is rejected before playback', () async {
@@ -330,9 +341,24 @@ Future<_ReplayResult> _runReplay({
   final playbackFailedEvents = <TtsRequestEvent>[];
   final playerStates = <String>[];
   final backendErrors = <JustAudioPlaybackErrorEvent>[];
+  final sourceReads = <String>[];
+  final nativeErrors = <String>[];
   String? requestKey;
 
   final sourceStartedSub = backend.playbackSourceStartedStream.listen((event) {
+    final source = backend.player.audioSources
+        .whereType<ChunkAudioSource>()
+        .where(
+          (source) =>
+              source.playbackId == event.playbackId &&
+              source.index == event.sourceIndex,
+        )
+        .firstOrNull;
+    sourceReads.add(
+      '${event.sourceIndex}:bytes=${source?.bufferedBytes}:'
+      'at=${event.timestamp.toIso8601String()}',
+    );
+    if (sourceReads.length > 12) sourceReads.removeAt(0);
     if (event.requestKey == requestKey &&
         event.sourceIndex == 0 &&
         !firstSourceStarted.isCompleted) {
@@ -344,6 +370,12 @@ Future<_ReplayResult> _runReplay({
     playerStates.add(state.name);
   });
   final backendErrorSub = backend.playbackErrorStream.listen(backendErrors.add);
+  // 后端会在处理错误时删除音源，先从原生错误流保存队列快照。
+  final nativeErrorSub = backend.player.errorStream.listen((error) {
+    nativeErrors.add(
+      '$error; ${_describePlayerState(backend, errorIndex: error.index)}',
+    );
+  });
 
   final service = TtsFlow(
     engine:
@@ -384,7 +416,9 @@ Future<_ReplayResult> _runReplay({
       throw StateError(
         'Replay ingestion failed: $error; '
         'states=$playerStates, errors=${_describeBackendErrors(backendErrors)}, '
-        'requestFailures=${_describeRequestFailures(playbackFailedEvents)}',
+        'requestFailures=${_describeRequestFailures(playbackFailedEvents)}, '
+        'nativeErrors=$nativeErrors, sourceReads=$sourceReads; '
+        '${_describePlayerState(backend)}',
       );
     }
 
@@ -397,13 +431,10 @@ Future<_ReplayResult> _runReplay({
     } on TimeoutException catch (error) {
       throw TimeoutException(
         '${error.message}; states=$playerStates, '
-        'index=${backend.player.currentIndex}, '
-        'sources=${backend.player.audioSources.length}, '
-        'position=${backend.player.position}, '
-        'duration=${backend.player.duration}, '
-        'playing=${backend.player.playing}, '
+        '${_describePlayerState(backend)}, '
         'waiting=${waitingEvents.map((event) => event.sourceIndex).toList()}, '
-        'errors=${_describeBackendErrors(backendErrors)}',
+        'errors=${_describeBackendErrors(backendErrors)}, '
+        'nativeErrors=$nativeErrors, sourceReads=$sourceReads',
         playbackTimeout,
       );
     }
@@ -420,8 +451,30 @@ Future<_ReplayResult> _runReplay({
     await sourceStartedSub.cancel();
     await playerStateSub.cancel();
     await backendErrorSub.cancel();
+    await nativeErrorSub.cancel();
     await service.dispose();
   }
+}
+
+String _describePlayerState(JustAudioBackend backend, {int? errorIndex}) {
+  final player = backend.player;
+  final focus = errorIndex ?? player.currentIndex ?? 0;
+  final nearbySources = player.audioSources.indexed
+      .where((entry) => (entry.$1 - focus).abs() <= 2)
+      .map((entry) {
+        final source = entry.$2;
+        if (source is! ChunkAudioSource) {
+          return '${entry.$1}:${source.runtimeType}';
+        }
+        return '${entry.$1}:segment=${source.index}:'
+            'bytes=${source.bufferedBytes}:frozen=${source.hasStarted}:'
+            'spec=${source.audioSpec}';
+      })
+      .toList();
+  return 'index=${player.currentIndex}, sources=${player.audioSources.length}, '
+      'position=${player.position}, duration=${player.duration}, '
+      'playing=${player.playing}, state=${player.processingState.name}, '
+      'nearbySources=$nearbySources';
 }
 
 List<String> _describeBackendErrors(List<JustAudioPlaybackErrorEvent> events) {

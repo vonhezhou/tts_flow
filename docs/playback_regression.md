@@ -3,6 +3,10 @@
 这些测试以服务音频分片适合有限 Source 播放为前提，不处理任意压缩字节分片。
 入口为 `apps/tts_flow_flutter_example/integration_test/playback_regression_test.dart`，
 使用已入库的音频，不依赖服务凭据或网络请求。
+Windows/macOS 原生 workflow 通过 `workflow_dispatch` 手动运行，用于平台诊断。
+日常 CI 在 `packages/tts_flow_flutter/test/src/just_audio_backend_test.dart`
+注入 mock `AudioPlayer`，显式控制完成、欠载、错误事件和暂停确认，验证后端契约。
+原生套件继续验证真实解码器、系统播放时钟和平台回调。
 
 ## 覆盖内容
 

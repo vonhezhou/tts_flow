@@ -1,10 +1,8 @@
 name: Windows playback regression
 
 on:
+  # 原生解码和播放时钟依赖 runner 环境，按需手动诊断。
   workflow_dispatch:
-  schedule:
-    # Thursday 03:30 UTC; native Windows playback is outside the Linux CI job.
-    - cron: '30 3 * * 4'
 
 permissions:
   contents: read

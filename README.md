@@ -47,10 +47,12 @@ with `FLUTTER_STORAGE_BASE_URL=https://storage.flutter-io.cn fvm install`.
   plus Python fixture-tool tests on pull requests and pushes to `main`.
   It uploads Dart-core and Flutter-adapter LCOV reports as a workflow artifact
   and rejects either report below the current 76% line-coverage baseline.
-- `macOS playback regression` runs the native JustAudio jitter and
-  playback-control regressions weekly and can be run manually.
-- `Windows playback regression` runs the same native regression suites weekly and can
-  be run manually. Target coverage and the remaining device evidence are
+- `macOS playback regression` provides manually triggered native JustAudio
+  jitter and playback-control diagnostics.
+- `Windows playback regression` provides the same manually triggered native
+  diagnostics. These suites exercise system decoders and playback clocks.
+  Deterministic playback regressions run with a mock `AudioPlayer` in `CI`.
+  Test boundaries, target coverage and the remaining device evidence are
   recorded in [platform verification](./docs/platform_verification.md).
 - `Provider live contracts` runs weekly only when the MiMo GitHub Actions
   secret is configured. It sends a short fixed text and checks that the audio
