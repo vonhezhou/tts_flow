@@ -122,6 +122,7 @@ class JustAudioBackend
     _errorSubscription = _player.errorStream.listen((error) {
       unawaited(_enqueuePlayerOperation(() => _onPlayerError(error)));
     });
+    _subscribeToSourceEnd();
   }
 
   /// Testing constructor that injects a preconfigured player.
@@ -155,6 +156,7 @@ class JustAudioBackend
     _errorSubscription = _player.errorStream.listen((error) {
       unawaited(_enqueuePlayerOperation(() => _onPlayerError(error)));
     });
+    _subscribeToSourceEnd();
   }
 
   /// 收齐一个请求的压缩流后再提交单个文件，适用于任意网络分块。
@@ -214,6 +216,7 @@ class JustAudioBackend
   _playbackSourceStartedController =
       StreamController<JustAudioPlaybackSourceStartedEvent>.broadcast();
   late final StreamSubscription<PlayerException> _errorSubscription;
+  late final StreamSubscription<PlaybackEvent> _sourceEndSubscription;
 
   Future<void> _playerOperationTail = Future<void>.value();
   var _disposeRequested = false;
@@ -350,6 +353,7 @@ class JustAudioBackend
     await _indexSubscription.cancel();
     await _posSubscription.cancel();
     await _errorSubscription.cancel();
+    await _sourceEndSubscription.cancel();
     await _enqueuePlayerOperation(() async {
       await _player.stop();
       await _player.clearAudioSources();

@@ -57,7 +57,37 @@ Their assertions continue to report failures. The separate scheduled
 `Provider live contracts` workflow checks the configured MiMo service against
 its real endpoint.
 
-On the current `d6bc1d6` commit, main CI passed on November 10. The November 12
+### Windows native EOF stall (November 27, 2026)
+
+[Run 45922940401](https://github.com/vonhezhou/tts_flow/actions/runs/45922940401)
+used `7e4e25c`: 33 jitter/format cases passed and Gemini PCM jitter timed out;
+all five playback-control cases passed. The previous three zero-underflow
+assertion failures no longer occurred. The stalled player reported
+`index=3`, `sources=5`, `position=duration=320ms`, `playing=true`, `state=ready`;
+source 4 contained 90,240 bytes but had never been requested. No attributed
+native or backend playback error was emitted.
+
+The installed `just_audio_media_kit` 2.1.0 adapter only forwards native EOF as
+`completed` when its current index is the last playlist entry. Concurrently
+appending another entry can suppress that notification. This is consistent
+with the observed stall, though the exact Windows callback order remains
+unconfirmed. The backend now also advances a queued next source when the
+native `PlaybackEvent.updatePosition` reaches its positive duration while
+ready and playing. It does not infer EOF from interpolated position updates,
+advance paused playback, or synthesize request completion from position alone.
+Queued callbacks recheck source identity and the latest native event.
+
+Mock tests reproduce both append-before-EOF and append-after-EOF failures
+with the old advancement condition and pass with the new condition; they
+also cover stale EOF events, pause, and positions before the source end.
+Local validation passed 36 Flutter unit tests, package static analysis, and
+two macOS native smoke cases (Gemini PCM jitter and invalid Edge MP3).
+Windows verification of this change is still pending; these local results
+do not establish that the Windows stall is resolved.
+
+### Earlier runner observations
+
+On `d6bc1d6`, main CI passed on November 10. The November 12
 Windows scheduled run passed 30 jitter/format cases and failed four; all five
 playback-control cases passed. The November 9 macOS run on `748601f` passed
 33 jitter/format cases and failed one, then skipped the control suite.

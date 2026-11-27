@@ -5,6 +5,32 @@ part of 'just_audio_backend.dart';
 /// Every caller already executes through the backend's serialized
 /// player-operation queue; these helpers must not introduce a second queue.
 extension _JustAudioSourceListOperations on JustAudioBackend {
+  void _subscribeToSourceEnd() {
+    _sourceEndSubscription = _player.playbackEventStream.listen((event) {
+      if (!_player.playing || !_nativeSourceEnded(event)) return;
+      final source = _currentSource();
+      unawaited(
+        _enqueuePlayerOperation(() async {
+          // 排队期间可能已切段或清理会话，旧音源的末尾事件不能推进新音源。
+          if (_player.playing && identical(source, _currentSource())) {
+            await _ensurePlaybackRunning();
+          }
+        }),
+      );
+    });
+  }
+
+  bool _nativeSourceEnded(PlaybackEvent event) {
+    final duration = event.duration;
+    // 使用原生位置，不使用 positionStream 按墙钟插值的预测位置。
+    // media_kit 在追加下一项后可能抑制 completed，但仍上报段尾位置。
+    return event.processingState == ProcessingState.ready &&
+        event.currentIndex == _player.currentIndex &&
+        duration != null &&
+        duration > Duration.zero &&
+        event.updatePosition >= duration;
+  }
+
   Future<ChunkAudioSource> _createSegment(
     _PlaybackSession session, {
     required List<int> initialBytes,
@@ -56,7 +82,8 @@ extension _JustAudioSourceListOperations on JustAudioBackend {
       return;
     }
 
-    if (_player.processingState == ProcessingState.completed &&
+    if ((_player.processingState == ProcessingState.completed ||
+            _nativeSourceEnded(_player.playbackEvent)) &&
         _player.currentIndex != null &&
         _player.currentIndex! < _player.audioSources.length - 1) {
       await _player.seekToNext();

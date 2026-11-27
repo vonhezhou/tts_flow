@@ -458,6 +458,7 @@ Future<_ReplayResult> _runReplay({
 
 String _describePlayerState(JustAudioBackend backend, {int? errorIndex}) {
   final player = backend.player;
+  final nativeEvent = player.playbackEvent;
   final focus = errorIndex ?? player.currentIndex ?? 0;
   final nearbySources = player.audioSources.indexed
       .where((entry) => (entry.$1 - focus).abs() <= 2)
@@ -473,6 +474,9 @@ String _describePlayerState(JustAudioBackend backend, {int? errorIndex}) {
       .toList();
   return 'index=${player.currentIndex}, sources=${player.audioSources.length}, '
       'position=${player.position}, duration=${player.duration}, '
+      'nativePosition=${nativeEvent.updatePosition}, '
+      'nativeDuration=${nativeEvent.duration}, '
+      'nativeUpdateTime=${nativeEvent.updateTime.toIso8601String()}, '
       'playing=${player.playing}, state=${player.processingState.name}, '
       'nearbySources=$nearbySources';
 }
