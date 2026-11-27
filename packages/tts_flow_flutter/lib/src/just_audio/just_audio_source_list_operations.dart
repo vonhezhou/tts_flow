@@ -5,32 +5,6 @@ part of 'just_audio_backend.dart';
 /// Every caller already executes through the backend's serialized
 /// player-operation queue; these helpers must not introduce a second queue.
 extension _JustAudioSourceListOperations on JustAudioBackend {
-  void _subscribeToSourceEnd() {
-    _sourceEndSubscription = _player.playbackEventStream.listen((event) {
-      if (!_player.playing || !_nativeSourceEnded(event)) return;
-      final source = _currentSource();
-      unawaited(
-        _enqueuePlayerOperation(() async {
-          // 排队期间可能已切段或清理会话，旧音源的末尾事件不能推进新音源。
-          if (_player.playing && identical(source, _currentSource())) {
-            await _ensurePlaybackRunning();
-          }
-        }),
-      );
-    });
-  }
-
-  bool _nativeSourceEnded(PlaybackEvent event) {
-    final duration = event.duration;
-    // 使用原生位置，不使用 positionStream 按墙钟插值的预测位置。
-    // media_kit 在追加下一项后可能抑制 completed，但仍上报段尾位置。
-    return event.processingState == ProcessingState.ready &&
-        event.currentIndex == _player.currentIndex &&
-        duration != null &&
-        duration > Duration.zero &&
-        event.updatePosition >= duration;
-  }
-
   Future<ChunkAudioSource> _createSegment(
     _PlaybackSession session, {
     required List<int> initialBytes,
@@ -74,21 +48,35 @@ extension _JustAudioSourceListOperations on JustAudioBackend {
       if (_player.processingState == ProcessingState.completed &&
           _player.currentIndex != null &&
           _player.currentIndex! < _player.audioSources.length - 1) {
-        await _player.seekToNext();
+        await _seekToNextSource();
       } else if (_player.currentIndex == null) {
-        await _player.seek(Duration.zero, index: 0);
+        await _seekToSource(0);
       }
       _startPlayerInBackground();
       return;
     }
 
-    if ((_player.processingState == ProcessingState.completed ||
-            _nativeSourceEnded(_player.playbackEvent)) &&
+    if (_player.processingState == ProcessingState.completed &&
         _player.currentIndex != null &&
         _player.currentIndex! < _player.audioSources.length - 1) {
-      await _player.seekToNext();
+      await _seekToNextSource();
       _startPlayerInBackground();
     }
+  }
+
+  bool get _usesMediaKit =>
+      !kIsWeb &&
+      (defaultTargetPlatform == TargetPlatform.windows ||
+          defaultTargetPlatform == TargetPlatform.linux);
+
+  Future<void> _seekToNextSource() => _usesMediaKit
+      ? _seekToSource(_player.currentIndex! + 1)
+      : _player.seekToNext();
+
+  Future<void> _seekToSource(int index) {
+    // media_kit 的 jump 已从目标片段开头播放，null 避免再发一次 seek(0)。
+    // 2.1.0 适配器会把短片段的 seek 延后到后续长片段，并重置 EOF 状态。
+    return _player.seek(_usesMediaKit ? null : Duration.zero, index: index);
   }
 
   _SourceRange? _findRangeForPlayback(String playbackId) {
@@ -132,7 +120,7 @@ extension _JustAudioSourceListOperations on JustAudioBackend {
         ? _player.audioSources.length - 1
         : removedStart;
     await _player.stop();
-    await _player.seek(Duration.zero, index: nextIndex);
+    await _seekToSource(nextIndex);
     _startPlayerInBackground();
   }
 

@@ -67,23 +67,46 @@ assertion failures no longer occurred. The stalled player reported
 source 4 contained 90,240 bytes but had never been requested. No attributed
 native or backend playback error was emitted.
 
-The installed `just_audio_media_kit` 2.1.0 adapter only forwards native EOF as
-`completed` when its current index is the last playlist entry. Concurrently
-appending another entry can suppress that notification. This is consistent
-with the observed stall, though the exact Windows callback order remains
-unconfirmed. The backend now also advances a queued next source when the
-native `PlaybackEvent.updatePosition` reaches its positive duration while
-ready and playing. It does not infer EOF from interpolated position updates,
-advance paused playback, or synthesize request completion from position alone.
-Queued callbacks recheck source identity and the latest native event.
+The `362e949` attempt added a native-position EOF fallback. However,
+[run 45924894229](https://github.com/vonhezhou/tts_flow/actions/runs/45924894229)
+still failed: 31 jitter/format cases passed, Gemini continuous and jitter
+timed out, and Gemini long PCM raised `RangeError` inside
+`MediaKitPlayer._currentMedia` (`index=140`, playlist length 140). All five
+playback-control cases passed. The new diagnostics showed that the stalled
+native position was **zero**, while just_audio's interpolated position had
+reached the duration. Thus the fallback's central assumption did not match
+this failure. The fallback and its assumption-based tests have been removed.
+The long-fixture exception was newly observed; these logs alone do not prove
+whether the fallback introduced it or exposed an existing adapter race.
 
-Mock tests reproduce both append-before-EOF and append-after-EOF failures
-with the old advancement condition and pass with the new condition; they
-also cover stale EOF events, pause, and positions before the source end.
-Local validation passed 36 Flutter unit tests, package static analysis, and
-two macOS native smoke cases (Gemini PCM jitter and invalid Edge MP3).
-Windows verification of this change is still pending; these local results
-do not establish that the Windows stall is resolved.
+The installed `just_audio_media_kit` 2.1.0 implementation performs a native
+`jump(index)` followed by a position seek for `seek(Duration.zero, index: ...)`.
+If the current duration is less than one second, it retains that seek in
+`_setPosition` until a subsequent duration is at least one second. The delayed
+seek resets native EOF, and its completion callback resets the adapter's
+reported position. This is a concrete unsafe command sequence consistent
+with the observed zero position, though the Windows event order has not
+been reproduced locally.
+
+Windows/Linux source transitions now use `seek(null, index: ...)`: this
+adapter starts the finite source at its beginning without scheduling the
+additional position seek. This applies to initial selection, underflow
+recovery and continuing after source removal. Other platforms retain their
+existing seek behavior. Request completion still requires the native
+processing-state notification; no wall-clock or position fallback is used.
+
+Mock-player contracts verify index-only selection, recovery with either
+playing state, unique completion and removal/next-request handling on both
+Windows and Linux. These contracts fail with the previous seek sequence.
+Local validation passed 39 Flutter unit tests and package static analysis.
+A temporary host test explicitly loaded the real `just_audio_media_kit` 2.1.0
+adapter and `media_kit` 1.2.6 against an existing macOS libmpv binary with
+`ao=null`. Gemini continuous, jitter, long PCM (about 47 seconds), and invalid
+Edge MP3 passed. The native libraries were copied and signed under `/tmp`;
+the dependency cache was not modified. The previous seek sequence also
+passed the two short host replays in a control run. These results validate
+the local adapter contract but do **not** demonstrate that the Windows
+stall or index exception is resolved; Windows CI verification is pending.
 
 ### Earlier runner observations
 

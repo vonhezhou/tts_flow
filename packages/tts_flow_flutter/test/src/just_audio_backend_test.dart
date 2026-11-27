@@ -1,6 +1,8 @@
 import 'dart:async';
 import 'dart:typed_data';
 
+import 'package:flutter/foundation.dart'
+    show TargetPlatform, debugDefaultTargetPlatformOverride;
 import 'package:flutter_test/flutter_test.dart';
 import 'package:just_audio/just_audio.dart';
 import 'package:mocktail/mocktail.dart';
@@ -41,8 +43,6 @@ void main() {
     Duration? nativeDuration;
     late StreamController<Duration> positionController;
     late StreamController<PlayerException> errorController;
-    late StreamController<PlaybackEvent> playbackController;
-    late PlaybackEvent nativeEvent;
     late List<AudioSource> sources;
     late bool playing;
     late ProcessingState processingState;
@@ -56,8 +56,6 @@ void main() {
       nativeDuration = null;
       positionController = StreamController<Duration>.broadcast();
       errorController = StreamController<PlayerException>.broadcast();
-      playbackController = StreamController<PlaybackEvent>.broadcast();
-      nativeEvent = PlaybackEvent();
       sources = <AudioSource>[];
       playing = false;
       processingState = ProcessingState.idle;
@@ -73,10 +71,6 @@ void main() {
         () => player.positionStream,
       ).thenAnswer((_) => positionController.stream);
       when(() => player.errorStream).thenAnswer((_) => errorController.stream);
-      when(
-        () => player.playbackEventStream,
-      ).thenAnswer((_) => playbackController.stream);
-      when(() => player.playbackEvent).thenAnswer((_) => nativeEvent);
       when(() => player.audioSources).thenAnswer((_) => sources);
       when(() => player.playing).thenAnswer((_) => playing);
       when(() => player.processingState).thenAnswer((_) => processingState);
@@ -97,6 +91,11 @@ void main() {
         playing = false;
       });
       when(() => player.seek(any(), index: any(named: 'index'))).thenAnswer((
+        invocation,
+      ) async {
+        currentIndex = invocation.namedArguments[#index] as int?;
+      });
+      when(() => player.seek(null, index: any(named: 'index'))).thenAnswer((
         invocation,
       ) async {
         currentIndex = invocation.namedArguments[#index] as int?;
@@ -129,7 +128,6 @@ void main() {
       await indexController.close();
       await positionController.close();
       await errorController.close();
-      await playbackController.close();
     });
 
     for (final spec in [
@@ -613,101 +611,94 @@ void main() {
       },
     );
 
-    for (final appendAfterEnd in [false, true]) {
-      test('advances at native EOF without completed when append is '
-          '${appendAfterEnd ? 'late' : 'already queued'}', () async {
-        final backend = JustAudioBackend.testing(player: player);
-        addTearDown(backend.dispose);
-        final completions = <SpeakerPlaybackCompletedEvent>[];
-        final sub = backend.playbackCompletedEvents.listen(completions.add);
-        addTearDown(sub.cancel);
-        final id = await backend.startPlayback(
-          requestKey: 'native-eof',
-          audioSpec: const TtsAudioSpec.pcm(PcmDescriptor.s16Mono24KHz()),
-        );
-        Future<void> append(int index) => backend.appendChunk(
-          playbackId: id,
-          chunk: _audioChunk(
-            requestKey: 'native-eof',
-            sequenceNumber: index,
-            bytes: [1, 2],
+    for (final platform in [TargetPlatform.windows, TargetPlatform.linux]) {
+      for (final staysPlaying in [false, true]) {
+        test('${platform.name} recovers underflow without a deferred '
+            'position seek '
+            '(playing=$staysPlaying)', () async {
+          debugDefaultTargetPlatformOverride = platform;
+          addTearDown(() => debugDefaultTargetPlatformOverride = null);
+          final backend = JustAudioBackend.testing(player: player);
+          addTearDown(backend.dispose);
+          final completions = <SpeakerPlaybackCompletedEvent>[];
+          final sub = backend.playbackCompletedEvents.listen(completions.add);
+          addTearDown(sub.cancel);
+          final id = await backend.startPlayback(
+            requestKey: 'media-kit-recovery',
             audioSpec: const TtsAudioSpec.pcm(PcmDescriptor.s16Mono24KHz()),
-          ),
-        );
-        await append(0);
-        await (sources.single as ChunkAudioSource).request();
-        currentIndex = 0;
-        processingState = ProcessingState.ready;
-        if (!appendAfterEnd) await append(1);
-
-        nativeEvent = PlaybackEvent(
-          processingState: ProcessingState.ready,
-          currentIndex: 0,
-          duration: const Duration(milliseconds: 320),
-          updatePosition: const Duration(milliseconds: 320),
-        );
-        playbackController.add(nativeEvent);
-        await Future<void>.delayed(Duration.zero);
-        if (appendAfterEnd) await append(1);
-        await backend.finalizePlayback(playbackId: id);
-
-        expect(currentIndex, 1);
-        verify(() => player.seekToNext()).called(1);
-        expect(completions, isEmpty);
-        // 旧段尾事件不能跳过正在播放的下一段。
-        playbackController.add(nativeEvent);
-        await Future<void>.delayed(Duration.zero);
-        expect(currentIndex, 1);
-        verifyNever(() => player.seekToNext());
-        processingState = ProcessingState.completed;
-        processingController.add(ProcessingState.completed);
-        await Future<void>.delayed(Duration.zero);
-        expect(completions, hasLength(1));
-      });
-    }
-
-    test(
-      'native EOF does not advance while paused or before source end',
-      () async {
-        final backend = JustAudioBackend.testing(player: player);
-        addTearDown(backend.dispose);
-        final id = await backend.startPlayback(
-          requestKey: 'paused-eof',
-          audioSpec: const TtsAudioSpec.mp3(),
-        );
-        for (var i = 0; i < 2; i++) {
-          await backend.appendChunk(
+          );
+          Future<void> append(int sequence) => backend.appendChunk(
             playbackId: id,
             chunk: _audioChunk(
-              requestKey: 'paused-eof',
-              sequenceNumber: i,
+              requestKey: 'media-kit-recovery',
+              sequenceNumber: sequence,
               bytes: [1, 2],
+              audioSpec: const TtsAudioSpec.pcm(PcmDescriptor.s16Mono24KHz()),
             ),
           );
-          await (sources.last as ChunkAudioSource).request();
-        }
-        currentIndex = 0;
-        processingState = ProcessingState.ready;
-        nativeEvent = PlaybackEvent(
-          processingState: ProcessingState.ready,
-          currentIndex: 0,
-          duration: const Duration(milliseconds: 320),
-          updatePosition: const Duration(milliseconds: 319),
-        );
-        playbackController.add(nativeEvent);
-        await Future<void>.delayed(Duration.zero);
-        verifyNever(() => player.seekToNext());
-        await backend.pausePlayback(playbackId: id);
-        nativeEvent = nativeEvent.copyWith(
-          updatePosition: const Duration(milliseconds: 320),
-        );
-        playbackController.add(nativeEvent);
-        await Future<void>.delayed(Duration.zero);
-        expect(playing, isFalse);
-        expect(currentIndex, 0);
-        verifyNever(() => player.seekToNext());
-      },
-    );
+          await append(0);
+          verify(() => player.seek(null, index: 0)).called(1);
+          await (sources.single as ChunkAudioSource).request();
+          processingState = ProcessingState.completed;
+          playing = staysPlaying;
+          processingController.add(ProcessingState.completed);
+          await Future<void>.delayed(Duration.zero);
+
+          await append(1);
+          await backend.finalizePlayback(playbackId: id);
+          expect(currentIndex, 1);
+          expect(playing, isTrue);
+          verify(() => player.seek(null, index: 1)).called(1);
+          verifyNever(() => player.seekToNext());
+          verifyNever(
+            () => player.seek(Duration.zero, index: any(named: 'index')),
+          );
+          expect(completions, isEmpty);
+
+          processingController.add(ProcessingState.completed);
+          await Future<void>.delayed(Duration.zero);
+          expect(completions, hasLength(1));
+          expect(sources, isEmpty);
+        });
+      }
+
+      test(
+        '${platform.name} removal resumes the next request by index only',
+        () async {
+          debugDefaultTargetPlatformOverride = platform;
+          addTearDown(() => debugDefaultTargetPlatformOverride = null);
+          final backend = JustAudioBackend.testing(player: player);
+          addTearDown(backend.dispose);
+          final ids = <String>[];
+          for (final key in ['first', 'second']) {
+            final id = await backend.startPlayback(
+              requestKey: key,
+              audioSpec: const TtsAudioSpec.mp3(),
+            );
+            ids.add(id);
+            await backend.appendChunk(
+              playbackId: id,
+              chunk: _audioChunk(
+                requestKey: key,
+                sequenceNumber: 0,
+                bytes: [1, 2],
+              ),
+            );
+          }
+          verify(() => player.seek(null, index: 0)).called(1);
+          processingState = ProcessingState.ready;
+          await backend.stopPlayback(playbackId: ids.first);
+          expect(sources, hasLength(1));
+          expect((sources.single as ChunkAudioSource).requestKey, 'second');
+          expect(currentIndex, 0);
+          expect(playing, isTrue);
+          verify(() => player.seek(null, index: 0)).called(1);
+          verifyNever(
+            () => player.seek(Duration.zero, index: any(named: 'index')),
+          );
+        },
+      );
+    }
 
     test(
       'keeps the next segment queued without a waiting event when supply '
